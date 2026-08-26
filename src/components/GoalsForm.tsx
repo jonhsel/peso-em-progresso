@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Goals } from "@/types/database";
@@ -18,33 +18,69 @@ export default function GoalsForm({ userId, goals }: { userId: string; goals: Go
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const num = (v: string) => Number(v.replace(",", "."));
+  /** Converte string do input em número. String vazia → NaN (não zero). */
+  const parseRequired = (v: string): number => {
+    const trimmed = v.trim();
+    if (trimmed === "") return NaN;
+    return Number(trimmed.replace(",", "."));
+  };
+
+  const parseOptional = (v: string): number | null => {
+    const trimmed = v.trim();
+    if (trimmed === "") return null;
+    return Number(trimmed.replace(",", "."));
+  };
+
+  // Some com a mensagem "Metas atualizadas" após 3s
+  useEffect(() => {
+    if (!saved) return;
+    const t = setTimeout(() => setSaved(false), 3000);
+    return () => clearTimeout(t);
+  }, [saved]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setSaved(false);
 
-    const payload = {
-      user_id: userId,
-      weekly_loss_kg: num(weekly),
-      monthly_loss_kg: num(monthly),
-      quarterly_loss_kg: num(quarterly),
-      semester_loss_kg: num(semester),
-      target_weight_kg: target ? num(target) : null,
-      updated_at: new Date().toISOString(),
-    };
+    const w = parseRequired(weekly);
+    const m = parseRequired(monthly);
+    const q = parseRequired(quarterly);
+    const s = parseRequired(semester);
+    const t = parseOptional(target);
 
-    if (Object.values(payload).some((v) => typeof v === "number" && (isNaN(v) || v < 0))) {
-      setError("Verifique se todos os valores são números válidos.");
+    const requiredValues = { "Meta semanal": w, "Meta mensal": m, "Meta trimestral": q, "Meta semestral": s };
+    for (const [label, value] of Object.entries(requiredValues)) {
+      if (isNaN(value)) {
+        setError(`${label}: informe um número válido (use ponto ou vírgula).`);
+        return;
+      }
+      if (value < 0) {
+        setError(`${label}: não pode ser negativa.`);
+        return;
+      }
+    }
+
+    if (t !== null && (isNaN(t) || t <= 0 || t >= 500)) {
+      setError("Peso alvo: informe um número entre 0 e 500 kg (ou deixe em branco).");
       return;
     }
 
+    const payload = {
+      user_id: userId,
+      weekly_loss_kg: w,
+      monthly_loss_kg: m,
+      quarterly_loss_kg: q,
+      semester_loss_kg: s,
+      target_weight_kg: t,
+      updated_at: new Date().toISOString(),
+    };
+
     setLoading(true);
-    const { error } = await supabase.from("goals").upsert(payload, { onConflict: "user_id" });
+    const { error: supaError } = await supabase.from("goals").upsert(payload, { onConflict: "user_id" });
     setLoading(false);
 
-    if (error) {
+    if (supaError) {
       setError("Não foi possível salvar as metas.");
       return;
     }

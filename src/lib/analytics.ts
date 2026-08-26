@@ -24,6 +24,19 @@ const GOAL_FIELD: Record<Period, keyof Goals> = {
   semester: "semester_loss_kg",
 };
 
+/**
+ * Horizonte máximo de "frescor" do baseline por período.
+ * Se a última pesagem anterior ao início do período for mais antiga que isso,
+ * o KPI se recusa a projetar (evita comparar peso atual contra uma referência
+ * de meses atrás, que geraria "esperado hoje" absurdo).
+ */
+const BASELINE_MAX_DAYS_BEFORE: Record<Period, number> = {
+  week: 30,
+  month: 60,
+  quarter: 120,
+  semester: 240,
+};
+
 /** Início do período que contém `reference`. Semana começa na segunda-feira. */
 export function periodStart(period: Period, reference: Date): Date {
   switch (period) {
@@ -64,48 +77,67 @@ function toPoints(entries: WeightEntry[]): EntryPoint[] {
 }
 
 /**
- * Pega o peso "base" de um período: a última pesagem registrada
- * ANTES ou NO início do período. Se não houver, usa a primeira pesagem
- * disponível dentro do período (fallback para usuários novos).
+ * Baseline do período:
+ * 1. Última pesagem ANTES ou NO início do período, se estiver dentro do
+ *    horizonte de frescor (ver BASELINE_MAX_DAYS_BEFORE).
+ * 2. Se não houver pesagem prévia recente, usa a primeira pesagem DENTRO do
+ *    período (útil para usuário novo que começou a pesar no meio do período).
+ * 3. Se nada disso existir, retorna null — o KPI mostra "sem dados suficientes"
+ *    em vez de projetar contra referência velha.
  */
-function baselineWeight(points: EntryPoint[], start: Date): number | null {
+function baselineWeight(points: EntryPoint[], start: Date, period: Period): number | null {
+  const maxDaysBefore = BASELINE_MAX_DAYS_BEFORE[period];
+  const earliestAllowed = new Date(start.getTime() - maxDaysBefore * 86_400_000);
+
   let best: EntryPoint | null = null;
   for (const p of points) {
-    if (p.date.getTime() <= start.getTime()) {
+    if (p.date.getTime() <= start.getTime() && p.date.getTime() >= earliestAllowed.getTime()) {
       if (!best || p.date.getTime() > best.date.getTime()) best = p;
     }
   }
   if (best) return best.weight;
 
-  const firstInOrAfter = points.find((p) => p.date.getTime() >= start.getTime());
-  return firstInOrAfter ? firstInOrAfter.weight : null;
+  const firstInPeriod = points.find((p) => p.date.getTime() >= start.getTime());
+  return firstInPeriod ? firstInPeriod.weight : null;
 }
 
 export type TrendResult = {
   slopeKgPerWeek: number;
-  label: "perdendo_rapido" | "perdendo" | "estavel" | "ganhando";
+  label: "perdendo_rapido" | "perdendo" | "estavel" | "ganhando" | "insufficient_data";
   description: string;
 };
 
 /**
  * Tendência via regressão linear simples sobre as últimas `windowDays`.
- * O coeficiente angular (kg/dia) é convertido para kg/semana, que é a
- * unidade mais intuitiva para acompanhamento de peso corporal.
+ * Se houver menos de 2 pesagens na janela, retorna `insufficient_data` em vez
+ * de projetar tendência a partir de pesagens antigas (que induziria o usuário
+ * a acreditar em uma "tendência atual" baseada em dados de meses atrás).
  */
 export function computeTrend(entries: WeightEntry[], windowDays = 21): TrendResult {
   const points = toPoints(entries);
   if (points.length < 2) {
-    return { slopeKgPerWeek: 0, label: "estavel", description: "Dados insuficientes para calcular tendência." };
+    return {
+      slopeKgPerWeek: 0,
+      label: "insufficient_data",
+      description: "Registre ao menos 2 pesagens para calcular a tendência.",
+    };
   }
 
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - windowDays);
   const recent = points.filter((p) => p.date >= cutoff);
-  const sample = recent.length >= 2 ? recent : points.slice(-Math.max(2, Math.min(points.length, 6)));
 
-  const t0 = sample[0].date.getTime();
-  const xs = sample.map((p) => (p.date.getTime() - t0) / 86_400_000); // dias
-  const ys = sample.map((p) => p.weight);
+  if (recent.length < 2) {
+    return {
+      slopeKgPerWeek: 0,
+      label: "insufficient_data",
+      description: `Menos de 2 pesagens nos últimos ${windowDays} dias — pese com mais frequência para ver a tendência atual.`,
+    };
+  }
+
+  const t0 = recent[0].date.getTime();
+  const xs = recent.map((p) => (p.date.getTime() - t0) / 86_400_000); // dias
+  const ys = recent.map((p) => p.weight);
   const n = xs.length;
 
   const sumX = xs.reduce((a, b) => a + b, 0);
@@ -155,6 +187,10 @@ export type PeriodKpi = {
  * KPI central do app: compara o peso atual com o peso "esperado" caso o
  * usuário estivesse seguindo a meta do período de forma linear até hoje.
  * Isso responde diretamente "onde estou vs. onde deveria estar".
+ *
+ * Se não houver baseline confiável (nenhuma pesagem próxima ao início do
+ * período), o KPI reporta status `caution` com "sem dados suficientes" em
+ * vez de projetar a partir de referência velha.
  */
 export function computePeriodKpi(
   entries: WeightEntry[],
@@ -166,7 +202,7 @@ export function computePeriodKpi(
   const start = periodStart(period, now);
   const targetLossKg = Number(goals[GOAL_FIELD[period]] ?? 0);
 
-  const baseline = baselineWeight(points, start);
+  const baseline = baselineWeight(points, start, period);
   const latest = points.length ? points[points.length - 1] : null;
   const current = latest ? latest.weight : null;
 
@@ -191,7 +227,10 @@ export function computePeriodKpi(
 
   if (deltaVsExpected === null) {
     status = "caution";
-    statusLabel = "Sem dados suficientes";
+    statusLabel =
+      current === null
+        ? "Sem pesagens registradas"
+        : "Sem pesagem recente para servir de referência";
   } else if (deltaVsExpected <= -0.15) {
     status = "ahead";
     statusLabel = `${Math.abs(deltaVsExpected).toFixed(2)} kg à frente da meta`;

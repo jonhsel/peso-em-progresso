@@ -42,11 +42,19 @@ signup (`handle_new_user`, `handle_new_user_goals`).
 ### Lógica central (`src/lib/analytics.ts`) — funções puras, sem dependência de React/Supabase
 - `computeTrend(entries)`: regressão linear simples sobre os últimos 21 dias →
   classifica em perdendo_rapido / perdendo / estavel / ganhando, em kg/semana.
+  **Não faz fallback para pesagens fora da janela**: se houver menos de 2 pesagens
+  nos últimos 21 dias, retorna label `insufficient_data` — evita mostrar tendência
+  de meses atrás como se fosse a "atual".
 - `computePeriodKpi(entries, goals, period)`: o KPI principal pedido pelo usuário —
   compara peso atual real vs. "peso esperado hoje" (projeção linear da meta desde o
   baseline do período até agora). Retorna status `ahead | on_pace | caution | behind`
   e o texto explicativo. Funciona tanto para "perdendo menos que a meta" quanto para
   "ganhando peso" (ambos caem em `behind`, com o texto ajustado).
+  **Baseline tem horizonte máximo de frescor** (`BASELINE_MAX_DAYS_BEFORE`): se a
+  última pesagem antes do início do período for muito antiga (>30d para semana,
+  >60d para mês, >120d para trimestre, >240d para semestre) e não houver pesagem
+  dentro do período, o KPI reporta `caution` "sem pesagem recente para servir de
+  referência" em vez de projetar contra dado velho.
 - `computeAllKpis`: roda os 4 períodos de uma vez.
 
 ## Decisões importantes (não reabrir sem motivo)
@@ -70,6 +78,38 @@ signup (`handle_new_user`, `handle_new_user_goals`).
    patcheada contra os CVEs de RSC de dez/2025), `@supabase/ssr@^0.12.5` +
    `@supabase/supabase-js@^2.112.4` (precisam estar alinhados — versões desencontradas
    causaram erros de tipo em `.upsert()` do tipo `never[]`).
+
+## Auditoria de código (sessão de 25/08/2026 — bugs corrigidos)
+
+Auditoria completa apontou 12 achados. Os 4 de maior severidade foram corrigidos
+nesta versão. Detalhes:
+
+**Corrigidos:**
+1. `analytics.ts::baselineWeight` não tinha horizonte — usava pesagem de meses
+   atrás como baseline se o usuário fosse intermitente, gerando "esperado hoje"
+   absurdo. Agora respeita `BASELINE_MAX_DAYS_BEFORE` por período.
+2. `analytics.ts::computeTrend` tinha fallback silencioso para últimos 6 pontos
+   do histórico quando não havia dado nos últimos 21 dias — mostrava tendência
+   de meses atrás como "Tendência (21 dias)". Agora retorna `insufficient_data`
+   nesse caso; `TrendBadge` foi atualizado com o novo label ("Sem dados recentes").
+3. `EntriesList.handleDelete` deletava sem confirmação e sem tratamento de erro.
+   Agora usa `window.confirm()` mostrando peso+data, tem estado `deletingId` para
+   desabilitar o botão durante a operação, e exibe erro visível se o Supabase falhar.
+4. `GoalsForm` — `Number("")` retorna `0`, então campos vazios eram salvos como
+   zero, quebrando cálculo de progresso. Nova função `parseRequired` retorna
+   `NaN` para strings vazias e a validação mostra qual campo está inválido.
+   Também adicionado auto-hide da mensagem "Metas atualizadas" após 3s.
+
+**Pendentes (menor gravidade — ver seção abaixo):**
+- `zod` está no `package.json` mas nunca importado — validar com schema ou remover.
+- Sem tela para editar `profile.display_name` e `profile.height_cm` (colunas mortas).
+- Sem cabeçalhos de segurança (CSP, X-Frame-Options) em `next.config.js`.
+- `WeightEntryForm`: `max` no input date é bypassável — falta validação equivalente
+  no `handleSubmit` para rejeitar `measured_at` no futuro.
+- `NavBar.handleSignOut` ignora erros do `signOut` silenciosamente.
+- `layout.tsx` sem `export const viewport` (padrão App Router do Next 14).
+- `goals.updated_at` no schema sem trigger — hoje funciona porque o cliente envia,
+  fica frágil se aparecer novo caller.
 
 ## Pendências / próximos passos sugeridos (não iniciados)
 

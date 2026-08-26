@@ -5,6 +5,7 @@ const STYLES: Record<TrendResult["label"], { icon: string; color: string; text: 
   perdendo: { icon: "↓", color: "text-signal-onpace", text: "Perdendo peso" },
   estavel: { icon: "→", color: "text-ink-muted", text: "Estável" },
   ganhando: { icon: "↑", color: "text-signal-behind", text: "Ganhando peso" },
+  insufficient_data: { icon: "—", color: "text-ink-faint", text: "Sem dados recentes" },
 };
 
 export default function TrendBadge({ trend }: { trend: TrendResult }) {
