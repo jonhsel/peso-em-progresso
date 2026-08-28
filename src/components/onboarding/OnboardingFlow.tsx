@@ -122,9 +122,9 @@ function StepDots({ current }: { current: number }) {
           key={i}
           className={`h-1.5 rounded-full transition-all ${
             i + 1 === current
-              ? "w-8 bg-signal-onpace"
+              ? "w-8 bg-accent"
               : i + 1 < current
-                ? "w-1.5 bg-signal-onpace/50"
+                ? "w-1.5 bg-accent opacity-50"
                 : "w-1.5 bg-base-border"
           }`}
         />
@@ -142,7 +142,7 @@ function StepWelcome({
 }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-signal-onpace font-mono">
+      <p className="text-xs uppercase tracking-wide text-accent font-mono">
         bem-vindo(a)
       </p>
       <h1 className="mt-3 font-display font-bold text-3xl">
@@ -155,7 +155,7 @@ function StepWelcome({
       </p>
       <button
         onClick={onNext}
-        className="mt-8 w-full rounded-lg bg-signal-onpace text-base-bg font-medium py-3 text-sm hover:brightness-110 transition"
+        className="mt-8 w-full rounded-lg bg-accent text-base-bg font-medium py-3 text-sm hover:bg-accent-hover transition"
       >
         Vamos lá
       </button>
@@ -172,7 +172,7 @@ function StepKpiExplainer({
 }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-signal-onpace font-mono">
+      <p className="text-xs uppercase tracking-wide text-accent font-mono">
         como o app mede
       </p>
       <h2 className="mt-3 font-display font-bold text-2xl">
@@ -211,7 +211,7 @@ function StepKpiExplainer({
         </button>
         <button
           onClick={onNext}
-          className="flex-1 rounded-lg bg-signal-onpace text-base-bg font-medium py-3 text-sm hover:brightness-110 transition"
+          className="flex-1 rounded-lg bg-accent text-base-bg font-medium py-3 text-sm hover:bg-accent-hover transition"
         >
           Entendi, configurar minha meta
         </button>
@@ -241,7 +241,7 @@ function StepFirstGoal({
 }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-signal-onpace font-mono">
+      <p className="text-xs uppercase tracking-wide text-accent font-mono">
         última etapa
       </p>
       <h2 className="mt-3 font-display font-bold text-2xl">
@@ -262,7 +262,7 @@ function StepFirstGoal({
           value={weeklyLossKg}
           onChange={(e) => onWeeklyLossChange(e.target.value)}
           placeholder="0.25"
-          className="w-full rounded-lg bg-base-surface2 border border-base-border px-3 py-2 text-sm outline-none focus:border-signal-onpace"
+          className="w-full rounded-lg bg-base-surface2 border border-base-border px-3 py-2 text-sm outline-none focus:border-accent"
         />
       </label>
 
@@ -276,7 +276,7 @@ function StepFirstGoal({
           value={targetWeightKg}
           onChange={(e) => onTargetWeightChange(e.target.value)}
           placeholder="Deixe em branco se ainda não sabe"
-          className="w-full rounded-lg bg-base-surface2 border border-base-border px-3 py-2 text-sm outline-none focus:border-signal-onpace"
+          className="w-full rounded-lg bg-base-surface2 border border-base-border px-3 py-2 text-sm outline-none focus:border-accent"
         />
       </label>
 
@@ -297,7 +297,7 @@ function StepFirstGoal({
         <button
           onClick={onFinish}
           disabled={loading}
-          className="flex-1 rounded-lg bg-signal-onpace text-base-bg font-medium py-3 text-sm hover:brightness-110 transition disabled:opacity-60"
+          className="flex-1 rounded-lg bg-accent text-base-bg font-medium py-3 text-sm hover:bg-accent-hover transition disabled:opacity-60"
         >
           {loading ? "Salvando…" : "Concluir e ir pro dashboard"}
         </button>

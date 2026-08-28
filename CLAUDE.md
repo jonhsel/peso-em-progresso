@@ -15,10 +15,11 @@ na tela `/dashboard/goals`, não fixas no código.
 
 - Next.js 14 (App Router) + TypeScript, deploy alvo: **Vercel**
 - Banco/Auth: **Supabase** (Postgres + Auth + Row Level Security)
-- UI: Tailwind CSS (tema dark customizado, ver `tailwind.config.ts`) + Recharts para gráficos
+- UI: Tailwind CSS (tema dark/light custom, accent terracota, ver `tailwind.config.ts` +
+  `src/app/globals.css`) + Recharts para gráficos
 - Sem ORM extra — queries via `@supabase-js` / `@supabase/ssr` direto
 
-## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) completos, não validados em produção
+## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -139,6 +140,48 @@ Sem isso, `/onboarding` e o redirect em `loadUserData.ts` quebram em produção.
    porque o `@react-pdf/renderer` não lê classes Tailwind. Se a paleta `signal-*`
    mudar no Tailwind, atualizar esse mapa manualmente também (mesmo padrão de
    sincronização manual já usado em `TrajectoryGraphic.tsx`).
+9. **Accent terracota (`#C1652F` light / `#D97A45` dark) escolhido sobre o azul
+   `signal-onpace` como cor de ação/CTA**, validado visualmente com o usuário em
+   28/08/2026 (Fase 1.2). Todo botão primário, foco de input e indicador de
+   progresso do onboarding que usava `bg-signal-onpace`/`focus:border-signal-onpace`
+   como cor de marca passou a usar `accent`/`accent-hover`. `signal-onpace`
+   continua existindo e é usado onde é genuinamente status de KPI/tendência
+   (`KpiCard`, `TrendBadge`, `KPI_STATUSES`) — não confundir os dois usos ao
+   mexer em cor de botão/link no futuro.
+10. **Toggle de tema é exclusivo do `app.*`** — a landing pública (`/`) não tem
+    `ThemeToggle`, não lê o cookie de tema e não recebe `data-theme` dinâmico;
+    mantém o visual dark fixo atual, decisão confirmada com o usuário. Isso é
+    estrutural: `/login`, `/onboarding` e `/dashboard/*` vivem dentro do route
+    group `src/app/(app)/` (que não afeta a URL), cujo `layout.tsx` lê o cookie
+    e aplica `data-theme` num `<div id="app-theme-root">` — nunca no `<html>`
+    raiz, que é compartilhado com a landing.
+11. **Tema via cookie lido no Server Component** (`src/lib/get-theme.ts`, cookie
+    `peso-theme`) — sem necessidade de script anti-flash (diferente do padrão
+    comum de localStorage + script inline): como o SSR já lê o cookie antes do
+    primeiro paint, o HTML chega correto de primeira. Cookies bloqueados
+    degradam pra `DEFAULT_THEME` (dark) sem erro.
+12. **`signal-*` (status de KPI) permanece com hex fixo**, igual nos dois temas —
+    só o texto dos badges de status (`KpiCard.tsx`, `src/lib/kpi-status.ts`)
+    passou a usar os pares `--badge-*-text` (`globals.css`, via valor arbitrário
+    Tailwind `text-[var(--badge-x-text)]`) em vez de `text-signal-x` puro, pra
+    resolver contraste em fundo claro (`caution` amarelo puro é ~2:1, abaixo do
+    WCAG AA). Em dark os valores são idênticos ao hex antigo, então isso não
+    mudou nada visualmente ali — inclusive no uso de `KPI_STATUSES` pela landing,
+    que reaproveita o mesmo array mas nunca recebe `data-theme`.
+13. **Opacity modifier (`/50` etc.) não funciona em cores Tailwind definidas só
+    como `var(--x)`** (achado durante a Fase 1.2, `tailwindcss@3.4.4`) — gera
+    classe sem regra CSS nenhuma, silenciosamente (ex.: `bg-accent/50` não
+    apareceu no CSS final). Onde precisar de opacidade sobre `accent`/`base-*`/
+    `ink-*`, usar a utilidade `opacity-*` num elemento próprio, ou definir uma
+    var dedicada com o rgba já embutido (como `--accent-glow`, usado no glow do
+    peso atual em `/dashboard`) — nunca `token/NN` direto nessas cores.
+14. **Gráfico de evolução (`WeightChart.tsx`) lê as CSS vars do tema em runtime**
+    via `getComputedStyle`, porque Recharts recebe cor por prop, não por
+    className. Um `MutationObserver` no `#app-theme-root` recalcula as cores
+    quando o `ThemeToggle` alterna `data-theme` (troca que é só DOM, sem
+    re-render de Server Component). A linha/gradiente do peso usa `--accent`
+    (antes era azul fixo); a `ReferenceLine` da meta continua verde fixo
+    (`#34D399`, = `signal-ahead`), por ser status/sucesso, não marca.
 
 ## Auditoria de código (sessão de 25/08/2026 — bugs corrigidos)
 
@@ -212,6 +255,36 @@ projeto, ver `## Pendências`).
 - [ ] Testar as duas rotas deslogado — devem responder 401.
 - [ ] Testar com 0 pesagens — botões somem; acessando a URL direto, CSV sai só com
       cabeçalho e PDF mostra "Nenhuma pesagem registrada ainda."
+
+## Fase 1.2 — Modo escuro/claro, accent terracota (implementada 28/08/2026)
+
+Spec completo em `claude_darkmode.md` (na raiz do repo, não versionado — mesmo
+padrão dos specs anteriores). Implementado nesta sessão: `tsc --noEmit` e
+`npm run build` limpos. Decisões e mecanismo completo documentados em
+"Decisões importantes" (itens 9–14) — resumo:
+
+- `/login`, `/onboarding` e `/dashboard/*` foram movidos para o route group
+  `src/app/(app)/` (URLs inalteradas) para compartilhar `src/app/(app)/layout.tsx`,
+  que lê o cookie `peso-theme` (`src/lib/get-theme.ts`) e aplica `data-theme` num
+  `<div id="app-theme-root">`. A landing (`/`, fora do grupo) não é afetada.
+- `ThemeToggle` (`src/components/NavBar.tsx`) alterna o atributo DOM na hora
+  (feedback instantâneo) e persiste via Server Action (`src/lib/theme-actions.ts`).
+- Tokens novos em `tailwind.config.ts`/`globals.css`: `accent`/`accent-hover`
+  (CTA/marca), `--accent-glow` (glow decorativo), `--badge-*-bg`/`--badge-*-text`
+  (contraste de status em fundo claro). `base`/`ink` viraram CSS vars por tema;
+  `signal-*` continua hex fixo.
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de dev —
+      **ainda não visto rodando num navegador real**, ver itens abaixo).
+- [ ] Alternar tema em `/dashboard`, `/dashboard/entries`, `/dashboard/goals`,
+      `/onboarding`, `/login` — nenhuma cor hardcoded "vazando" o tema errado.
+- [ ] Reload com tema light já setado (cookie presente) — sem flash de dark antes
+      do light.
+- [ ] Cookies bloqueados — degrada pra dark sem erro (comportamento esperado por
+      código, não visto rodando).
+- [ ] Contraste dos 4 badges de status (KpiCard) nos dois temas.
+- [ ] Gráfico Recharts (`WeightChart.tsx`) legível nos dois temas, inclusive
+      alternando o tema com o gráfico já montado (linha/gradiente devem virar
+      terracota, grid/eixos/tooltip devem trocar de cor via o `MutationObserver`).
 
 ## Pendências / próximos passos sugeridos (não iniciados)
 

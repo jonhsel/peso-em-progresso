@@ -109,7 +109,7 @@ export default function GoalsForm({ userId, goals }: { userId: string; goals: Go
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-signal-onpace text-base-bg font-medium py-2.5 text-sm disabled:opacity-60 transition hover:brightness-110"
+        className="w-full rounded-lg bg-accent text-base-bg font-medium py-2.5 text-sm disabled:opacity-60 transition hover:bg-accent-hover"
       >
         {loading ? "Salvando..." : "Salvar metas"}
       </button>
@@ -137,7 +137,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-lg bg-base-surface2 border border-base-border px-3 py-2 text-sm font-mono outline-none focus:border-signal-onpace"
+        className="w-full rounded-lg bg-base-surface2 border border-base-border px-3 py-2 text-sm font-mono outline-none focus:border-accent"
       />
     </div>
   );

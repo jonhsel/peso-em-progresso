@@ -5,22 +5,32 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // base/ink viram CSS vars (definidas por tema em globals.css) porque
+        // mudam entre dark/light. signal-* fica com hex literal fixo — são
+        // iguais nos dois temas, não precisam indireção.
         base: {
-          bg: "#0B1220",
-          surface: "#141B2D",
-          surface2: "#1B2438",
-          border: "#26314A",
+          bg: "var(--base-bg)",
+          surface: "var(--base-surface)",
+          surface2: "var(--base-surface2)",
+          border: "var(--base-border)",
         },
         ink: {
-          DEFAULT: "#E7ECF7",
-          muted: "#8C97B4",
-          faint: "#5B6584",
+          DEFAULT: "var(--ink)",
+          muted: "var(--ink-muted)",
+          faint: "var(--ink-faint)",
         },
         signal: {
           ahead: "#34D399",
           onpace: "#60A5FA",
           caution: "#FBBF24",
           behind: "#FB7185",
+        },
+        // Cor de ação/marca (terracota) — nova nesta fase, compartilhada
+        // pelos dois temas. Substitui signal-onpace como cor de CTA/botão
+        // primário (decisão validada visualmente em 28/08/2026).
+        accent: {
+          DEFAULT: "var(--accent)",
+          hover: "var(--accent-hover)",
         },
       },
       fontFamily: {

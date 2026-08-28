@@ -2,6 +2,58 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Tema claro/escuro (Fase 1.2) — tokens base/ink/accent + badges de status.
+   :root já vem com os valores dark como default — isso evita flash antes do
+   data-theme do wrapper do app resolver: mesmo sem o wrapper (ex. na landing,
+   que não usa data-theme), o app renderiza no tema dark (o atual/conhecido).
+   signal-* (tailwind.config.ts) fica com hex fixo, igual nos dois temas — só
+   os badges de status (abaixo) ganham par bg/text dedicado por tema, pra
+   resolver contraste em fundo claro (especialmente signal-caution). */
+:root,
+[data-theme="dark"] {
+  --base-bg: #0B1220;
+  --base-surface: #141B2D;
+  --base-surface2: #1B2438;
+  --base-border: #26314A;
+  --ink: #E7ECF7;
+  --ink-muted: #8C97B4;
+  --ink-faint: #5B6584;
+  --accent: #D97A45;
+  --accent-hover: #E08B5C;
+  --accent-glow: rgba(217, 122, 69, 0.25);
+
+  --badge-ahead-bg: rgba(52, 211, 153, 0.15);
+  --badge-ahead-text: #34D399;
+  --badge-onpace-bg: rgba(96, 165, 250, 0.15);
+  --badge-onpace-text: #60A5FA;
+  --badge-caution-bg: rgba(251, 191, 36, 0.15);
+  --badge-caution-text: #FBBF24;
+  --badge-behind-bg: rgba(251, 113, 133, 0.15);
+  --badge-behind-text: #FB7185;
+}
+
+[data-theme="light"] {
+  --base-bg: #FAF3EC;
+  --base-surface: #FFFFFF;
+  --base-surface2: #F3E7DB;
+  --base-border: #E4D2C0;
+  --ink: #3A2A1F;
+  --ink-muted: #8A7362;
+  --ink-faint: #B4A192;
+  --accent: #C1652F;
+  --accent-hover: #A8531F;
+  --accent-glow: rgba(193, 101, 47, 0.25);
+
+  --badge-ahead-bg: #DCEFE1;
+  --badge-ahead-text: #1F6E45;
+  --badge-onpace-bg: #E1E9F5;
+  --badge-onpace-text: #33538F;
+  --badge-caution-bg: #F7E6C9;
+  --badge-caution-text: #8A5A0B;
+  --badge-behind-bg: #F5DAD1;
+  --badge-behind-text: #A3402A;
+}
+
 * {
   border-color: theme("colors.base.border");
 }
@@ -17,10 +69,18 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid #60a5fa;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
+/* O ícone padrão do seletor de data é escuro — precisa clarear só sobre
+   fundo escuro. Em tema claro o ícone padrão já tem contraste bom, então o
+   invert precisa ficar restrito ao dark (senão o ícone fica ~branco sobre
+   fundo branco no tema claro). */
 input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(0.7);
+}
+
+[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: none;
 }

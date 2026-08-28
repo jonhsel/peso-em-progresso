@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { type Theme } from "@/lib/theme";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const links = [
   { href: "/dashboard", label: "Visão geral" },
@@ -10,7 +12,7 @@ const links = [
   { href: "/dashboard/goals", label: "Metas" },
 ];
 
-export default function NavBar({ displayName }: { displayName: string }) {
+export default function NavBar({ displayName, theme }: { displayName: string; theme: Theme }) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -44,6 +46,7 @@ export default function NavBar({ displayName }: { displayName: string }) {
         </div>
         <div className="flex items-center gap-3">
           <span className="text-sm text-ink-muted hidden sm:inline">{displayName}</span>
+          <ThemeToggle current={theme} />
           <button
             onClick={handleSignOut}
             className="text-xs text-ink-muted hover:text-signal-behind border border-base-border rounded-lg px-3 py-1.5 transition"

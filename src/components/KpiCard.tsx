@@ -1,10 +1,16 @@
 import type { PeriodKpi } from "@/lib/analytics";
 
+// O dot/ring seguem os tokens signal-* (hex fixo, iguais nos dois temas).
+// O texto do status usa os pares --badge-*-text (globals.css) via valor
+// arbitrário do Tailwind — em vez de signal-* puro — porque texto solto
+// sobre bg-base-surface claro quebra contraste (especialmente caution,
+// ~2:1). Em dark os valores são idênticos ao hex antigo, então isso não
+// muda nada visualmente ali.
 const STATUS_STYLES: Record<PeriodKpi["status"], { dot: string; text: string; ring: string }> = {
-  ahead: { dot: "bg-signal-ahead", text: "text-signal-ahead", ring: "border-signal-ahead/30" },
-  on_pace: { dot: "bg-signal-onpace", text: "text-signal-onpace", ring: "border-signal-onpace/30" },
-  caution: { dot: "bg-signal-caution", text: "text-signal-caution", ring: "border-signal-caution/30" },
-  behind: { dot: "bg-signal-behind", text: "text-signal-behind", ring: "border-signal-behind/30" },
+  ahead: { dot: "bg-signal-ahead", text: "text-[var(--badge-ahead-text)]", ring: "border-signal-ahead/30" },
+  on_pace: { dot: "bg-signal-onpace", text: "text-[var(--badge-onpace-text)]", ring: "border-signal-onpace/30" },
+  caution: { dot: "bg-signal-caution", text: "text-[var(--badge-caution-text)]", ring: "border-signal-caution/30" },
+  behind: { dot: "bg-signal-behind", text: "text-[var(--badge-behind-text)]", ring: "border-signal-behind/30" },
 };
 
 export default function KpiCard({ kpi }: { kpi: PeriodKpi }) {

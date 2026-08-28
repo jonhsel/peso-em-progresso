@@ -1,4 +1,5 @@
 import { loadUserData } from "@/lib/loadUserData";
+import { getTheme } from "@/lib/get-theme";
 import { computeAllKpis, computeTrend } from "@/lib/analytics";
 import NavBar from "@/components/NavBar";
 import KpiCard from "@/components/KpiCard";
@@ -10,6 +11,7 @@ import { ptBR } from "date-fns/locale";
 
 export default async function DashboardPage() {
   const { profile, entries, goals } = await loadUserData();
+  const theme = await getTheme();
 
   const kpis = computeAllKpis(entries, goals);
   const trend = computeTrend(entries);
@@ -26,7 +28,7 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <NavBar displayName={profile.display_name} />
+      <NavBar displayName={profile.display_name} theme={theme} />
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-end justify-between flex-wrap gap-4">
           <div>
@@ -34,7 +36,7 @@ export default async function DashboardPage() {
             <h1 className="font-display font-bold text-5xl sm:text-6xl tracking-tight">
               {latest ? (
                 <>
-                  <span className="text-ink" style={{ textShadow: "0 0 40px rgba(96,165,250,0.25)" }}>
+                  <span className="text-ink" style={{ textShadow: "0 0 40px var(--accent-glow)" }}>
                     {Number(latest.weight_kg).toFixed(1)}
                   </span>
                   <span className="text-2xl sm:text-3xl text-ink-muted font-medium ml-1">kg</span>
@@ -57,7 +59,7 @@ export default async function DashboardPage() {
           </div>
           <Link
             href="/dashboard/entries"
-            className="text-sm rounded-lg bg-signal-onpace text-base-bg font-medium px-5 py-2.5 hover:brightness-110 transition"
+            className="text-sm rounded-lg bg-accent text-base-bg font-medium px-5 py-2.5 hover:bg-accent-hover transition"
           >
             Registrar pesagem
           </Link>

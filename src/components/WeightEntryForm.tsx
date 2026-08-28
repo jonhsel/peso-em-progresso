@@ -61,7 +61,7 @@ export default function WeightEntryForm({ userId }: { userId: string }) {
             value={date}
             onChange={(e) => setDate(e.target.value)}
             max={format(new Date(), "yyyy-MM-dd")}
-            className="w-full rounded-lg bg-base-surface2 border border-base-border px-3 py-2 text-sm outline-none focus:border-signal-onpace"
+            className="w-full rounded-lg bg-base-surface2 border border-base-border px-3 py-2 text-sm outline-none focus:border-accent"
           />
         </div>
         <div>
@@ -72,7 +72,7 @@ export default function WeightEntryForm({ userId }: { userId: string }) {
             value={weight}
             onChange={(e) => setWeight(e.target.value)}
             placeholder="ex: 92,4"
-            className="w-full rounded-lg bg-base-surface2 border border-base-border px-3 py-2 text-sm font-mono outline-none focus:border-signal-onpace"
+            className="w-full rounded-lg bg-base-surface2 border border-base-border px-3 py-2 text-sm font-mono outline-none focus:border-accent"
           />
         </div>
       </div>
@@ -83,14 +83,14 @@ export default function WeightEntryForm({ userId }: { userId: string }) {
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="ex: pós-treino, em jejum..."
-          className="w-full rounded-lg bg-base-surface2 border border-base-border px-3 py-2 text-sm outline-none focus:border-signal-onpace"
+          className="w-full rounded-lg bg-base-surface2 border border-base-border px-3 py-2 text-sm outline-none focus:border-accent"
         />
       </div>
       {error && <p className="text-sm text-signal-behind">{error}</p>}
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-signal-onpace text-base-bg font-medium py-2.5 text-sm disabled:opacity-60 transition hover:brightness-110"
+        className="w-full rounded-lg bg-accent text-base-bg font-medium py-2.5 text-sm disabled:opacity-60 transition hover:bg-accent-hover"
       >
         {loading ? "Salvando..." : "Salvar pesagem"}
       </button>
