@@ -312,6 +312,44 @@ já fazia). `tsc --noEmit` e `npm run build` limpos.
 - [ ] Ver a seção renderizada num navegador real (layout dos 3 cards em mobile,
       espaçamento entre os dois grids) — só validado por build, não visualmente.
 
+## Dashboard — teaser de KPI acima da dobra (implementada 28/08/2026)
+
+Pedido veio de `claude_dashboard_kpi_teaser.md` (na raiz do repo, não versionado,
+mesmo padrão dos outros specs) — motivado por print de uso real: os 4 `KpiCard` por
+período ficavam abaixo da dobra em `/dashboard`, sem nada acima sugerindo que
+existiam, e a pessoa só descobriu rolando por acaso.
+
+Novo componente `src/components/KpiWeeklyTeaser.tsx` ("use client", por causa do
+`onClick`/`scrollIntoView`): card compacto entre o bloco de peso atual e o gráfico,
+mostrando só o KPI da **semana** (`kpis.find(k => k.period === "week")` — o spec
+tinha `kpis.semana`, mas o `Period` real em `analytics.ts` usa `"week"`, não
+`"semana"`) com a cor de status e um texto de uma linha, terminando num botão que
+rola suave até `id="kpi-details"` (adicionado na seção dos 4 `KpiCard` existente,
+em `src/app/(app)/dashboard/page.tsx`).
+
+Dois ajustes sobre o spec original:
+1. **Cor de status via classes literais**, não o `bg-${tone}` dinâmico do
+   snippet do spec — mesma armadilha já documentada na seção "Como funciona"
+   acima (JIT do Tailwind não reconhece template string, gera classe sem CSS).
+   Mapeamento copiado de `KpiCard.tsx` (`STATUS_DOT`) para manter as duas peças
+   sincronizadas — se a paleta `signal-*` mudar, atualizar os dois arquivos.
+2. **Texto do teaser trata `hasData` separadamente do texto de status fixo do
+   spec**: `computePeriodKpi` retorna `status: "caution"` tanto para "atrás da
+   meta" quanto para "sem pesagem recente pra servir de baseline" (ver
+   `analytics.ts::computePeriodKpi`). O snippet do spec usava um texto fixo por
+   status ("começando a ficar atrás da meta semanal") que ficaria enganoso no
+   caso de faltar dado. O componente agora checa
+   `currentWeightKg !== null && baselineWeightKg !== null` (mesmo critério do
+   `KpiCard`) antes de mostrar o texto de status, caindo em "Registre pesagens
+   para ver seu progresso da semana" quando não há dado suficiente.
+
+`tsc --noEmit` e `npm run build` limpos.
+
+- [ ] Ver o teaser renderizado num navegador real: cor batendo com o `KpiCard`
+      correspondente nos 4 status, clique rolando suave até os cards com o topo
+      da seção visível (não cortado), e comportamento em mobile (texto do verb
+      truncando com reticências, sem quebrar o layout).
+
 ## Pendências / próximos passos sugeridos (não iniciados)
 
 - [ ] Testar o app fim a fim contra um projeto Supabase real (criar projeto, rodar

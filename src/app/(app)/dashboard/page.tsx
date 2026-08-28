@@ -3,6 +3,7 @@ import { getTheme } from "@/lib/get-theme";
 import { computeAllKpis, computeTrend } from "@/lib/analytics";
 import NavBar from "@/components/NavBar";
 import KpiCard from "@/components/KpiCard";
+import KpiWeeklyTeaser from "@/components/KpiWeeklyTeaser";
 import TrendBadge from "@/components/TrendBadge";
 import WeightChart from "@/components/WeightChart";
 import Link from "next/link";
@@ -14,6 +15,7 @@ export default async function DashboardPage() {
   const theme = await getTheme();
 
   const kpis = computeAllKpis(entries, goals);
+  const weekKpi = kpis.find((kpi) => kpi.period === "week");
   const trend = computeTrend(entries);
   const latest = entries[entries.length - 1] ?? null;
   const first = entries[0] ?? null;
@@ -65,6 +67,8 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
+        {weekKpi && <KpiWeeklyTeaser kpi={weekKpi} />}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2">
             <WeightChart entries={entries} targetWeightKg={goals.target_weight_kg} />
@@ -72,7 +76,7 @@ export default async function DashboardPage() {
           <TrendBadge trend={trend} />
         </div>
 
-        <div>
+        <div id="kpi-details">
           <p className="text-xs uppercase tracking-wide text-ink-muted mb-3">Metas por período</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {kpis.map((kpi) => (
