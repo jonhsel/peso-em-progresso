@@ -31,7 +31,7 @@ export default function WeightChart({
 
   if (data.length < 2) {
     return (
-      <div className="bg-base-surface border border-base-border rounded-card p-6 h-72 flex items-center justify-center">
+      <div className="bg-base-surface border border-base-border rounded-card p-6 h-96 flex items-center justify-center">
         <p className="text-sm text-ink-faint">
           Registre pelo menos 2 pesagens para ver o gráfico de evolução.
         </p>
@@ -45,7 +45,7 @@ export default function WeightChart({
   const pad = Math.max(0.5, (max - min) * 0.15);
 
   return (
-    <div className="bg-base-surface border border-base-border rounded-card p-4 h-72">
+    <div className="bg-base-surface border border-base-border rounded-card p-4 h-96">
       <p className="text-xs uppercase tracking-wide text-ink-muted mb-2 px-1">Evolução do peso</p>
       <ResponsiveContainer width="100%" height="90%">
         <AreaChart data={data} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>

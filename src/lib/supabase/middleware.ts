@@ -31,7 +31,9 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
-  const isProtectedRoute = request.nextUrl.pathname.startsWith("/dashboard");
+  const isProtectedRoute =
+    request.nextUrl.pathname.startsWith("/dashboard") ||
+    request.nextUrl.pathname.startsWith("/onboarding");
 
   if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone();
@@ -42,6 +44,18 @@ export async function updateSession(request: NextRequest) {
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
+  }
+
+  // No subdomínio do app, a raiz "/" pula a landing (que só existe pro
+  // domínio apex) e vai direto pro fluxo de login/dashboard, igual o
+  // comportamento antigo de page.tsx antes da landing existir.
+  const host = request.headers.get("host") ?? "";
+  const isAppHost = host.startsWith("app.");
+
+  if (isAppHost && request.nextUrl.pathname === "/") {
+    const url = request.nextUrl.clone();
+    url.pathname = user ? "/dashboard" : "/login";
     return NextResponse.redirect(url);
   }
 

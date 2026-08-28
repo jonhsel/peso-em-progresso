@@ -20,9 +20,15 @@ export async function loadUserData() {
     supabase.from("goals").select("*").eq("user_id", user.id).single(),
   ]);
 
+  // Fase 0: quem nunca concluiu o onboarding é redirecionado antes de ver
+  // qualquer tela do dashboard.
+  if (profile && !(profile as Profile).onboarded_at) {
+    redirect("/onboarding");
+  }
+
   return {
     user,
-    profile: (profile as Profile) ?? { id: user.id, display_name: user.email ?? "Usuário", height_cm: null, created_at: "" },
+    profile: (profile as Profile) ?? { id: user.id, display_name: user.email ?? "Usuário", height_cm: null, created_at: "", onboarded_at: null },
     entries: (entries as WeightEntry[]) ?? [],
     goals:
       (goals as Goals) ??

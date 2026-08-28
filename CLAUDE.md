@@ -18,26 +18,41 @@ na tela `/dashboard/goals`, não fixas no código.
 - UI: Tailwind CSS (tema dark customizado, ver `tailwind.config.ts`) + Recharts para gráficos
 - Sem ORM extra — queries via `@supabase-js` / `@supabase/ssr` direto
 
-## Status atual: MVP completo e validado
+## Status atual: MVP + Fase 0 (landing/onboarding) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
-  contra um projeto Supabase real** (só localmente com env vars placeholder) — o
-  próximo passo de qualquer sessão futura, se ainda não feito, é validar isso.
+  contra um projeto Supabase real com a migração 0002 aplicada** — o próximo passo de
+  qualquer sessão futura, se ainda não feito, é validar isso (ver checklist da Fase 0).
 
 ### Páginas
+- `/` — landing pública (pitch + 3 planos vitrine: Grátis/Básico R$5,90/Completo R$9,90,
+  sem cobrança real). Só renderiza pra visitante deslogado; logado cai em `/dashboard`.
+  Todo CTA aponta pro subdomínio do app via `appPath()` (`src/lib/app-url.ts`), não
+  pra rota relativa — landing (apex) e app (`app.*`) são origens diferentes.
 - `/login` — criar conta / entrar (Supabase Auth, email+senha)
-- `/dashboard` — peso atual, gráfico de evolução (Recharts), badge de tendência,
-  4 cards de KPI (semana/mês/trimestre/semestre)
+- `/onboarding` — 3 telas (boas-vindas → explicação dos 4 status de KPI → configurar
+  1ª meta semanal), gatilhado por `profiles.onboarded_at is null`. `loadUserData()`
+  redireciona pra cá automaticamente; ao concluir, grava `goals` + `onboarded_at` e
+  manda pro `/dashboard`. Protegido no middleware igual `/dashboard`.
+- `/dashboard` — peso atual (destaque `text-5xl/6xl` com glow), gráfico de evolução
+  (Recharts, `h-96`), badge de tendência, 4 cards de KPI (semana/mês/trimestre/semestre)
 - `/dashboard/entries` — formulário de registro de peso (upsert por dia) + histórico
   com diff dia a dia + exclusão
 - `/dashboard/goals` — formulário para editar as 4 metas de perda + peso alvo opcional
 
-### Banco (`supabase/schema.sql`)
+Containers do dashboard usam `max-w-6xl` (landing usa `max-w-4xl`, design próprio).
+
+### Banco (`supabase/schema.sql` + `supabase/migrations/`)
 Tabelas: `profiles`, `weight_entries` (1 registro/dia/usuário via unique constraint),
 `goals` (1 linha por usuário). RLS ativado em todas, políticas restringem tudo a
 `auth.uid() = user_id`. Triggers criam `profile` e `goals` padrão automaticamente no
 signup (`handle_new_user`, `handle_new_user_goals`).
+
+`supabase/migrations/0002_onboarding.sql` adiciona `profiles.onboarded_at timestamptz`
+(nullable, idempotente). **Ainda precisa ser rodada manualmente no Supabase Dashboard
+> SQL Editor** — não foi aplicada por esta sessão (sem acesso ao projeto Supabase real).
+Sem isso, `/onboarding` e o redirect em `loadUserData.ts` quebram em produção.
 
 ### Lógica central (`src/lib/analytics.ts`) — funções puras, sem dependência de React/Supabase
 - `computeTrend(entries)`: regressão linear simples sobre os últimos 21 dias →
@@ -78,6 +93,18 @@ signup (`handle_new_user`, `handle_new_user_goals`).
    patcheada contra os CVEs de RSC de dez/2025), `@supabase/ssr@^0.12.5` +
    `@supabase/supabase-js@^2.112.4` (precisam estar alinhados — versões desencontradas
    causaram erros de tipo em `.upsert()` do tipo `never[]`).
+6. **Landing (apex) e app (`app.*`) são o mesmo deploy Vercel**, diferenciados só por
+   um `if (host.startsWith("app."))` no `updateSession` (`src/lib/supabase/middleware.ts`)
+   que redireciona `/` pro `/login` ou `/dashboard` nesse host. Não é bloqueio de rota —
+   `pesoemprogresso.com.br/dashboard` funciona igual, é cosmético por design (fora do
+   escopo bloquear isso). `NEXT_PUBLIC_APP_URL` (só usada pela landing, via `appPath()`)
+   é o que faz os CTAs cross-origin funcionarem; sem ela em prod, os botões da landing
+   apontariam pra `localhost:3000`.
+7. **Onboarding é obrigatório e não pulável** — `loadUserData()` (usado pelas 3 páginas
+   do dashboard) redireciona pra `/onboarding` sempre que `profiles.onboarded_at` for
+   null, então não dá pra chegar em `/dashboard` sem passar pelas 3 telas. Acessar
+   `/onboarding` de novo depois de concluído redireciona pro `/dashboard` (não deixa
+   revisitar via URL direta).
 
 ## Auditoria de código (sessão de 25/08/2026 — bugs corrigidos)
 
@@ -111,16 +138,37 @@ nesta versão. Detalhes:
 - `goals.updated_at` no schema sem trigger — hoje funciona porque o cliente envia,
   fica frágil se aparecer novo caller.
 
+## Fase 0 — Landing pública + Onboarding guiado (implementada 27/08/2026)
+
+Spec completo em `claude_fase0_v3.md` (na raiz do repo, não versionado — histórico de
+como a feature foi planejada). Implementado nesta sessão: `tsc --noEmit` e `npm run
+build` limpos. **Ainda não testado contra Supabase real nem em produção** — ver
+checklist abaixo.
+
+- [ ] Rodar `supabase/migrations/0002_onboarding.sql` no Supabase Dashboard.
+- [ ] Configurar DNS: `pesoemprogresso.com.br` nos nameservers da Vercel,
+      `app.pesoemprogresso.com.br` adicionado como domínio no mesmo projeto Vercel.
+- [ ] Definir `NEXT_PUBLIC_APP_URL=https://app.pesoemprogresso.com.br` nas env vars
+      da Vercel (Production **e** Preview) — sem isso os CTAs da landing quebram.
+- [ ] Atualizar Site URL / Redirect URLs no Supabase Auth pro subdomínio do app.
+- [ ] Testar fim a fim: conta nova → `/onboarding` (não `/dashboard`) → completar 3
+      telas → grava `goals`+`onboarded_at` → `/dashboard`; revisitar `/onboarding`
+      depois de concluído → redireciona; landing deslogado/logado nos dois domínios;
+      link de confirmação de e-mail aponta pro subdomínio certo.
+
 ## Pendências / próximos passos sugeridos (não iniciados)
 
 - [ ] Testar o app fim a fim contra um projeto Supabase real (criar projeto, rodar
-      `schema.sql`, configurar `.env.local`, testar signup/login/registro de peso).
+      `schema.sql` + `migrations/0002_onboarding.sql`, configurar `.env.local`,
+      testar signup/login/registro de peso).
 - [ ] Deploy real na Vercel + configurar Site URL / Redirect URLs no Supabase Auth.
 - [ ] Tela de importação de CSV do Fitdays (usar `source='import'`).
 - [ ] Testes unitários para `src/lib/analytics.ts` (funções puras, fáceis de testar).
 - [ ] Composição corporal (%gordura, massa magra) caso o usuário tenha balança de
       bioimpedância — exigiria novas colunas em `weight_entries` ou tabela nova.
 - [ ] Notificação (e-mail) quando um KPI fecha "atrás da meta".
+- [ ] Fase 3 (não iniciada): ligar os planos pagos (`src/lib/pricing.ts`) a cobrança
+      real (Stripe) — hoje todo CTA de plano pago só leva pro `/login`, sem gate.
 
 ## Entregável
 

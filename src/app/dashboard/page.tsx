@@ -18,23 +18,34 @@ export default async function DashboardPage() {
   return (
     <div>
       <NavBar displayName={profile.display_name} />
-      <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-        <div className="flex items-end justify-between flex-wrap gap-3">
+      <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
+        <div className="flex items-end justify-between flex-wrap gap-4">
           <div>
-            <p className="text-xs uppercase tracking-wide text-ink-muted mb-1">Visão geral</p>
-            <h1 className="font-display font-bold text-3xl">
-              {latest ? `${Number(latest.weight_kg).toFixed(1)} kg` : "Sem registros"}
+            <p className="text-xs uppercase tracking-wide text-ink-muted mb-2">Visão geral</p>
+            <h1 className="font-display font-bold text-5xl sm:text-6xl tracking-tight">
+              {latest ? (
+                <>
+                  <span className="text-ink" style={{ textShadow: "0 0 40px rgba(96,165,250,0.25)" }}>
+                    {Number(latest.weight_kg).toFixed(1)}
+                  </span>
+                  <span className="text-2xl sm:text-3xl text-ink-muted font-medium ml-1">kg</span>
+                </>
+              ) : (
+                <span className="text-ink-muted">Sem registros</span>
+              )}
             </h1>
             {totalChange !== null && (
-              <p className="text-sm text-ink-faint mt-1">
-                {totalChange <= 0 ? "-" : "+"}
-                {Math.abs(totalChange).toFixed(1)} kg desde o primeiro registro
-              </p>
+              <div className="mt-3 inline-flex items-center gap-2 bg-base-surface border border-base-border rounded-full px-3 py-1.5">
+                <span className={`text-sm font-mono font-bold ${totalChange <= 0 ? "text-signal-ahead" : "text-signal-behind"}`}>
+                  {totalChange <= 0 ? "↓" : "↑"} {Math.abs(totalChange).toFixed(1)} kg
+                </span>
+                <span className="text-xs text-ink-faint">desde o primeiro registro</span>
+              </div>
             )}
           </div>
           <Link
             href="/dashboard/entries"
-            className="text-sm rounded-lg bg-signal-onpace text-base-bg font-medium px-4 py-2 hover:brightness-110 transition"
+            className="text-sm rounded-lg bg-signal-onpace text-base-bg font-medium px-5 py-2.5 hover:brightness-110 transition"
           >
             Registrar pesagem
           </Link>

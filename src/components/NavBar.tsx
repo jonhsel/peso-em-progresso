@@ -23,7 +23,7 @@ export default function NavBar({ displayName }: { displayName: string }) {
 
   return (
     <header className="border-b border-base-border">
-      <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-8">
           <span className="font-display font-bold text-lg">Peso em Progresso</span>
           <nav className="hidden sm:flex gap-1">

@@ -9,7 +9,7 @@ export default async function EntriesPage() {
   return (
     <div>
       <NavBar displayName={profile.display_name} />
-      <main className="max-w-4xl mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+      <main className="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="md:sticky md:top-8 self-start">
           <WeightEntryForm userId={user.id} />
         </div>

@@ -8,7 +8,7 @@ export default async function GoalsPage() {
   return (
     <div>
       <NavBar displayName={profile.display_name} />
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="max-w-6xl mx-auto px-4 py-8">
         <GoalsForm userId={user.id} goals={goals} />
       </main>
     </div>

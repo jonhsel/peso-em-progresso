@@ -3,6 +3,7 @@ export type Profile = {
   display_name: string;
   height_cm: number | null;
   created_at: string;
+  onboarded_at: string | null;
 };
 
 export type WeightEntry = {
