@@ -2,6 +2,7 @@ import { loadUserData } from "@/lib/loadUserData";
 import NavBar from "@/components/NavBar";
 import WeightEntryForm from "@/components/WeightEntryForm";
 import EntriesList from "@/components/EntriesList";
+import ExportButtons from "@/components/entries/ExportButtons";
 
 export default async function EntriesPage() {
   const { user, profile, entries } = await loadUserData();
@@ -14,7 +15,10 @@ export default async function EntriesPage() {
           <WeightEntryForm userId={user.id} />
         </div>
         <div>
-          <p className="text-xs uppercase tracking-wide text-ink-muted mb-3">Histórico</p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs uppercase tracking-wide text-ink-muted">Histórico</p>
+            {entries.length > 0 && <ExportButtons />}
+          </div>
           <EntriesList entries={entries} />
         </div>
       </main>

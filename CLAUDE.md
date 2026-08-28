@@ -18,12 +18,13 @@ na tela `/dashboard/goals`, não fixas no código.
 - UI: Tailwind CSS (tema dark customizado, ver `tailwind.config.ts`) + Recharts para gráficos
 - Sem ORM extra — queries via `@supabase-js` / `@supabase/ssr` direto
 
-## Status atual: MVP + Fase 0 (landing/onboarding) completos, não validados em produção
+## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
   contra um projeto Supabase real com a migração 0002 aplicada** — o próximo passo de
-  qualquer sessão futura, se ainda não feito, é validar isso (ver checklist da Fase 0).
+  qualquer sessão futura, se ainda não feito, é validar isso (ver checklist da Fase 0
+  e da Fase 1.1).
 
 ### Páginas
 - `/` — landing pública (pitch + 3 planos vitrine: Grátis/Básico R$5,90/Completo R$9,90,
@@ -105,6 +106,16 @@ Sem isso, `/onboarding` e o redirect em `loadUserData.ts` quebram em produção.
    null, então não dá pra chegar em `/dashboard` sem passar pelas 3 telas. Acessar
    `/onboarding` de novo depois de concluído redireciona pro `/dashboard` (não deixa
    revisitar via URL direta).
+8. **Exportação CSV/PDF é server-side** — PDF gerado via `@react-pdf/renderer`
+   (runtime Node, não Edge) em Route Handlers (`src/app/api/export/`), reaproveitando
+   `computeAllKpis`/`computeTrend` de `src/lib/analytics.ts` sem duplicar lógica.
+   CSV usa `;` como delimitador e `,` como decimal por causa do Excel pt-BR.
+   `next.config.js` precisa de `serverComponentsExternalPackages: ["@react-pdf/renderer"]`
+   por causa do binding nativo `yoga-layout` — sem isso o build pode falhar na Vercel.
+   Rotas protegidas com auth check + `Cache-Control: no-store, private` +
+   `dynamic = "force-dynamic"` para não cachear dados pessoais. `renderToBuffer` retorna
+   `Buffer`, que precisa ser envolvido em `new Uint8Array(buffer)` antes de passar pro
+   `NextResponse` — o tipo `BodyInit` do Next 14 não aceita `Buffer` diretamente.
 
 ## Auditoria de código (sessão de 25/08/2026 — bugs corrigidos)
 
@@ -156,11 +167,34 @@ checklist abaixo.
       depois de concluído → redireciona; landing deslogado/logado nos dois domínios;
       link de confirmação de e-mail aponta pro subdomínio certo.
 
+## Fase 1.1 — Exportar dados (CSV/PDF) (implementada 28/08/2026)
+
+Spec completo em `claude_fase1_export_v2.md` (na raiz do repo, não versionado —
+histórico de como a feature foi planejada, mesmo padrão do `claude_fase0_v3.md`).
+Implementado nesta sessão: `tsc --noEmit` e `npm run build` limpos. **Ainda não
+testado contra Supabase real** — ver checklist abaixo (mesma pendência geral do
+projeto, ver `## Pendências`).
+
+- Rota `GET /api/export/csv` — CSV com `;` de delimitador, peso em `,` decimal,
+  BOM UTF-8, `Cache-Control: no-store, private`.
+- Rota `GET /api/export/pdf` — PDF via `@react-pdf/renderer` (`src/lib/pdf/ExportDocument.tsx`),
+  reaproveita `computeAllKpis`/`computeTrend`; fallback de goals padrão se o trigger
+  de signup não tiver criado a linha em `goals`.
+- Botões "Exportar CSV"/"Exportar PDF" em `/dashboard/entries`
+  (`src/components/entries/ExportButtons.tsx`), só aparecem com ≥1 pesagem registrada.
+- [ ] Testar `/api/export/csv` logado contra Supabase real — baixa, abre no Excel/Sheets
+      sem quebrar acentos, peso reconhecido como número.
+- [ ] Testar `/api/export/pdf` logado — tabela de histórico não corta linha no meio
+      da página.
+- [ ] Testar as duas rotas deslogado — devem responder 401.
+- [ ] Testar com 0 pesagens — botões somem; acessando a URL direto, CSV sai só com
+      cabeçalho e PDF mostra "Nenhuma pesagem registrada ainda."
+
 ## Pendências / próximos passos sugeridos (não iniciados)
 
 - [ ] Testar o app fim a fim contra um projeto Supabase real (criar projeto, rodar
       `schema.sql` + `migrations/0002_onboarding.sql`, configurar `.env.local`,
-      testar signup/login/registro de peso).
+      testar signup/login/registro de peso, exportação CSV/PDF).
 - [ ] Deploy real na Vercel + configurar Site URL / Redirect URLs no Supabase Auth.
 - [ ] Tela de importação de CSV do Fitdays (usar `source='import'`).
 - [ ] Testes unitários para `src/lib/analytics.ts` (funções puras, fáceis de testar).
