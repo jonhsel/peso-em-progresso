@@ -19,7 +19,7 @@ na tela `/dashboard/goals`, não fixas no código.
   `src/app/globals.css`) + Recharts para gráficos
 - Sem ORM extra — queries via `@supabase-js` / `@supabase/ssr` direto
 
-## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) completos, não validados em produção
+## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -183,6 +183,21 @@ Sem isso, `/onboarding` e o redirect em `loadUserData.ts` quebram em produção.
     re-render de Server Component). A linha/gradiente do peso usa `--accent`
     (antes era azul fixo); a `ReferenceLine` da meta continua verde fixo
     (`#34D399`, = `signal-ahead`), por ser status/sucesso, não marca.
+15. **Importação CSV é client-side** — o arquivo é lido com FileReader, parseado
+    com parser puro (`src/lib/csv-parser.ts`), preview mostrado antes de salvar,
+    e persistido via `supabase.from("weight_entries").insert()` em lotes de 50.
+    Sem dependência nova. Aceita delimitadores `,` e `;` (auto-detectado),
+    decimais com `,` ou `.`, datas em ISO/BR/EN. Colunas detectadas por heurística
+    no header com fallback para seleção manual. Não sobrescreve pesagens manuais
+    existentes (insert, não upsert). Limite de 500 linhas por upload.
+    Fitdays não tem exportação CSV nativa — o usuário exporta via Apple Saúde ou
+    Google Fit. A tela é genérica ("Importar CSV"), não específica do Fitdays.
+    **Correção sobre o spec original (`claude_fase2_import.md`):** o destaque do
+    dropzone ao arrastar um arquivo usava `bg-accent/5`, caindo exatamente na
+    armadilha do item 13 acima (`accent` é `var(--accent)`, então o modificador
+    `/5` gera classe sem CSS, silenciosamente). Corrigido com uma var dedicada
+    `--accent-tint` (rgba de baixa opacidade, por tema, em `globals.css`) usada
+    via `bg-[var(--accent-tint)]`, mesmo padrão já usado por `--accent-glow`.
 
 ## Auditoria de código (sessão de 25/08/2026 — bugs corrigidos)
 
@@ -350,13 +365,56 @@ Dois ajustes sobre o spec original:
       da seção visível (não cortado), e comportamento em mobile (texto do verb
       truncando com reticências, sem quebrar o layout).
 
+## Fase 2.1 — Importação de CSV (implementada 28/08/2026)
+
+Spec completo em `claude_fase2_import.md` (na raiz do repo, não versionado — mesmo
+padrão dos specs anteriores). Implementado nesta sessão: `tsc --noEmit` e
+`npm run build` limpos. **Ainda não testado contra Supabase real nem visto num
+navegador** — ver checklist abaixo.
+
+- `src/lib/csv-parser.ts` — parser puro sem dependência (delimitador `,`/`;`
+  auto-detectado, aspas RFC4180, BOM UTF-8), detecção de coluna de data/peso por
+  heurística de header, parsing de data ISO/BR/EN e peso com `,` ou `.` decimal,
+  `validateRows` reporta erros por linha e duplicatas dentro do próprio arquivo.
+- `src/components/import/CsvImporter.tsx` — fluxo upload → preview/mapeamento
+  manual (se a heurística falhar) → confirmação → salvar em lotes de 50 → resultado.
+  100% client-side (`FileReader`); nada sobe ao servidor antes da confirmação.
+  Limite de 500 linhas por upload (trunca com aviso). Conflito com pesagem manual
+  existente na mesma data = `insert` não sobrescreve, linha é reportada como
+  "ignorada" no resultado (mesma prioridade documentada no item 15).
+- `src/app/(app)/dashboard/import/page.tsx` — rota dedicada `/dashboard/import`,
+  Server Component que só carrega dados do usuário e renderiza o `CsvImporter`.
+- Link "Importar CSV" adicionado em `entries/page.tsx`, ao lado do `ExportButtons`.
+- **Correção sobre o spec original** (registrada em detalhe no item 15 de
+  "Decisões importantes"): o dropzone usava `bg-accent/5`, que não gera CSS porque
+  `accent` é `var(--accent)` (achado da Fase 1.2, item 13). Trocado por
+  `bg-[var(--accent-tint)]`, nova var em `globals.css` (mesmo padrão do
+  `--accent-glow`).
+
+- [ ] Upload de CSV com `,` como delimitador e `.` como decimal → detecta colunas,
+      mostra prévia, importa.
+- [ ] Upload de CSV com `;` como delimitador e `,` como decimal (Excel pt-BR) →
+      funciona igual.
+- [ ] Upload de CSV exportado por `/api/export/csv` do próprio app → detecta
+      "Data"/"Peso (kg)", importa com `source='import'`.
+- [ ] CSV sem header reconhecível → dropdowns de seleção manual de colunas.
+- [ ] Datas em formato BR (`15/01/2024`) e ISO (`2024-01-15`) → parseiam certo.
+- [ ] Importar com pesagens manuais já existentes na mesma data → manuais
+      intocadas, relatório mostra quantas foram ignoradas.
+- [ ] Re-importar o mesmo CSV → 0 inserções, tudo ignorado como existente.
+- [ ] CSV com mais de 500 linhas → aviso + truncamento.
+- [ ] Arquivo vazio e arquivo .xlsx/.pdf → mensagens de erro apropriadas.
+- [ ] Pesagens importadas aparecem no histórico com label "Importado", no gráfico
+      e nos KPIs normalmente.
+- [ ] Dropzone com destaque visível ao arrastar um arquivo, nos dois temas
+      (valida a correção do `bg-accent/5` acima).
+
 ## Pendências / próximos passos sugeridos (não iniciados)
 
 - [ ] Testar o app fim a fim contra um projeto Supabase real (criar projeto, rodar
       `schema.sql` + `migrations/0002_onboarding.sql`, configurar `.env.local`,
-      testar signup/login/registro de peso, exportação CSV/PDF).
+      testar signup/login/registro de peso, exportação CSV/PDF, importação CSV).
 - [ ] Deploy real na Vercel + configurar Site URL / Redirect URLs no Supabase Auth.
-- [ ] Tela de importação de CSV do Fitdays (usar `source='import'`).
 - [ ] Testes unitários para `src/lib/analytics.ts` (funções puras, fáceis de testar).
 - [ ] Composição corporal (%gordura, massa magra) caso o usuário tenha balança de
       bioimpedância — exigiria novas colunas em `weight_entries` ou tabela nova.

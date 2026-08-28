@@ -21,6 +21,7 @@
   --accent: #D97A45;
   --accent-hover: #E08B5C;
   --accent-glow: rgba(217, 122, 69, 0.25);
+  --accent-tint: rgba(217, 122, 69, 0.08);
 
   --badge-ahead-bg: rgba(52, 211, 153, 0.15);
   --badge-ahead-text: #34D399;
@@ -43,6 +44,7 @@
   --accent: #C1652F;
   --accent-hover: #A8531F;
   --accent-glow: rgba(193, 101, 47, 0.25);
+  --accent-tint: rgba(193, 101, 47, 0.08);
 
   --badge-ahead-bg: #DCEFE1;
   --badge-ahead-text: #1F6E45;

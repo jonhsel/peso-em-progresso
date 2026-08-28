@@ -19,7 +19,15 @@ export default async function EntriesPage() {
         <div>
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs uppercase tracking-wide text-ink-muted">Histórico</p>
-            {entries.length > 0 && <ExportButtons />}
+            <div className="flex items-center gap-2">
+              <a
+                href="/dashboard/import"
+                className="text-xs border border-base-border rounded-lg px-3 py-1.5 text-ink-muted hover:text-ink transition"
+              >
+                Importar CSV
+              </a>
+              {entries.length > 0 && <ExportButtons />}
+            </div>
           </div>
           <EntriesList entries={entries} />
         </div>
