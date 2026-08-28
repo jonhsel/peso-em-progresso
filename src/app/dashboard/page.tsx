@@ -5,6 +5,8 @@ import KpiCard from "@/components/KpiCard";
 import TrendBadge from "@/components/TrendBadge";
 import WeightChart from "@/components/WeightChart";
 import Link from "next/link";
+import { format, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export default async function DashboardPage() {
   const { profile, entries, goals } = await loadUserData();
@@ -14,6 +16,13 @@ export default async function DashboardPage() {
   const latest = entries[entries.length - 1] ?? null;
   const first = entries[0] ?? null;
   const totalChange = latest && first ? Number(latest.weight_kg) - Number(first.weight_kg) : null;
+
+  const lastMeasuredLabel = latest
+    ? `${format(parseISO(latest.measured_at), "dd/MM/yyyy", { locale: ptBR })} às ${new Intl.DateTimeFormat(
+        "pt-BR",
+        { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }
+      ).format(new Date(latest.created_at))}`
+    : null;
 
   return (
     <div>
@@ -34,6 +43,9 @@ export default async function DashboardPage() {
                 <span className="text-ink-muted">Sem registros</span>
               )}
             </h1>
+            {lastMeasuredLabel && (
+              <p className="mt-1.5 text-xs text-ink-faint">Última pesagem: {lastMeasuredLabel}</p>
+            )}
             {totalChange !== null && (
               <div className="mt-3 inline-flex items-center gap-2 bg-base-surface border border-base-border rounded-full px-3 py-1.5">
                 <span className={`text-sm font-mono font-bold ${totalChange <= 0 ? "text-signal-ahead" : "text-signal-behind"}`}>
