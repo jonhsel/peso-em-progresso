@@ -48,7 +48,7 @@ export default function WeightChart({
     <div className="bg-base-surface border border-base-border rounded-card p-4 h-96">
       <p className="text-xs uppercase tracking-wide text-ink-muted mb-2 px-1">Evolução do peso</p>
       <ResponsiveContainer width="100%" height="90%">
-        <AreaChart data={data} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+        <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="pesoGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#60A5FA" stopOpacity={0.35} />
