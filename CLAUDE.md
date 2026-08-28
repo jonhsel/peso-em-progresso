@@ -116,6 +116,17 @@ Sem isso, `/onboarding` e o redirect em `loadUserData.ts` quebram em produção.
    `dynamic = "force-dynamic"` para não cachear dados pessoais. `renderToBuffer` retorna
    `Buffer`, que precisa ser envolvido em `new Uint8Array(buffer)` antes de passar pro
    `NextResponse` — o tipo `BodyInit` do Next 14 não aceita `Buffer` diretamente.
+   **Correção 28/08/2026 (erro 500 em produção):** `@react-pdf/renderer` usa `pdfkit`
+   por baixo, que carrega os arquivos de fonte padrão (`Helvetica.cjs` etc.) via
+   `require()` dinâmico em runtime — o bundler do Next não rastreia isso e a função
+   serverless da Vercel sobe sem esses arquivos, gerando
+   `Cannot find module 'pdfkit/js/standard-fonts/Helvetica.cjs'`. Corrigido com
+   `experimental.outputFileTracingIncludes` no `next.config.js`, forçando o trace a
+   incluir `node_modules/pdfkit/**/*` (e os pacotes internos `@react-pdf/*`) na função
+   `/api/export/pdf`. **Atenção à chave:** no Next 14.x (a versão fixada aqui) essa
+   opção só é lida dentro de `experimental` — no nível raiz (como a doc oficial do
+   Next 15+ mostra) é silenciosamente ignorada, com só um aviso `Unrecognized key(s)`
+   no log de build, e o 500 continua acontecendo.
 
 ## Auditoria de código (sessão de 25/08/2026 — bugs corrigidos)
 
