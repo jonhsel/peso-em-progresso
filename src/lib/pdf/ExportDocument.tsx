@@ -40,8 +40,10 @@ const styles = StyleSheet.create({
   colDiff: { width: "18%" },
   colNote: { width: "44%" },
   colPeriod: { width: "20%" },
-  colStatus: { width: "22%" },
+  colStatus: { width: "22%", flexDirection: "row", alignItems: "center", gap: 5 },
   colDetail: { width: "58%" },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusText: { fontSize: 9, fontFamily: "Helvetica-Bold" },
   empty: { fontSize: 9, color: "#9CA3AF", marginTop: 4 },
   footer: { position: "absolute", bottom: 24, left: 32, right: 32, fontSize: 7, color: "#9CA3AF", textAlign: "center" },
 });
@@ -51,6 +53,17 @@ const STATUS_LABEL: Record<PeriodKpi["status"], string> = {
   on_pace: "No ritmo",
   caution: "Atenção",
   behind: "Atrasado",
+};
+
+// Mesmas cores dos 4 status de KPI usadas na landing/onboarding e no dashboard
+// (ver src/lib/kpi-status.ts — fonte da verdade, espelhada em tailwind.config.ts
+// como as cores `signal-*`). Mantido em sincronia manualmente porque o PDF é
+// renderizado com hex literal, sem acesso às classes Tailwind.
+const STATUS_COLOR: Record<PeriodKpi["status"], string> = {
+  ahead: "#34D399",
+  on_pace: "#60A5FA",
+  caution: "#FBBF24",
+  behind: "#FB7185",
 };
 
 const TREND_LABEL: Record<TrendResult["label"], string> = {
@@ -124,13 +137,19 @@ export function ExportDocument({
             <Text style={[styles.th, styles.colStatus]}>Status</Text>
             <Text style={[styles.th, styles.colDetail]}>Detalhe</Text>
           </View>
-          {kpis.map((kpi) => (
-            <View style={styles.tableRow} key={kpi.period}>
-              <Text style={[styles.td, styles.colPeriod]}>{kpi.label}</Text>
-              <Text style={[styles.td, styles.colStatus]}>{STATUS_LABEL[kpi.status]}</Text>
-              <Text style={[styles.td, styles.colDetail]}>{kpi.statusLabel}</Text>
-            </View>
-          ))}
+          {kpis.map((kpi) => {
+            const color = STATUS_COLOR[kpi.status];
+            return (
+              <View style={styles.tableRow} key={kpi.period}>
+                <Text style={[styles.td, styles.colPeriod]}>{kpi.label}</Text>
+                <View style={styles.colStatus}>
+                  <View style={[styles.statusDot, { backgroundColor: color }]} />
+                  <Text style={[styles.statusText, { color }]}>{STATUS_LABEL[kpi.status]}</Text>
+                </View>
+                <Text style={[styles.td, styles.colDetail, { color }]}>{kpi.statusLabel}</Text>
+              </View>
+            );
+          })}
         </View>
 
         <Text style={styles.sectionTitle}>Histórico de pesagens ({sorted.length})</Text>

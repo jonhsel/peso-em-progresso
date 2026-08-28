@@ -127,6 +127,13 @@ Sem isso, `/onboarding` e o redirect em `loadUserData.ts` quebram em produção.
    opção só é lida dentro de `experimental` — no nível raiz (como a doc oficial do
    Next 15+ mostra) é silenciosamente ignorada, com só um aviso `Unrecognized key(s)`
    no log de build, e o 500 continua acontecendo.
+   **Cores do PDF (28/08/2026):** a tabela "Metas por período" usa as mesmas 4 cores
+   de status do resto do app (`src/lib/kpi-status.ts` / tokens `signal-*` do
+   `tailwind.config.ts`) — `ahead` `#34D399`, `on_pace` `#60A5FA`, `caution` `#FBBF24`,
+   `behind` `#FB7185` — via `STATUS_COLOR` em `ExportDocument.tsx`, com hex literal
+   porque o `@react-pdf/renderer` não lê classes Tailwind. Se a paleta `signal-*`
+   mudar no Tailwind, atualizar esse mapa manualmente também (mesmo padrão de
+   sincronização manual já usado em `TrajectoryGraphic.tsx`).
 
 ## Auditoria de código (sessão de 25/08/2026 — bugs corrigidos)
 
