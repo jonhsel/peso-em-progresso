@@ -111,18 +111,63 @@ function Hero() {
 }
 
 function HowItWorks() {
+  const steps = [
+    {
+      number: "01",
+      title: "Defina sua meta",
+      description:
+        "Escolha uma meta de peso por período — semana, mês, trimestre ou semestre. Por exemplo, perder 250g por semana. Muda quando você quiser.",
+    },
+    {
+      number: "02",
+      title: "Registre seu peso",
+      description:
+        "Uma pesagem por dia, direto da balança. Leva uns 10 segundos e fica salvo no seu histórico particular.",
+    },
+    {
+      number: "03",
+      title: "Veja se está no ritmo",
+      description:
+        "O app compara seu peso de hoje com o que era esperado nesse ponto da meta e te mostra um status claro.",
+    },
+  ];
+
   return (
     <section id="como-funciona" className="border-t border-base-border py-20">
       <div className="max-w-4xl mx-auto px-4">
+        <p className="text-xs uppercase tracking-wide text-ink-faint font-mono mb-3">
+          Como funciona
+        </p>
         <h2 className="font-display font-bold text-2xl sm:text-3xl max-w-lg">
           A cada pesagem, um veredito — não só um número.
         </h2>
         <p className="mt-3 text-ink-muted text-[15px] leading-relaxed max-w-lg">
-          O app projeta onde seu peso deveria estar hoje, dado o dia em que
-          você começou a meta, e compara com o que você acabou de registrar.
+          Você define a meta. O app projeta onde seu peso deveria estar hoje
+          e compara com o que você acabou de registrar — sem planilha, sem
+          adivinhação.
         </p>
 
-        <div className="mt-10 grid sm:grid-cols-4 gap-3">
+        <div className="mt-10 grid sm:grid-cols-3 gap-4">
+          {steps.map((step) => (
+            <div
+              key={step.number}
+              className="rounded-card border border-base-border bg-base-surface p-5"
+            >
+              <span className="font-mono text-xs text-ink-faint">{step.number}</span>
+              <h3 className="font-display font-bold text-base mt-2 mb-1.5">
+                {step.title}
+              </h3>
+              <p className="text-[13px] text-ink-muted leading-relaxed">
+                {step.description}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-14 mb-4 text-xs uppercase tracking-wide text-ink-faint font-mono">
+          O status que você vê no dashboard
+        </p>
+        <div className="grid sm:grid-cols-4 gap-3">
           {KPI_STATUSES.map((s) => (
             <div
               key={s.key}
