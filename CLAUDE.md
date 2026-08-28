@@ -28,10 +28,11 @@ na tela `/dashboard/goals`, não fixas no código.
   e da Fase 1.1).
 
 ### Páginas
-- `/` — landing pública (pitch + 3 planos vitrine: Grátis/Básico R$5,90/Completo R$9,90,
-  sem cobrança real). Só renderiza pra visitante deslogado; logado cai em `/dashboard`.
-  Todo CTA aponta pro subdomínio do app via `appPath()` (`src/lib/app-url.ts`), não
-  pra rota relativa — landing (apex) e app (`app.*`) são origens diferentes.
+- `/` — landing pública (pitch + seção "Como funciona" + 3 planos vitrine:
+  Grátis/Básico R$5,90/Completo R$9,90, sem cobrança real). Só renderiza pra
+  visitante deslogado; logado cai em `/dashboard`. Todo CTA aponta pro subdomínio
+  do app via `appPath()` (`src/lib/app-url.ts`), não pra rota relativa — landing
+  (apex) e app (`app.*`) são origens diferentes.
 - `/login` — criar conta / entrar (Supabase Auth, email+senha)
 - `/onboarding` — 3 telas (boas-vindas → explicação dos 4 status de KPI → configurar
   1ª meta semanal), gatilhado por `profiles.onboarded_at is null`. `loadUserData()`
@@ -285,6 +286,31 @@ padrão dos specs anteriores). Implementado nesta sessão: `tsc --noEmit` e
 - [ ] Gráfico Recharts (`WeightChart.tsx`) legível nos dois temas, inclusive
       alternando o tema com o gráfico já montado (linha/gradiente devem virar
       terracota, grid/eixos/tooltip devem trocar de cor via o `MutationObserver`).
+
+## Landing — seção "Como funciona" com os 3 passos (ajustada 28/08/2026)
+
+Pedido veio de `claude_landing_como_funciona.md` (na raiz do repo, não versionado,
+mesmo padrão dos outros specs) — motivado por feedback real: uma pessoa usando o
+app não reconheceu os 4 cards de KPI por período no `/dashboard` porque ficam
+abaixo da dobra, sem teaser. A landing precisava deixar o mecanismo central
+(meta por período → comparação com progresso real → status semáforo) claro antes
+do cadastro.
+
+A seção `HowItWorks` (`src/app/page.tsx`, `id="como-funciona"`) **já existia**
+desde a Fase 0, com título + parágrafo + grid dos 4 status (`KPI_STATUSES`,
+`src/lib/kpi-status.ts`) — o que faltava era a narrativa explícita dos 3 passos
+(Defina sua meta → Registre seu peso → Veja se está no ritmo), que foi inserida
+como um grid de 3 cards antes da grade de status, reaproveitando o padrão visual
+já usado no arquivo (`rounded-card`/`border-base-border`/`bg-base-surface`,
+`font-display`/`font-mono`). **Não copiei o JSX do spec ao pé da letra**: ele
+usava `bg-${status.tone}` (classe Tailwind construída via template dinâmico), que
+o JIT do Tailwind não reconhece por scanning estático — geraria classe sem CSS
+nenhum, silenciosamente. A implementação real mantém classes literais (`s.dot`/
+`s.text` vindos de `KPI_STATUSES`, já resolvidos, como a grade de status original
+já fazia). `tsc --noEmit` e `npm run build` limpos.
+
+- [ ] Ver a seção renderizada num navegador real (layout dos 3 cards em mobile,
+      espaçamento entre os dois grids) — só validado por build, não visualmente.
 
 ## Pendências / próximos passos sugeridos (não iniciados)
 
