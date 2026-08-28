@@ -10,11 +10,15 @@ const SOURCE_LABEL: Record<string, string> = {
   import: "Importado",
 };
 
-function csvEscape(value: string): string {
-  if (/[";\n]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
+/**
+ * Envolve o valor em aspas duplas (RFC4180). Aspas internas são escapadas
+ * dobrando-as ("" dentro de "..."). Aplicado a todo campo, sem exceção —
+ * sem isso, apps de planilha que dividem por `,` além de `;` partem um peso
+ * como "111,0" ou uma nota com vírgula embutida em colunas extras, corrompendo
+ * o arquivo (bug real visto em teste de produção).
+ */
+function csvField(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
 }
 
 export async function GET() {
@@ -43,16 +47,18 @@ export async function GET() {
   >[];
 
   const header = ["Data", "Peso (kg)", "Nota", "Origem"];
-  const lines = [header.join(";")];
+  const lines = [header.map(csvField).join(";")];
 
   for (const row of rows) {
     lines.push(
       [
         row.measured_at,
         Number(row.weight_kg).toFixed(1).replace(".", ","),
-        csvEscape(row.note ?? ""),
+        row.note ?? "",
         SOURCE_LABEL[row.source] ?? row.source,
-      ].join(";")
+      ]
+        .map(csvField)
+        .join(";")
     );
   }
 

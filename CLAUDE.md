@@ -109,7 +109,12 @@ Sem isso, `/onboarding` e o redirect em `loadUserData.ts` quebram em produção.
 8. **Exportação CSV/PDF é server-side** — PDF gerado via `@react-pdf/renderer`
    (runtime Node, não Edge) em Route Handlers (`src/app/api/export/`), reaproveitando
    `computeAllKpis`/`computeTrend` de `src/lib/analytics.ts` sem duplicar lógica.
-   CSV usa `;` como delimitador e `,` como decimal por causa do Excel pt-BR.
+   CSV usa `;` como delimitador e `,` como decimal por causa do Excel pt-BR, com
+   **todo campo entre aspas duplas sempre** (RFC4180, via `csvField()`), não só
+   quando contém caractere especial — **correção 28/08/2026:** sem aspas em todo
+   campo, apps de planilha que dividem por `,` além de `;` partiam um peso como
+   `111,0` ou uma nota com vírgula embutida em colunas extras, corrompendo o
+   arquivo (bug real visto em teste de produção).
    `next.config.js` precisa de `serverComponentsExternalPackages: ["@react-pdf/renderer"]`
    por causa do binding nativo `yoga-layout` — sem isso o build pode falhar na Vercel.
    Rotas protegidas com auth check + `Cache-Control: no-store, private` +
