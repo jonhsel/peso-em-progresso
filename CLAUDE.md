@@ -409,6 +409,38 @@ navegador** — ver checklist abaixo.
 - [ ] Dropzone com destaque visível ao arrastar um arquivo, nos dois temas
       (valida a correção do `bg-accent/5` acima).
 
+## Dashboard — linha de tendência da semana no gráfico (implementada 29/08/2026)
+
+Spec completo em `claude_dashboard_linha_tendencia.md` (na raiz do repo, não
+versionado, mesmo padrão dos outros specs) — motivado por feedback direto do
+usuário olhando `/dashboard` em produção: o gráfico de evolução (`WeightChart.tsx`)
+mostrava a linha real do peso e a `ReferenceLine` verde da meta final, mas não o
+conceito central do produto ("onde eu deveria estar hoje, seguindo o ritmo da
+meta"), que já existia visualmente na landing (`TrajectoryGraphic.tsx`, linha
+tracejada "esperada" vs. linha real) mas nunca chegou ao dashboard de verdade.
+
+`WeightChart.tsx` ganhou uma prop `weekKpi: PeriodKpi | null` (reaproveitando o
+`weekKpi` que `dashboard/page.tsx` já calculava para o `KpiWeeklyTeaser`, sem
+recalcular nada) e uma segunda série `esperado` no dataset do gráfico: reta
+linear entre `weekKpi.baselineWeightKg` (peso no início da semana) e
+`weekKpi.expectedWeightNowKg` (onde a meta prevê que eu esteja hoje) — ambos já
+calculados por `computePeriodKpi("week")` em `analytics.ts`, nenhum cálculo novo.
+Renderizada como `<Line>` tracejada cinza (`colors.axis`, mesma var lida via
+`getComputedStyle`/`MutationObserver` já usada pelas outras cores do gráfico) por
+cima da `Area` do peso real. Só aparece (`hasWeeklyTrend`) quando `baselineWeightKg`
+e `expectedWeightNowKg` não são `null` — mesmo critério de "dado confiável" já
+usado pelo `KpiWeeklyTeaser`; sem meta semanal ou sem baseline recente, o gráfico
+funciona igual a antes, sem a linha. Legenda curta "peso real / ritmo da semana"
+aparece só junto com a linha. Patch aplicado ao pé da letra do spec, sem desvios.
+
+- [ ] Ver renderizado num navegador real: linha tracejada só aparece com meta
+      semanal + baseline confiável; legenda some/aparece junto; não fica
+      escondida atrás do gradiente da área de peso real.
+- [ ] Alternar tema dark/light com o gráfico já montado — linha tracejada muda
+      de cor junto com o grid/eixos.
+- [ ] Usuário sem meta semanal e usuário sem pesagem dentro da semana atual —
+      gráfico continua normal, sem a linha, sem erro.
+
 ## Pendências / próximos passos sugeridos (não iniciados)
 
 - [ ] Testar o app fim a fim contra um projeto Supabase real (criar projeto, rodar

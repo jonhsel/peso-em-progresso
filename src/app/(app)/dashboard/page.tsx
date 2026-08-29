@@ -71,7 +71,11 @@ export default async function DashboardPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2">
-            <WeightChart entries={entries} targetWeightKg={goals.target_weight_kg} />
+            <WeightChart
+              entries={entries}
+              targetWeightKg={goals.target_weight_kg}
+              weekKpi={weekKpi ?? null}
+            />
           </div>
           <TrendBadge trend={trend} />
         </div>

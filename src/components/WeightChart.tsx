@@ -5,15 +5,17 @@ import {
   ResponsiveContainer,
   AreaChart,
   Area,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ReferenceLine,
 } from "recharts";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { WeightEntry } from "@/types/database";
+import type { PeriodKpi } from "@/lib/analytics";
 
 // Recharts recebe cor via prop (stroke/fill/style), não className — não dá
 // pra usar as classes Tailwind bg-base-*/text-ink-* aqui. Em vez disso lemos
@@ -51,9 +53,11 @@ function readChartColors(el: HTMLElement) {
 export default function WeightChart({
   entries,
   targetWeightKg,
+  weekKpi,
 }: {
   entries: WeightEntry[];
   targetWeightKg: number | null;
+  weekKpi: PeriodKpi | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [colors, setColors] = useState(FALLBACK_CHART_COLORS);
@@ -71,13 +75,53 @@ export default function WeightChart({
     return () => observer.disconnect();
   }, []);
 
+  // Linha "esperado": mesma matemática de computePeriodKpi (analytics.ts),
+  // só desenhada. baselineWeightKg = peso no início da semana (ou mais
+  // próximo dele), expectedWeightNowKg = onde a meta prevê que eu esteja
+  // hoje. A reta entre esses dois pontos, no tempo, é o "ritmo da semana" —
+  // mesmo conceito da linha tracejada em TrajectoryGraphic.tsx (landing).
+  // Não recalcula nada: usa o resultado já pronto de computePeriodKpi.
+  const weekStart = weekKpi?.periodStart ? parseISO(weekKpi.periodStart) : null;
+  const hasWeeklyTrend =
+    weekStart !== null && weekKpi?.baselineWeightKg != null && weekKpi?.expectedWeightNowKg != null;
+
+  const totalElapsedDays = weekStart ? differenceInCalendarDays(new Date(), weekStart) : 0;
+
   const data = [...entries]
     .sort((a, b) => a.measured_at.localeCompare(b.measured_at))
-    .map((e) => ({
-      date: e.measured_at,
-      label: format(parseISO(e.measured_at), "dd/MM", { locale: ptBR }),
-      peso: Number(e.weight_kg),
-    }));
+    .map((e) => {
+      const point: {
+        date: string;
+        label: string;
+        peso: number;
+        esperado?: number;
+      } = {
+        date: e.measured_at,
+        label: format(parseISO(e.measured_at), "dd/MM", { locale: ptBR }),
+        peso: Number(e.weight_kg),
+      };
+
+      // Só marca "esperado" pra pesagens dentro da semana atual — fora
+      // desse intervalo a reta não tem significado (é um KPI por período).
+      if (hasWeeklyTrend && weekStart) {
+        const entryDate = parseISO(e.measured_at);
+        const elapsedAtEntry = differenceInCalendarDays(entryDate, weekStart);
+        if (elapsedAtEntry >= 0) {
+          const frac =
+            totalElapsedDays > 0 ? Math.min(1, elapsedAtEntry / totalElapsedDays) : elapsedAtEntry === 0 ? 0 : null;
+          if (frac !== null) {
+            point.esperado = Number(
+              (
+                weekKpi!.baselineWeightKg! +
+                (weekKpi!.expectedWeightNowKg! - weekKpi!.baselineWeightKg!) * frac
+              ).toFixed(2)
+            );
+          }
+        }
+      }
+
+      return point;
+    });
 
   if (data.length < 2) {
     return (
@@ -100,6 +144,18 @@ export default function WeightChart({
   return (
     <div ref={containerRef} className="bg-base-surface border border-base-border rounded-card p-4 h-96">
       <p className="text-xs uppercase tracking-wide text-ink-muted mb-2 px-1">Evolução do peso</p>
+      {hasWeeklyTrend && (
+        <div className="flex items-center gap-4 px-1 mb-1 font-mono text-[11px] text-ink-faint">
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: colors.accent }} />
+            peso real
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-0.5 w-3" style={{ backgroundColor: colors.axis, opacity: 0.8 }} />
+            ritmo da semana
+          </span>
+        </div>
+      )}
       <ResponsiveContainer width="100%" height="90%">
         <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
           <defs>
@@ -152,6 +208,20 @@ export default function WeightChart({
             dot={{ r: 2.5, fill: colors.accent, strokeWidth: 0 }}
             activeDot={{ r: 4 }}
           />
+          {hasWeeklyTrend && (
+            <Line
+              type="linear"
+              dataKey="esperado"
+              stroke={colors.axis}
+              strokeWidth={1.5}
+              strokeDasharray="4 4"
+              dot={false}
+              activeDot={false}
+              connectNulls
+              isAnimationActive={false}
+              legendType="none"
+            />
+          )}
         </AreaChart>
       </ResponsiveContainer>
     </div>
