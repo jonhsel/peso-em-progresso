@@ -11,10 +11,10 @@ import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default async function DashboardPage() {
-  const { profile, entries, goals } = await loadUserData();
+  const { profile, entries, goals, goalsHistory } = await loadUserData();
   const theme = await getTheme();
 
-  const kpis = computeAllKpis(entries, goals);
+  const kpis = computeAllKpis(entries, goalsHistory);
   const weekKpi = kpis.find((kpi) => kpi.period === "week");
   const trend = computeTrend(entries);
   const latest = entries[entries.length - 1] ?? null;

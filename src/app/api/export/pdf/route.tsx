@@ -3,7 +3,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { createClient } from "@/lib/supabase/server";
 import { computeAllKpis, computeTrend } from "@/lib/analytics";
 import { ExportDocument } from "@/lib/pdf/ExportDocument";
-import type { WeightEntry, Goals } from "@/types/database";
+import type { WeightEntry, Goals, GoalsHistoryEntry } from "@/types/database";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +26,7 @@ export async function GET() {
     return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   }
 
-  const [{ data: profile }, { data: entries, error: entriesError }, { data: goals }] =
+  const [{ data: profile }, { data: entries, error: entriesError }, { data: goalsHistory }] =
     await Promise.all([
       supabase.from("profiles").select("display_name").eq("id", user.id).single(),
       supabase
@@ -34,7 +34,11 @@ export async function GET() {
         .select("*")
         .eq("user_id", user.id)
         .order("measured_at", { ascending: true }),
-      supabase.from("goals").select("*").eq("user_id", user.id).single(),
+      supabase
+        .from("goals_history")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
     ]);
 
   if (entriesError) {
@@ -42,11 +46,23 @@ export async function GET() {
   }
 
   const typedEntries = (entries ?? []) as WeightEntry[];
-  const typedGoals: Goals = goals
-    ? (goals as Goals)
-    : { user_id: user.id, updated_at: "", ...DEFAULT_GOALS };
+  const typedGoalsHistory: GoalsHistoryEntry[] =
+    (goalsHistory as GoalsHistoryEntry[])?.length
+      ? (goalsHistory as GoalsHistoryEntry[])
+      : [
+          {
+            id: "fallback",
+            user_id: user.id,
+            weekly_loss_kg: DEFAULT_GOALS.weekly_loss_kg,
+            monthly_loss_kg: DEFAULT_GOALS.monthly_loss_kg,
+            quarterly_loss_kg: DEFAULT_GOALS.quarterly_loss_kg,
+            semester_loss_kg: DEFAULT_GOALS.semester_loss_kg,
+            target_weight_kg: DEFAULT_GOALS.target_weight_kg,
+            created_at: new Date(0).toISOString(),
+          },
+        ];
 
-  const kpis = computeAllKpis(typedEntries, typedGoals);
+  const kpis = computeAllKpis(typedEntries, typedGoalsHistory);
   const trend = computeTrend(typedEntries);
 
   const buffer = await renderToBuffer(

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { Goals, Profile, WeightEntry, BodyMeasurement } from "@/types/database";
+import type { Goals, GoalsHistoryEntry, Profile, WeightEntry, BodyMeasurement } from "@/types/database";
 
 export async function loadUserData() {
   const supabase = createClient();
@@ -10,7 +10,7 @@ export async function loadUserData() {
 
   if (!user) redirect("/login");
 
-  const [{ data: profile }, { data: entries }, { data: goals }, { data: measurements }] =
+  const [{ data: profile }, { data: entries }, { data: goals }, { data: measurements }, { data: goalsHistory }] =
     await Promise.all([
       supabase.from("profiles").select("*").eq("id", user.id).single(),
       supabase
@@ -24,6 +24,11 @@ export async function loadUserData() {
         .select("*")
         .eq("user_id", user.id)
         .order("measured_at", { ascending: true }),
+      supabase
+        .from("goals_history")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
     ]);
 
   // Fase 0: quem nunca concluiu o onboarding é redirecionado antes de ver
@@ -37,6 +42,21 @@ export async function loadUserData() {
     profile: (profile as Profile) ?? { id: user.id, display_name: user.email ?? "Usuário", height_cm: null, created_at: "", onboarded_at: null },
     entries: (entries as WeightEntry[]) ?? [],
     measurements: (measurements as BodyMeasurement[]) ?? [],
+    goalsHistory:
+      (goalsHistory as GoalsHistoryEntry[])?.length
+        ? (goalsHistory as GoalsHistoryEntry[])
+        : [
+            {
+              id: "fallback",
+              user_id: user.id,
+              weekly_loss_kg: 0.25,
+              monthly_loss_kg: 1,
+              quarterly_loss_kg: 3,
+              semester_loss_kg: 6,
+              target_weight_kg: null,
+              created_at: new Date(0).toISOString(),
+            },
+          ],
     goals:
       (goals as Goals) ??
       ({

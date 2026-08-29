@@ -6,7 +6,7 @@ import {
   parseISO,
   formatISO,
 } from "date-fns";
-import type { WeightEntry, Goals } from "@/types/database";
+import type { WeightEntry, GoalsHistoryEntry } from "@/types/database";
 
 export type Period = "week" | "month" | "quarter" | "semester";
 
@@ -17,7 +17,10 @@ const PERIOD_LABEL: Record<Period, string> = {
   semester: "Semestre",
 };
 
-const GOAL_FIELD: Record<Period, keyof Goals> = {
+// Campos de meta de perda que existem tanto em Goals quanto em GoalsHistoryEntry.
+type GoalFieldKey = "weekly_loss_kg" | "monthly_loss_kg" | "quarterly_loss_kg" | "semester_loss_kg";
+
+const GOAL_FIELD: Record<Period, GoalFieldKey> = {
   week: "weekly_loss_kg",
   month: "monthly_loss_kg",
   quarter: "quarterly_loss_kg",
@@ -184,6 +187,44 @@ export type PeriodKpi = {
 };
 
 /**
+ * Resolve qual meta estava vigente no início de um período, usando o
+ * histórico completo (goals_history). A função ordena internamente —
+ * a ordem de entrada não importa.
+ *
+ * "Vigente" = o registro mais recente com created_at <= início do período.
+ * Se não houver nenhum (conta criada depois do início do período, ou
+ * histórico vazio), cai no registro mais antigo disponível como fallback —
+ * nunca retorna null, porque toda conta tem ao menos 1 registro desde o
+ * signup (trigger handle_goals_history_sync ou backfill da migração 0004).
+ * Só retorna null se `history` estiver genuinamente vazio (não deveria
+ * acontecer em produção, mas evita throw se acontecer).
+ */
+export function resolveGoalsForPeriod(
+  history: GoalsHistoryEntry[],
+  periodStartDate: Date
+): GoalsHistoryEntry | null {
+  if (history.length === 0) return null;
+
+  const sorted = [...history].sort(
+    (a, b) => parseISO(a.created_at).getTime() - parseISO(b.created_at).getTime()
+  );
+
+  // Último registro com created_at <= início do período.
+  let candidate: GoalsHistoryEntry | null = null;
+  for (const g of sorted) {
+    if (parseISO(g.created_at).getTime() <= periodStartDate.getTime()) {
+      candidate = g;
+    } else {
+      break;
+    }
+  }
+
+  // Fallback: nenhum registro é anterior ao início do período (conta nova
+  // no meio do período) — usa o mais antigo disponível em vez de null.
+  return candidate ?? sorted[0];
+}
+
+/**
  * KPI central do app: compara o peso atual com o peso "esperado" caso o
  * usuário estivesse seguindo a meta do período de forma linear até hoje.
  * Isso responde diretamente "onde estou vs. onde deveria estar".
@@ -194,13 +235,14 @@ export type PeriodKpi = {
  */
 export function computePeriodKpi(
   entries: WeightEntry[],
-  goals: Goals,
+  goalsHistory: GoalsHistoryEntry[],
   period: Period,
   now: Date = new Date()
 ): PeriodKpi {
   const points = toPoints(entries);
   const start = periodStart(period, now);
-  const targetLossKg = Number(goals[GOAL_FIELD[period]] ?? 0);
+  const activeGoals = resolveGoalsForPeriod(goalsHistory, start);
+  const targetLossKg = Number(activeGoals?.[GOAL_FIELD[period]] ?? 0);
 
   const baseline = baselineWeight(points, start, period);
   const latest = points.length ? points[points.length - 1] : null;
@@ -264,8 +306,12 @@ export function computePeriodKpi(
   };
 }
 
-export function computeAllKpis(entries: WeightEntry[], goals: Goals, now: Date = new Date()): PeriodKpi[] {
+export function computeAllKpis(
+  entries: WeightEntry[],
+  goalsHistory: GoalsHistoryEntry[],
+  now: Date = new Date()
+): PeriodKpi[] {
   return (["week", "month", "quarter", "semester"] as Period[]).map((p) =>
-    computePeriodKpi(entries, goals, p, now)
+    computePeriodKpi(entries, goalsHistory, p, now)
   );
 }

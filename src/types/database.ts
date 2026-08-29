@@ -26,6 +26,17 @@ export type Goals = {
   updated_at: string;
 };
 
+export type GoalsHistoryEntry = {
+  id: string;
+  user_id: string;
+  weekly_loss_kg: number;
+  monthly_loss_kg: number;
+  quarterly_loss_kg: number;
+  semester_loss_kg: number;
+  target_weight_kg: number | null;
+  created_at: string;
+};
+
 export type BodyMeasurement = {
   id: string;
   user_id: string;
@@ -63,6 +74,18 @@ export type Database = {
         Row: BodyMeasurement;
         Insert: Partial<BodyMeasurement> & { user_id: string; measured_at: string };
         Update: Partial<BodyMeasurement>;
+        Relationships: [];
+      };
+      goals_history: {
+        Row: GoalsHistoryEntry;
+        Insert: Partial<GoalsHistoryEntry> & {
+          user_id: string;
+          weekly_loss_kg: number;
+          monthly_loss_kg: number;
+          quarterly_loss_kg: number;
+          semester_loss_kg: number;
+        };
+        Update: never; // append-only, sem policy de update
         Relationships: [];
       };
     };

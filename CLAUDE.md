@@ -19,7 +19,7 @@ na tela `/dashboard/goals`, não fixas no código.
   `src/app/globals.css`) + Recharts para gráficos
 - Sem ORM extra — queries via `@supabase-js` / `@supabase/ssr` direto
 
-## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) completos, não validados em produção
+## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -64,6 +64,14 @@ Sem isso, `/onboarding` e o redirect em `loadUserData.ts` quebram em produção.
 (idempotente). **Também ainda precisa ser rodada manualmente no Supabase Dashboard
 > SQL Editor** — sem isso, `/dashboard/measurements` quebra em produção (tabela
 inexistente).
+
+`supabase/migrations/0004_goals_history.sql` cria a tabela `goals_history` (log
+append-only de toda meta que já existiu por usuário) + trigger `on_goals_changed_history`
+(AFTER INSERT OR UPDATE em `goals`) + backfill pra quem já tinha `goals` sem histórico.
+**Também ainda precisa ser rodada manualmente no Supabase Dashboard > SQL Editor** —
+sem isso, `goalsHistory` em `loadUserData()` chega vazio do banco (cai no fallback
+sintético de `loadUserData.ts`, então o app não quebra, mas `/dashboard/goals` mostra
+"ainda não há histórico" pra sempre e o KPI nunca reflete uma meta antiga de verdade).
 
 ### Lógica central (`src/lib/analytics.ts`) — funções puras, sem dependência de React/Supabase
 - `computeTrend(entries)`: regressão linear simples sobre os últimos 21 dias →
@@ -525,12 +533,114 @@ desvios.
 - [ ] RLS: usuário A não consegue ver/editar medidas do usuário B (testar com
       2 contas, se possível).
 
+## Fase 2.3 — Histórico de metas (implementada 29/08/2026)
+
+Spec completo em `claude_fase2_historico_metas_v2.md` (na raiz do repo, não
+versionado — mesmo padrão dos specs anteriores). Implementado nesta sessão:
+`tsc --noEmit` e `npm run build` limpos. **Ainda não testado contra Supabase
+real** — ver checklist abaixo. Patch aplicado ao pé da letra do spec (v2, já
+revisado por auditoria prévia), sem desvios.
+
+Último item da Fase 2 (import CSV + medidas corporais + este) — fecha a fase.
+
+- **Problema resolvido:** `goals` sempre foi uma tabela singleton (`user_id`
+  PRIMARY KEY, upsert sobrescreve) — não havia como saber qual era a meta
+  vigente numa data passada, então o KPI de um período que começou antes da
+  última edição de meta (ex.: KPI do mês, editando a meta hoje) comparava o
+  progresso do mês inteiro contra a meta *nova*, retroativamente, o que é
+  logicamente errado.
+- Nova tabela `goals_history` (`supabase/migrations/0004_goals_history.sql`,
+  também adicionada a `supabase/schema.sql`) — log append-only (sem policy de
+  update/delete), RLS por `auth.uid() = user_id`. Trigger
+  `on_goals_changed_history` (`AFTER INSERT OR UPDATE on goals`) espelha toda
+  escrita em `goals` automaticamente — cobre o INSERT do trigger de signup, o
+  upsert do onboarding e o upsert do `GoalsForm`, sem precisar de insert
+  client-side em nenhum desses três lugares. Migração inclui backfill: quem já
+  tinha `goals` sem histórico ganha 1 registro retroativo com `created_at =
+  goals.updated_at`.
+- `src/lib/analytics.ts::resolveGoalsForPeriod(history, periodStartDate)`
+  (nova) resolve a meta vigente = registro de `goals_history` mais recente com
+  `created_at <= início do período`; sem nenhum anterior (conta nova no meio
+  do período), cai no mais antigo disponível — nunca retorna `null` na
+  prática, porque toda conta tem ao menos 1 registro (trigger de signup +
+  backfill da migração 0004).
+  `computePeriodKpi`/`computeAllKpis` mudaram de assinatura: recebem
+  `goalsHistory: GoalsHistoryEntry[]` em vez de `goals: Goals` — resolvem a
+  meta certa internamente por período, em vez de usar sempre a meta atual.
+  Nada mais dentro de `computePeriodKpi` mudou (baseline, `expectedWeightNow`,
+  thresholds de status — tudo igual, só a origem de `targetLossKg` mudou).
+  `GOAL_FIELD` trocou de `Record<Period, keyof Goals>` pra
+  `Record<Period, GoalFieldKey>` (tipo literal dos 4 campos de ritmo de perda)
+  — evita mismatch de tipo, já que `GoalsHistoryEntry` não tem todos os campos
+  de `Goals` (`user_id`/`updated_at`).
+- `loadUserData()` agora também carrega `goalsHistory` (`goals_history`
+  ordenado por `created_at desc`, em paralelo com profile/entries/goals/
+  measurements), com fallback sintético (1 registro com os defaults
+  0.25/1/3/6 e `created_at` na época Unix) só pro caso de a migração 0004
+  ainda não ter rodado — evita `resolveGoalsForPeriod` receber lista vazia.
+  `api/export/pdf/route.tsx` faz sua própria query (não usa `loadUserData()`)
+  e ganhou o mesmo tratamento: query em `goals_history` + fallback usando
+  `DEFAULT_GOALS` já existente na rota. `api/export/csv/route.ts` não mudou —
+  não usa `computeAllKpis`.
+- `/dashboard/goals` ganhou `GoalsHistoryList` (novo componente, somente
+  leitura) abaixo do `GoalsForm`, em layout empilhado (`space-y-6`, não lado a
+  lado como `entries/page.tsx`/`measurements/page.tsx` — histórico de metas
+  cresce devagar). Mostra `goalsHistory.slice(1)` (tudo exceto a meta ativa,
+  já visível no formulário acima) em ordem decrescente, sem diff entre
+  edições — os 4 campos mudam juntos e o que importa é o valor absoluto, não
+  a variação.
+- `GoalsForm.tsx` e `OnboardingFlow.tsx` **não precisaram de nenhuma mudança**
+  — o upsert em `goals` que ambos já faziam agora dispara o trigger sozinho;
+  inserir manualmente em `goals_history` nesses componentes duplicaria lógica
+  e arriscaria inconsistência se um dos dois inserts falhasse.
+- `targetWeightKg`/`target_weight_kg` **não entra** na resolução por
+  período — só os 4 campos de ritmo de perda são versionados; o peso alvo
+  final continua vindo sempre de `goals.target_weight_kg` (meta ativa), sem
+  histórico por data (decisão explícita do spec, fora de escopo desta
+  entrega). A linha tracejada do gráfico (Fase 2.2, `WeightChart.tsx`) não
+  precisou de nenhuma mudança — usa `weekKpi.baselineWeightKg`/
+  `expectedWeightNowKg`, que já refletem a meta resolvida internamente por
+  `computePeriodKpi`.
+
+- [ ] Rodar `supabase/migrations/0004_goals_history.sql` no Supabase
+      Dashboard — conferir que o backfill criou 1 linha em `goals_history`
+      pra cada usuário que já tinha `goals`.
+- [ ] Criar conta nova → completar onboarding → `goals_history` deve ter
+      **2** registros: 1 do trigger de signup (defaults) e 1 do onboarding
+      (valores configurados pelo usuário).
+- [ ] Editar metas em `/dashboard/goals` duas vezes seguidas com valores
+      diferentes → `goals_history` ganha 1 linha por edição (não sobrescreve);
+      `goals` reflete só a última.
+- [ ] Lista "Metas anteriores" mostra as edições em ordem decrescente,
+      omitindo a meta atual; estado vazio ("ainda não há histórico") aparece
+      corretamente pra conta com só 1 registro.
+- [ ] KPI da semana/mês/trimestre/semestre continua calculando igual a antes
+      **para quem nunca editou metas** (comportamento idêntico ao
+      pré-migração).
+- [ ] Cenário principal da feature: editar a meta semanal hoje, depois olhar
+      o KPI do **mês** (período que começou antes da edição) — deve usar a
+      meta *anterior* à edição, enquanto o KPI da **semana** (se a semana
+      atual começou depois da edição) usa a meta nova. Confirmar com valores
+      de teste que geram números visivelmente diferentes entre as duas metas.
+- [ ] Exportação PDF (`api/export/pdf`) gera KPIs consistentes com o
+      dashboard pro mesmo usuário/período.
+- [ ] RLS: usuário A não consegue ler `goals_history` do usuário B; confirmar
+      que não há policy de update/delete (append-only mesmo via API direta).
+- [ ] `GoalsForm` NÃO faz insert manual em `goals_history` — confirmar que o
+      trigger está cuidando disso (consultar `goals_history` antes e depois
+      de salvar, sem insert client-side no código — já é o caso hoje).
+
+Fecha a Fase 2 inteira (import CSV + medidas corporais + histórico de metas),
+gatilho documentado pra "criar plano completo vs. plano básico" (já specced em
+`claude_fase3_planos.md`, pendente só da conta Kiwify).
+
 ## Pendências / próximos passos sugeridos (não iniciados)
 
 - [ ] Testar o app fim a fim contra um projeto Supabase real (criar projeto, rodar
-      `schema.sql` + `migrations/0002_onboarding.sql` + `migrations/0003_body_measurements.sql`,
-      configurar `.env.local`, testar signup/login/registro de peso, exportação
-      CSV/PDF, importação CSV, registro de medidas corporais).
+      `schema.sql` + `migrations/0002_onboarding.sql` + `migrations/0003_body_measurements.sql`
+      + `migrations/0004_goals_history.sql`, configurar `.env.local`, testar
+      signup/login/registro de peso, exportação CSV/PDF, importação CSV, registro
+      de medidas corporais, edição de metas e histórico de metas).
 - [ ] Deploy real na Vercel + configurar Site URL / Redirect URLs no Supabase Auth.
 - [ ] Testes unitários para `src/lib/analytics.ts` (funções puras, fáceis de testar).
 - [ ] Massa magra/composição corporal mais completa (bioimpedância avançada) — hoje
