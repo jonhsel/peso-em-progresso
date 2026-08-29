@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ResponsiveContainer,
-  AreaChart,
+  ComposedChart,
   Area,
   Line,
   XAxis,
@@ -157,7 +157,13 @@ export default function WeightChart({
         </div>
       )}
       <ResponsiveContainer width="100%" height="90%">
-        <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+        {/* ComposedChart, não AreaChart: o recharts@2.15 filtra os filhos
+            gráficos pelo GraphicalChild registrado no factory do chart — em
+            <AreaChart> isso é só <Area>, então um <Line> aninhado nele é
+            descartado silenciosamente (sem warning, sem erro) e nunca chega
+            a existir no SVG. <ComposedChart> aceita misturar Area/Line/Bar
+            no mesmo gráfico, mesma API do resto (data, XAxis, YAxis, etc.). */}
+        <ComposedChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="pesoGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={colors.accent} stopOpacity={0.35} />
@@ -230,7 +236,7 @@ export default function WeightChart({
               legendType="none"
             />
           )}
-        </AreaChart>
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   );

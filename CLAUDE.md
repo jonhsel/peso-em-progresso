@@ -433,9 +433,32 @@ usado pelo `KpiWeeklyTeaser`; sem meta semanal ou sem baseline recente, o gráfi
 funciona igual a antes, sem a linha. Legenda curta "peso real / ritmo da semana"
 aparece só junto com a linha. Patch aplicado ao pé da letra do spec, sem desvios.
 
-- [ ] Ver renderizado num navegador real: linha tracejada só aparece com meta
+**Bug real encontrado e corrigido no mesmo dia, validado num navegador de
+verdade (Playwright headless + login real):** a linha tracejada não aparecia
+— nem no DOM (sem erro no console). Causa: o gráfico usava `<AreaChart>` como
+wrapper, e o `recharts@2.15` só reconhece `<Area>` como filho gráfico válido
+dentro de `<AreaChart>` — um `<Line>` aninhado é **descartado silenciosamente**
+(sem warning, sem exceção), mesmo com a prop/dado corretos e a legenda (que não
+depende do recharts) aparecendo normalmente. Trocado `<AreaChart>` por
+`<ComposedChart>` (mesma API — `data`, `XAxis`/`YAxis`/`Tooltip`/etc. idênticos),
+que aceita misturar `Area`+`Line`+`Bar` no mesmo gráfico. Comentário deixado no
+código (`WeightChart.tsx`) explicando, porque é fácil reintroduzir esse bug
+"invisível" numa mudança futura se alguém trocar de volta pra `AreaChart` sem
+saber do porquê. Também corrigido de brinde: o `Tooltip` rotulava as duas séries
+(peso real e esperado) como "Peso" — agora usa `name="Peso"`/`name="Esperado"`
+em cada série — e a linha ganhou um `dot` (círculo vazado) em cada pesagem
+dentro da semana atual, porque a diferença entre peso real e esperado numa
+semana costuma ser de poucas centenas de gramas: no eixo Y do gráfico (que
+pode ir do peso atual até a meta final, dezenas de kg de intervalo), isso vira
+poucos pixels de distância da linha sólida — o traço tracejado sozinho pode
+ficar visualmente colado nela mesmo estando desenhado corretamente; os pontos
+dão uma âncora visível nesse caso.
+
+- [x] Ver renderizado num navegador real: linha tracejada só aparece com meta
       semanal + baseline confiável; legenda some/aparece junto; não fica
-      escondida atrás do gradiente da área de peso real.
+      escondida atrás do gradiente da área de peso real. **Validado
+      29/08/2026** via Playwright headless logado na conta real — ver bug
+      acima.
 - [ ] Alternar tema dark/light com o gráfico já montado — linha tracejada muda
       de cor junto com o grid/eixos.
 - [ ] Usuário sem meta semanal e usuário sem pesagem dentro da semana atual —
