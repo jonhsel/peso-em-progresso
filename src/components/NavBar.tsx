@@ -9,6 +9,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 const links = [
   { href: "/dashboard", label: "Visão geral" },
   { href: "/dashboard/entries", label: "Pesagens" },
+  { href: "/dashboard/measurements", label: "Medidas" },
   { href: "/dashboard/goals", label: "Metas" },
 ];
 

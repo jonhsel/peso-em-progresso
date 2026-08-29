@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { Goals, Profile, WeightEntry } from "@/types/database";
+import type { Goals, Profile, WeightEntry, BodyMeasurement } from "@/types/database";
 
 export async function loadUserData() {
   const supabase = createClient();
@@ -10,15 +10,21 @@ export async function loadUserData() {
 
   if (!user) redirect("/login");
 
-  const [{ data: profile }, { data: entries }, { data: goals }] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", user.id).single(),
-    supabase
-      .from("weight_entries")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("measured_at", { ascending: true }),
-    supabase.from("goals").select("*").eq("user_id", user.id).single(),
-  ]);
+  const [{ data: profile }, { data: entries }, { data: goals }, { data: measurements }] =
+    await Promise.all([
+      supabase.from("profiles").select("*").eq("id", user.id).single(),
+      supabase
+        .from("weight_entries")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("measured_at", { ascending: true }),
+      supabase.from("goals").select("*").eq("user_id", user.id).single(),
+      supabase
+        .from("body_measurements")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("measured_at", { ascending: true }),
+    ]);
 
   // Fase 0: quem nunca concluiu o onboarding é redirecionado antes de ver
   // qualquer tela do dashboard.
@@ -30,6 +36,7 @@ export async function loadUserData() {
     user,
     profile: (profile as Profile) ?? { id: user.id, display_name: user.email ?? "Usuário", height_cm: null, created_at: "", onboarded_at: null },
     entries: (entries as WeightEntry[]) ?? [],
+    measurements: (measurements as BodyMeasurement[]) ?? [],
     goals:
       (goals as Goals) ??
       ({

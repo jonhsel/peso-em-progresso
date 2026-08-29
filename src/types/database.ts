@@ -26,6 +26,18 @@ export type Goals = {
   updated_at: string;
 };
 
+export type BodyMeasurement = {
+  id: string;
+  user_id: string;
+  measured_at: string; // YYYY-MM-DD
+  waist_cm: number | null;
+  hip_cm: number | null;
+  arm_cm: number | null;
+  body_fat_pct: number | null;
+  note: string | null;
+  created_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -45,6 +57,12 @@ export type Database = {
         Row: Goals;
         Insert: Partial<Goals> & { user_id: string };
         Update: Partial<Goals>;
+        Relationships: [];
+      };
+      body_measurements: {
+        Row: BodyMeasurement;
+        Insert: Partial<BodyMeasurement> & { user_id: string; measured_at: string };
+        Update: Partial<BodyMeasurement>;
         Relationships: [];
       };
     };

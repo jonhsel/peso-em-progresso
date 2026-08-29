@@ -19,7 +19,7 @@ na tela `/dashboard/goals`, não fixas no código.
   `src/app/globals.css`) + Recharts para gráficos
 - Sem ORM extra — queries via `@supabase-js` / `@supabase/ssr` direto
 
-## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) completos, não validados em produção
+## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -42,20 +42,28 @@ na tela `/dashboard/goals`, não fixas no código.
   (Recharts, `h-96`), badge de tendência, 4 cards de KPI (semana/mês/trimestre/semestre)
 - `/dashboard/entries` — formulário de registro de peso (upsert por dia) + histórico
   com diff dia a dia + exclusão
+- `/dashboard/measurements` — formulário de medidas corporais opcionais (cintura,
+  quadril, braço, % gordura, upsert por dia) + histórico com diff neutro por campo
 - `/dashboard/goals` — formulário para editar as 4 metas de perda + peso alvo opcional
 
 Containers do dashboard usam `max-w-6xl` (landing usa `max-w-4xl`, design próprio).
 
 ### Banco (`supabase/schema.sql` + `supabase/migrations/`)
 Tabelas: `profiles`, `weight_entries` (1 registro/dia/usuário via unique constraint),
-`goals` (1 linha por usuário). RLS ativado em todas, políticas restringem tudo a
-`auth.uid() = user_id`. Triggers criam `profile` e `goals` padrão automaticamente no
-signup (`handle_new_user`, `handle_new_user_goals`).
+`goals` (1 linha por usuário), `body_measurements` (1 registro/dia/usuário, todos os
+campos opcionais com `CHECK` exigindo ao menos 1 preenchido). RLS ativado em todas,
+políticas restringem tudo a `auth.uid() = user_id`. Triggers criam `profile` e `goals`
+padrão automaticamente no signup (`handle_new_user`, `handle_new_user_goals`).
 
 `supabase/migrations/0002_onboarding.sql` adiciona `profiles.onboarded_at timestamptz`
 (nullable, idempotente). **Ainda precisa ser rodada manualmente no Supabase Dashboard
 > SQL Editor** — não foi aplicada por esta sessão (sem acesso ao projeto Supabase real).
 Sem isso, `/onboarding` e o redirect em `loadUserData.ts` quebram em produção.
+
+`supabase/migrations/0003_body_measurements.sql` cria a tabela `body_measurements`
+(idempotente). **Também ainda precisa ser rodada manualmente no Supabase Dashboard
+> SQL Editor** — sem isso, `/dashboard/measurements` quebra em produção (tabela
+inexistente).
 
 ### Lógica central (`src/lib/analytics.ts`) — funções puras, sem dependência de React/Supabase
 - `computeTrend(entries)`: regressão linear simples sobre os últimos 21 dias →
@@ -464,15 +472,70 @@ dão uma âncora visível nesse caso.
 - [ ] Usuário sem meta semanal e usuário sem pesagem dentro da semana atual —
       gráfico continua normal, sem a linha, sem erro.
 
+## Fase 2.2 — Medidas corporais (implementada 29/08/2026)
+
+Spec completo em `claude_fase2_medidas.md` (na raiz do repo, não versionado — mesmo
+padrão dos specs anteriores). Implementado nesta sessão: `tsc --noEmit` e
+`npm run build` limpos. **Ainda não testado contra Supabase real nem visto num
+navegador** — ver checklist abaixo. Patch aplicado ao pé da letra do spec, sem
+desvios.
+
+- Tabela nova `body_measurements` (`supabase/migrations/0003_body_measurements.sql`,
+  também adicionada a `supabase/schema.sql`) — separada de `weight_entries` porque
+  medidas corporais são registradas com frequência menor que peso e nem todo campo
+  é preenchido toda vez. Os 4 campos (`waist_cm`, `hip_cm`, `arm_cm`, `body_fat_pct`)
+  são opcionais, mas um `CHECK` (`body_measurements_at_least_one_field`) exige pelo
+  menos 1 preenchido; mesmo padrão de `weight_entries`: 1 registro/dia/usuário
+  (`unique(user_id, measured_at)`, upsert client-side), RLS por `auth.uid() = user_id`.
+  **Ainda precisa ser rodada manualmente no Supabase Dashboard > SQL Editor.**
+- `src/components/BodyMeasurementForm.tsx` — mesmo padrão de `WeightEntryForm.tsx`
+  (upsert direto via `@supabase/ssr` client). `parseOptionalNumber` trata string
+  vazia como `null` explicitamente antes de qualquer `Number()` — a mesma armadilha
+  de `Number("") === 0` que já quebrou os KPIs de meta (ver auditoria 25/08/2026)
+  se aplicaria aqui em dobro, porque aqui campo vazio **precisa** virar `null`
+  (medida não tirada), não erro nem zero.
+- `src/components/BodyMeasurementsList.tsx` — histórico + exclusão com
+  `window.confirm`, mesmo padrão de `EntriesList.tsx`. Diff por campo calculado
+  contra o registro anterior mais recente **que também tenha aquele campo
+  preenchido** (não o registro anterior genérico), para não comparar cintura do
+  dia 3 com um registro do dia 2 que só tinha braço. Sem cor semântica no diff
+  (diferente de `EntriesList`, que pinta perda de peso de verde) — cintura menor
+  é "bom", mas braço menor geralmente não é (perda de massa magra), e isso varia
+  por pessoa/objetivo; aparece em `text-ink-faint` neutro, só o número com sinal.
+- `src/app/(app)/dashboard/measurements/page.tsx` — rota dedicada
+  `/dashboard/measurements`, mesmo layout 2 colunas (form fixo + histórico) de
+  `entries/page.tsx`. Link "Medidas" adicionado à `NavBar` entre "Pesagens" e
+  "Metas".
+- `loadUserData()` agora também carrega `measurements` (`body_measurements`
+  ordenado por `measured_at asc`), em paralelo com profile/entries/goals.
+
+- [ ] Rodar `supabase/migrations/0003_body_measurements.sql` no Supabase Dashboard.
+- [ ] Salvar medidas preenchendo só 1 dos 4 campos → aceita normalmente.
+- [ ] Tentar salvar sem preencher nenhum campo → erro "Preencha ao menos uma
+      medida.", nada é gravado.
+- [ ] Salvar medidas na mesma data de um registro existente → atualiza (upsert),
+      não duplica linha.
+- [ ] Valor fora do intervalo (ex: cintura 999) → erro de validação, sem round-trip
+      ao banco.
+- [ ] Excluir uma medida → some da lista, `window.confirm` aparece antes.
+- [ ] Histórico mostra o diff correto pulando registros onde aquele campo
+      específico estava vazio (ex: 3 registros, só o 1º e o 3º têm cintura —
+      diff do 3º deve comparar com o 1º, não com o 2º).
+- [ ] Link "Medidas" aparece na NavBar (desktop e mobile) e destaca quando ativo.
+- [ ] RLS: usuário A não consegue ver/editar medidas do usuário B (testar com
+      2 contas, se possível).
+
 ## Pendências / próximos passos sugeridos (não iniciados)
 
 - [ ] Testar o app fim a fim contra um projeto Supabase real (criar projeto, rodar
-      `schema.sql` + `migrations/0002_onboarding.sql`, configurar `.env.local`,
-      testar signup/login/registro de peso, exportação CSV/PDF, importação CSV).
+      `schema.sql` + `migrations/0002_onboarding.sql` + `migrations/0003_body_measurements.sql`,
+      configurar `.env.local`, testar signup/login/registro de peso, exportação
+      CSV/PDF, importação CSV, registro de medidas corporais).
 - [ ] Deploy real na Vercel + configurar Site URL / Redirect URLs no Supabase Auth.
 - [ ] Testes unitários para `src/lib/analytics.ts` (funções puras, fáceis de testar).
-- [ ] Composição corporal (%gordura, massa magra) caso o usuário tenha balança de
-      bioimpedância — exigiria novas colunas em `weight_entries` ou tabela nova.
+- [ ] Massa magra/composição corporal mais completa (bioimpedância avançada) — hoje
+      `body_measurements.body_fat_pct` cobre só % de gordura manual; sem cálculo ou
+      import automático de balança.
 - [ ] Notificação (e-mail) quando um KPI fecha "atrás da meta".
 - [ ] Fase 3 (não iniciada): ligar os planos pagos (`src/lib/pricing.ts`) a cobrança
       real (Stripe) — hoje todo CTA de plano pago só leva pro `/login`, sem gate.
