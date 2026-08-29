@@ -39,7 +39,15 @@ export async function loadUserData() {
 
   return {
     user,
-    profile: (profile as Profile) ?? { id: user.id, display_name: user.email ?? "Usuário", height_cm: null, created_at: "", onboarded_at: null },
+    profile: (profile as Profile) ?? {
+      id: user.id,
+      display_name: user.email ?? "Usuário",
+      height_cm: null,
+      created_at: "",
+      onboarded_at: null,
+      period_mode: "fixed" as const,
+      week_starts_on: "monday" as const,
+    },
     entries: (entries as WeightEntry[]) ?? [],
     measurements: (measurements as BodyMeasurement[]) ?? [],
     goalsHistory:

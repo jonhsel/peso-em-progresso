@@ -19,7 +19,7 @@ na tela `/dashboard/goals`, não fixas no código.
   `src/app/globals.css`) + Recharts para gráficos
 - Sem ORM extra — queries via `@supabase-js` / `@supabase/ssr` direto
 
-## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) completos, não validados em produção
+## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -214,6 +214,19 @@ sintético de `loadUserData.ts`, então o app não quebra, mas `/dashboard/goals
     `/5` gera classe sem CSS, silenciosamente). Corrigido com uma var dedicada
     `--accent-tint` (rgba de baixa opacidade, por tema, em `globals.css`) usada
     via `bg-[var(--accent-tint)]`, mesmo padrão já usado por `--accent-glow`.
+16. **Persistência de settings via update client-side, não Server Action** —
+    `SettingsForm.tsx` (Fase 3) segue o mesmo padrão de `GoalsForm.tsx`/
+    `BodyMeasurementForm.tsx`/`WeightEntryForm.tsx`/`OnboardingFlow.tsx`:
+    `supabase.from("profiles").update(...)` direto do client + `router.refresh()`.
+    `theme-actions.ts` é a única Server Action do projeto e é caso à parte —
+    escreve num **cookie**, não numa tabela com RLS; não é o padrão a seguir
+    para updates de `profiles`/`goals`/etc.
+17. **`ConfirmDialog.tsx` (Fase 3) é o primeiro modal do projeto** — overlay
+    fixo + `bg-black/50` (nota: `black` é cor literal do Tailwind, não uma
+    var `--x`, então `/50` funciona normalmente aqui — diferente da armadilha
+    do item 13). Padrão de referência para qualquer confirmação destrutiva ou
+    de mudança de comportamento futura: só dispara quando o valor em questão
+    de fato mudou (não em todo submit do formulário que o contém).
 
 ## Auditoria de código (sessão de 25/08/2026 — bugs corrigidos)
 
@@ -632,23 +645,131 @@ revisado por auditoria prévia), sem desvios.
 
 Fecha a Fase 2 inteira (import CSV + medidas corporais + histórico de metas),
 gatilho documentado pra "criar plano completo vs. plano básico" (já specced em
-`claude_fase3_planos.md`, pendente só da conta Kiwify).
+`claude_fase3_planos.md`, pendente só da conta Kiwify — **nome em conflito com
+a "Fase 3" abaixo, ver nota lá**).
+
+## Fase 3 — Período de meta (fixo/móvel) + Configurações (implementada 29/08/2026)
+
+Spec completo em `claude_fase3_periodo_v2.md` (na raiz do repo, não
+versionado — mesmo padrão dos specs anteriores; v2 já auditada contra o
+código real, ver Apêndice A do próprio arquivo). Implementado nesta sessão:
+`tsc --noEmit` e `npm run build` limpos. **Ainda não testado contra Supabase
+real** — ver checklist abaixo. Patch aplicado ao pé da letra do spec, sem
+desvios de lógica (só o ajuste de `schema.sql` abaixo, fora do escopo original
+do spec).
+
+**Nota de nomenclatura:** esta fase e a "Fase 3" citada no backlog de
+pricing/planos (`claude_fase3_planos.md`, ver `## Pendências` abaixo) têm o
+mesmo número por terem sido especificadas em documentos separados sem
+coordenação entre si — são features independentes, não a mesma fase. Não
+renumerar os specs já escritos; só ter isso em mente ao ler o histórico.
+
+- Dois campos novos em `profiles`: `period_mode` (`'fixed' | 'rolling'`,
+  default `'fixed'`, 1 escolha global pros 4 períodos) e `week_starts_on`
+  (`'monday' | 'sunday'`, default `'monday'`, só usado quando `period_mode =
+  'fixed'`, mas sempre perguntado no onboarding pra evitar uma segunda
+  pergunta se o usuário trocar de modo depois). Migração
+  `supabase/migrations/0005_period_mode.sql` (idempotente, `ADD COLUMN IF NOT
+  EXISTS`). **Ainda precisa ser rodada manualmente no Supabase Dashboard >
+  SQL Editor.**
+- **Achado fora do escopo do spec, corrigido de brinde:** `supabase/schema.sql`
+  (arquivo de referência) nunca tinha sido atualizado com a coluna
+  `profiles.onboarded_at` da migração 0002 (Fase 0) — só existia via
+  `ALTER TABLE`, não na definição `CREATE TABLE` de referência. Corrigido
+  junto com a adição de `period_mode`/`week_starts_on`, já que o spec desta
+  fase assumia (incorretamente) que `onboarded_at` já estava lá.
+- `src/lib/analytics.ts::periodStart` ganhou os parâmetros `mode`/
+  `weekStartsOn` (defaults `"fixed"`/`"monday"`, preservando o comportamento
+  de qualquer caller não atualizado). Modo `rolling` usa `subDays(reference,
+  N)` com `N` = 7/30/90/180 por período, ignorando `weekStartsOn`.
+  `periodLengthDays` recebeu o mesmo `mode` — no `rolling` retorna o
+  comprimento exato do período (30/90/180) em vez das aproximações civis
+  (30.4/91.3/182.6) usadas no `fixed`, pra não distorcer `fractionElapsed`.
+  `computePeriodKpi`/`computeAllKpis` propagam os dois parâmetros; nenhuma
+  outra lógica (baseline, thresholds de status, `resolveGoalsForPeriod`)
+  mudou — só a origem da data de início de período.
+- Onboarding (`OnboardingFlow.tsx`) ganhou um 4º step (`StepPeriodMode`,
+  entre a explicação de KPI e a meta semanal) — escolha de `period_mode` +
+  `week_starts_on`, gravados no mesmo `update` de `profiles` que já gravava
+  `onboarded_at` (não um update separado). `TOTAL_STEPS` (usado pelos
+  `StepDots`) atualizado de 3 para 4.
+- Tela nova `/dashboard/settings` (`SettingsForm.tsx`, client-side, mesmo
+  padrão de update direto ao Supabase de `GoalsForm`/`BodyMeasurementForm` —
+  **não** Server Action, que no projeto é só para o cookie de tema): edita
+  `display_name` (obrigatório, trim, rejeita vazio) e `height_cm` (opcional,
+  `parseOptionalHeight` trata `""` como `null` antes de qualquer `Number()`,
+  mesma armadilha de `Number("") === 0` já documentada em outros forms;
+  intervalo `0 < altura < 300`), além de `period_mode`/`week_starts_on`.
+  Aviso permanente (`text-xs text-ink-faint`) visível só quando
+  `period_mode === 'fixed'`, avisando que `week_starts_on` também vai valer
+  pro seletor de período do gráfico da Fase 5 (ainda não implementada).
+- `ConfirmDialog.tsx` — **primeiro modal do projeto** (ver decisão 17 acima).
+  `SettingsForm` só abre o modal quando `period_mode` no formulário difere do
+  valor salvo (prop original) no momento do submit; mudar só
+  `week_starts_on`/`display_name`/`height_cm` salva direto, sem modal.
+- Link "Configurações" adicionado ao array `links` do `NavBar.tsx` (5º link).
+  De brinde, mobile nav (`<nav className="sm:hidden ...">`) ganhou
+  `overflow-x-auto` + `whitespace-nowrap` nos links — com 5 links o layout
+  anterior (sem overflow) estourava em telas estreitas; não visto rodando
+  num navegador real, só inferido do CSS.
+- Callers de `computeAllKpis` atualizados para passar
+  `profile.period_mode`/`profile.week_starts_on`: `dashboard/page.tsx` (via
+  `loadUserData()`) e `api/export/pdf/route.tsx` (que faz query própria de
+  profile — o `select("display_name")` foi expandido para incluir os dois
+  campos novos; sem isso o PDF exportaria com `period_mode` `undefined` e
+  quebraria silenciosamente no modo rolling). `api/export/csv/route.ts` não
+  usa `computeAllKpis`, sem mudança.
+
+- [ ] Rodar `supabase/migrations/0005_period_mode.sql` no Supabase Dashboard
+      — conferir que contas existentes ganharam `period_mode='fixed'` e
+      `week_starts_on='monday'` via default.
+- [ ] Onboarding de conta nova: tela de período aparece entre a explicação de
+      KPI e a meta semanal (steps 2→3→4), salva corretamente em `profiles`, e
+      o restante do fluxo (`goals`+`onboarded_at`) continua funcionando.
+      `StepDots` mostra 4 dots.
+- [ ] `/dashboard/settings`: editar `display_name`/`height_cm` isoladamente
+      → salva sem modal; `display_name` atualizado aparece no NavBar após
+      refresh.
+- [ ] `/dashboard/settings`: trocar `period_mode` de `fixed` para `rolling`
+      → modal aparece; Cancelar não salva nada; Confirmar salva e os 4 KPIs
+      em `/dashboard` recalculam após o refresh.
+- [ ] Verificação numérica: com `period_mode='fixed'`+`week_starts_on='monday'`,
+      KPI da semana bate com o cálculo civil atual; trocar pra `rolling` e
+      confirmar que passa a comparar contra exatamente 7 dias corridos atrás
+      (número visivelmente diferente do modo fixed).
+- [ ] Exportação PDF reflete `period_mode`/`week_starts_on` do usuário —
+      comparar com o dashboard.
+- [ ] `goals_history`/`resolveGoalsForPeriod` seguem funcionando sem
+      alteração de comportamento (regressão da Fase 2.3).
+- [ ] RLS: `/dashboard/settings` não permite ler/editar `profiles` de outro
+      usuário.
+- [ ] NavBar mobile com 5 links — conferir visualmente que não estoura/trunca
+      de forma ilegível (fix aplicado por inferência, não visto rodando).
+- [ ] `display_name` vazio/só espaços e `height_cm` inválido (0, -10, 999) →
+      erro de validação, nada salvo; `height_cm` vazio → salva como `null`.
 
 ## Pendências / próximos passos sugeridos (não iniciados)
 
 - [ ] Testar o app fim a fim contra um projeto Supabase real (criar projeto, rodar
       `schema.sql` + `migrations/0002_onboarding.sql` + `migrations/0003_body_measurements.sql`
-      + `migrations/0004_goals_history.sql`, configurar `.env.local`, testar
-      signup/login/registro de peso, exportação CSV/PDF, importação CSV, registro
-      de medidas corporais, edição de metas e histórico de metas).
+      + `migrations/0004_goals_history.sql` + `migrations/0005_period_mode.sql`,
+      configurar `.env.local`, testar signup/login/registro de peso, exportação
+      CSV/PDF, importação CSV, medidas corporais, metas + histórico, e a tela
+      de Configurações/período de meta).
 - [ ] Deploy real na Vercel + configurar Site URL / Redirect URLs no Supabase Auth.
 - [ ] Testes unitários para `src/lib/analytics.ts` (funções puras, fáceis de testar).
 - [ ] Massa magra/composição corporal mais completa (bioimpedância avançada) — hoje
       `body_measurements.body_fat_pct` cobre só % de gordura manual; sem cálculo ou
       import automático de balança.
 - [ ] Notificação (e-mail) quando um KPI fecha "atrás da meta".
-- [ ] Fase 3 (não iniciada): ligar os planos pagos (`src/lib/pricing.ts`) a cobrança
-      real (Stripe) — hoje todo CTA de plano pago só leva pro `/login`, sem gate.
+- [ ] Seletor de período no gráfico de evolução (1 semana/1 mês/3 meses/6
+      meses) — Fase 5, depende de `period_mode`/`week_starts_on` (Fase 3
+      período, já implementada).
+- [ ] Fase 3 planos (não iniciada — nome de fase em conflito com a "Fase 3"
+      de período/Configurações acima, ver nota lá): ligar os planos pagos
+      (`src/lib/pricing.ts`) a cobrança real (Stripe) — hoje todo CTA de
+      plano pago só leva pro `/login`, sem gate. Specced em
+      `claude_fase3_planos.md`.
 
 ## Entregável
 

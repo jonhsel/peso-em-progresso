@@ -5,8 +5,9 @@ import {
   differenceInCalendarDays,
   parseISO,
   formatISO,
+  subDays,
 } from "date-fns";
-import type { WeightEntry, GoalsHistoryEntry } from "@/types/database";
+import type { WeightEntry, GoalsHistoryEntry, PeriodMode, WeekStartsOn } from "@/types/database";
 
 export type Period = "week" | "month" | "quarter" | "semester";
 
@@ -40,11 +41,32 @@ const BASELINE_MAX_DAYS_BEFORE: Record<Period, number> = {
   semester: 240,
 };
 
-/** Início do período que contém `reference`. Semana começa na segunda-feira. */
-export function periodStart(period: Period, reference: Date): Date {
+/**
+ * Início do período que contém `reference`.
+ * mode "fixed" (default): período civil — semana a partir de `weekStartsOn`,
+ * mês/trimestre/semestre civis.
+ * mode "rolling": N dias corridos atrás de hoje (7/30/90/180) — ignora
+ * `weekStartsOn`, que só se aplica ao modo fixed.
+ */
+export function periodStart(
+  period: Period,
+  reference: Date,
+  mode: PeriodMode = "fixed",
+  weekStartsOn: WeekStartsOn = "monday"
+): Date {
+  if (mode === "rolling") {
+    const rollingDays: Record<Period, number> = {
+      week: 7,
+      month: 30,
+      quarter: 90,
+      semester: 180,
+    };
+    return subDays(reference, rollingDays[period]);
+  }
+
   switch (period) {
     case "week":
-      return startOfWeek(reference, { weekStartsOn: 1 });
+      return startOfWeek(reference, { weekStartsOn: weekStartsOn === "sunday" ? 0 : 1 });
     case "month":
       return startOfMonth(reference);
     case "quarter":
@@ -57,8 +79,16 @@ export function periodStart(period: Period, reference: Date): Date {
   }
 }
 
-/** Duração aproximada do período em dias, usada para calcular a fração já decorrida. */
-function periodLengthDays(period: Period): number {
+/**
+ * Duração do período em dias, usada para calcular a fração já decorrida.
+ * mode "fixed": aproximação civil (30.4/91.3/182.6 para mês/trimestre/semestre).
+ * mode "rolling": valor exato (30/90/180), já que o período É esses N dias.
+ */
+function periodLengthDays(period: Period, mode: PeriodMode = "fixed"): number {
+  if (mode === "rolling") {
+    const exact: Record<Period, number> = { week: 7, month: 30, quarter: 90, semester: 180 };
+    return exact[period];
+  }
   switch (period) {
     case "week":
       return 7;
@@ -237,10 +267,12 @@ export function computePeriodKpi(
   entries: WeightEntry[],
   goalsHistory: GoalsHistoryEntry[],
   period: Period,
-  now: Date = new Date()
+  now: Date = new Date(),
+  mode: PeriodMode = "fixed",
+  weekStartsOn: WeekStartsOn = "monday"
 ): PeriodKpi {
   const points = toPoints(entries);
-  const start = periodStart(period, now);
+  const start = periodStart(period, now, mode, weekStartsOn);
   const activeGoals = resolveGoalsForPeriod(goalsHistory, start);
   const targetLossKg = Number(activeGoals?.[GOAL_FIELD[period]] ?? 0);
 
@@ -248,7 +280,7 @@ export function computePeriodKpi(
   const latest = points.length ? points[points.length - 1] : null;
   const current = latest ? latest.weight : null;
 
-  const lengthDays = periodLengthDays(period);
+  const lengthDays = periodLengthDays(period, mode);
   const elapsedDays = Math.max(0, differenceInCalendarDays(now, start));
   const fractionElapsed = Math.min(1, elapsedDays / lengthDays);
 
@@ -309,9 +341,11 @@ export function computePeriodKpi(
 export function computeAllKpis(
   entries: WeightEntry[],
   goalsHistory: GoalsHistoryEntry[],
-  now: Date = new Date()
+  now: Date = new Date(),
+  mode: PeriodMode = "fixed",
+  weekStartsOn: WeekStartsOn = "monday"
 ): PeriodKpi[] {
   return (["week", "month", "quarter", "semester"] as Period[]).map((p) =>
-    computePeriodKpi(entries, goalsHistory, p, now)
+    computePeriodKpi(entries, goalsHistory, p, now, mode, weekStartsOn)
   );
 }

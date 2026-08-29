@@ -14,7 +14,7 @@ export default async function DashboardPage() {
   const { profile, entries, goals, goalsHistory } = await loadUserData();
   const theme = await getTheme();
 
-  const kpis = computeAllKpis(entries, goalsHistory);
+  const kpis = computeAllKpis(entries, goalsHistory, new Date(), profile.period_mode, profile.week_starts_on);
   const weekKpi = kpis.find((kpi) => kpi.period === "week");
   const trend = computeTrend(entries);
   const latest = entries[entries.length - 1] ?? null;

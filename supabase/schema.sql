@@ -11,7 +11,10 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text not null default 'Usuário',
   height_cm numeric(5,1),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  onboarded_at timestamptz,
+  period_mode text not null default 'fixed' check (period_mode in ('fixed', 'rolling')),
+  week_starts_on text not null default 'monday' check (week_starts_on in ('monday', 'sunday'))
 );
 
 alter table public.profiles enable row level security;

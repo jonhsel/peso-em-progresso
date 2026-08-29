@@ -3,7 +3,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { createClient } from "@/lib/supabase/server";
 import { computeAllKpis, computeTrend } from "@/lib/analytics";
 import { ExportDocument } from "@/lib/pdf/ExportDocument";
-import type { WeightEntry, Goals, GoalsHistoryEntry } from "@/types/database";
+import type { WeightEntry, Goals, GoalsHistoryEntry, PeriodMode, WeekStartsOn } from "@/types/database";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,7 +28,7 @@ export async function GET() {
 
   const [{ data: profile }, { data: entries, error: entriesError }, { data: goalsHistory }] =
     await Promise.all([
-      supabase.from("profiles").select("display_name").eq("id", user.id).single(),
+      supabase.from("profiles").select("display_name, period_mode, week_starts_on").eq("id", user.id).single(),
       supabase
         .from("weight_entries")
         .select("*")
@@ -62,7 +62,13 @@ export async function GET() {
           },
         ];
 
-  const kpis = computeAllKpis(typedEntries, typedGoalsHistory);
+  const kpis = computeAllKpis(
+    typedEntries,
+    typedGoalsHistory,
+    new Date(),
+    (profile?.period_mode as PeriodMode) ?? "fixed",
+    (profile?.week_starts_on as WeekStartsOn) ?? "monday"
+  );
   const trend = computeTrend(typedEntries);
 
   const buffer = await renderToBuffer(

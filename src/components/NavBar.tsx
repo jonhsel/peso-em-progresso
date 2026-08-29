@@ -11,6 +11,7 @@ const links = [
   { href: "/dashboard/entries", label: "Pesagens" },
   { href: "/dashboard/measurements", label: "Medidas" },
   { href: "/dashboard/goals", label: "Metas" },
+  { href: "/dashboard/settings", label: "Configurações" },
 ];
 
 export default function NavBar({ displayName, theme }: { displayName: string; theme: Theme }) {
@@ -56,12 +57,12 @@ export default function NavBar({ displayName, theme }: { displayName: string; th
           </button>
         </div>
       </div>
-      <nav className="sm:hidden flex gap-1 px-4 pb-3">
+      <nav className="sm:hidden flex gap-1 px-4 pb-3 overflow-x-auto">
         {links.map((l) => (
           <Link
             key={l.href}
             href={l.href}
-            className={`text-sm px-3 py-1.5 rounded-lg transition ${
+            className={`text-sm px-3 py-1.5 rounded-lg transition whitespace-nowrap ${
               pathname === l.href ? "bg-base-surface2 text-ink" : "text-ink-muted"
             }`}
           >

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { TrajectoryGraphic } from "@/components/marketing/TrajectoryGraphic";
 import { KPI_STATUSES } from "@/lib/kpi-status";
 
-const TOTAL_STEPS = 3;
+const TOTAL_STEPS = 4;
 
 // Deriva metas de mês/trimestre/semestre a partir da meta semanal, como
 // ponto de partida — tudo continua editável em /dashboard/goals depois.
@@ -33,6 +33,8 @@ export function OnboardingFlow({
   const [step, setStep] = useState(1);
   const [weeklyLossKg, setWeeklyLossKg] = useState("0.25");
   const [targetWeightKg, setTargetWeightKg] = useState("");
+  const [periodMode, setPeriodMode] = useState<"fixed" | "rolling">("fixed");
+  const [weekStartsOn, setWeekStartsOn] = useState<"monday" | "sunday">("monday");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,9 +72,14 @@ export function OnboardingFlow({
       return;
     }
 
+    // Gravar period_mode e week_starts_on junto com onboarded_at
     const { error: profileError } = await supabase
       .from("profiles")
-      .update({ onboarded_at: new Date().toISOString() })
+      .update({
+        period_mode: periodMode,
+        week_starts_on: weekStartsOn,
+        onboarded_at: new Date().toISOString(),
+      })
       .eq("id", userId);
 
     setLoading(false);
@@ -99,12 +106,23 @@ export function OnboardingFlow({
       )}
 
       {step === 3 && (
+        <StepPeriodMode
+          periodMode={periodMode}
+          weekStartsOn={weekStartsOn}
+          onPeriodModeChange={setPeriodMode}
+          onWeekStartsOnChange={setWeekStartsOn}
+          onNext={() => setStep(4)}
+          onBack={() => setStep(2)}
+        />
+      )}
+
+      {step === 4 && (
         <StepFirstGoal
           weeklyLossKg={weeklyLossKg}
           targetWeightKg={targetWeightKg}
           onWeeklyLossChange={setWeeklyLossKg}
           onTargetWeightChange={setTargetWeightKg}
-          onBack={() => setStep(2)}
+          onBack={() => setStep(3)}
           onFinish={handleFinish}
           loading={loading}
           error={error}
@@ -214,6 +232,106 @@ function StepKpiExplainer({
           className="flex-1 rounded-lg bg-accent text-base-bg font-medium py-3 text-sm hover:bg-accent-hover transition"
         >
           Entendi, configurar minha meta
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function StepPeriodMode({
+  periodMode,
+  weekStartsOn,
+  onPeriodModeChange,
+  onWeekStartsOnChange,
+  onNext,
+  onBack,
+}: {
+  periodMode: "fixed" | "rolling";
+  weekStartsOn: "monday" | "sunday";
+  onPeriodModeChange: (v: "fixed" | "rolling") => void;
+  onWeekStartsOnChange: (v: "monday" | "sunday") => void;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  return (
+    <div>
+      <p className="text-xs uppercase tracking-wide text-accent font-mono">
+        período das metas
+      </p>
+      <h2 className="mt-3 font-display font-bold text-2xl">
+        Como você quer contar suas semanas e meses?
+      </h2>
+      <p className="mt-3 text-ink-muted text-[14px] leading-relaxed">
+        Isso define quando cada período começa pra calcular se você está no
+        ritmo. Dá pra trocar depois em Configurações.
+      </p>
+
+      <div className="mt-6 space-y-3">
+        {([
+          {
+            value: "fixed" as const,
+            title: "Semana/mês corrido",
+            desc: "Semana de segunda a domingo, mês do dia 1 ao fim.",
+          },
+          {
+            value: "rolling" as const,
+            title: "Últimos N dias",
+            desc: "Sempre os últimos 7/30/90/180 dias a partir de hoje.",
+          },
+        ]).map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onPeriodModeChange(opt.value)}
+            className={`w-full text-left rounded-card border p-4 transition ${
+              periodMode === opt.value
+                ? "border-accent bg-base-surface2"
+                : "border-base-border bg-base-surface hover:border-ink-faint"
+            }`}
+          >
+            <span className="text-sm font-medium text-ink">{opt.title}</span>
+            <span className="block mt-1 text-[13px] text-ink-muted">{opt.desc}</span>
+          </button>
+        ))}
+      </div>
+
+      <label className="block mt-6">
+        <span className="text-xs text-ink-muted mb-1.5 block">
+          Sua semana começa em:
+        </span>
+        <div className="flex gap-3">
+          {([
+            { value: "monday" as const, label: "Segunda-feira" },
+            { value: "sunday" as const, label: "Domingo" },
+          ]).map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onWeekStartsOnChange(opt.value)}
+              className={`flex-1 rounded-lg border px-3 py-2 text-sm transition ${
+                weekStartsOn === opt.value
+                  ? "border-accent bg-base-surface2 text-ink"
+                  : "border-base-border text-ink-muted hover:border-ink-faint"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </label>
+
+      <div className="mt-8 flex gap-3">
+        <button
+          onClick={onBack}
+          className="rounded-lg border border-base-border px-5 py-3 text-sm text-ink-muted hover:text-ink transition"
+        >
+          Voltar
+        </button>
+        <button
+          onClick={onNext}
+          className="flex-1 rounded-lg bg-accent text-base-bg font-medium py-3 text-sm hover:bg-accent-hover transition"
+        >
+          Próximo
         </button>
       </div>
     </div>

@@ -1,9 +1,14 @@
+export type PeriodMode = "fixed" | "rolling";
+export type WeekStartsOn = "monday" | "sunday";
+
 export type Profile = {
   id: string;
   display_name: string;
   height_cm: number | null;
   created_at: string;
   onboarded_at: string | null;
+  period_mode: PeriodMode;
+  week_starts_on: WeekStartsOn;
 };
 
 export type WeightEntry = {
