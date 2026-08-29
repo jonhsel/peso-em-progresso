@@ -189,7 +189,7 @@ export default function WeightChart({
               fontSize: 12,
             }}
             labelStyle={{ color: colors.tooltipLabel }}
-            formatter={(value: number) => [`${value.toFixed(1)} kg`, "Peso"]}
+            formatter={(value: number, name: string) => [`${value.toFixed(1)} kg`, name]}
           />
           {targetWeightKg && (
             <ReferenceLine
@@ -202,6 +202,7 @@ export default function WeightChart({
           <Area
             type="monotone"
             dataKey="peso"
+            name="Peso"
             stroke={colors.accent}
             strokeWidth={2}
             fill="url(#pesoGradient)"
@@ -212,11 +213,18 @@ export default function WeightChart({
             <Line
               type="linear"
               dataKey="esperado"
+              name="Esperado"
               stroke={colors.axis}
-              strokeWidth={1.5}
+              strokeWidth={2}
               strokeDasharray="4 4"
-              dot={false}
-              activeDot={false}
+              // Numa semana, a diferença entre peso real e esperado costuma
+              // ser de poucas centenas de gramas — em pixels, isso pode cair
+              // a 2-3px de distância da linha sólida (Area) e ficar oculta
+              // por baixo dela, mesmo a linha estando desenhada corretamente.
+              // Os pontos (um por pesagem dentro da semana) dão uma âncora
+              // visível mesmo quando o traço em si está colado na linha real.
+              dot={{ r: 3, fill: colors.tooltipBg, stroke: colors.axis, strokeWidth: 2 }}
+              activeDot={{ r: 5 }}
               connectNulls
               isAnimationActive={false}
               legendType="none"
