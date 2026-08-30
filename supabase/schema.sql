@@ -239,6 +239,34 @@ comment on table public.goals_history is
   'Log append-only de toda meta que já existiu por usuário — usado para resolver qual meta valia em cada período passado (ver resolveGoalsForPeriod em src/lib/analytics.ts) e pela tela de histórico em /dashboard/goals.';
 
 -- ---------------------------------------------------------
+-- 6. Conquistas (achievements)
+-- Ver supabase/migrations/0006_user_achievements.sql
+-- ---------------------------------------------------------
+create table if not exists public.user_achievements (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  achievement_key text not null,
+  unlocked_at timestamptz not null default now(),
+  constraint user_achievements_unique unique (user_id, achievement_key)
+);
+
+create index if not exists user_achievements_user_idx
+  on public.user_achievements (user_id);
+
+alter table public.user_achievements enable row level security;
+
+create policy "user_achievements_select_own"
+  on public.user_achievements for select
+  using (auth.uid() = user_id);
+
+create policy "user_achievements_insert_own"
+  on public.user_achievements for insert
+  with check (auth.uid() = user_id);
+
+comment on table public.user_achievements is
+  'Conquistas desbloqueadas por usuário. Chave única (user_id, achievement_key) impede duplicata. Sem update/delete — uma vez desbloqueada, permanece.';
+
+-- ---------------------------------------------------------
 -- Notas de arquitetura:
 -- * RLS garante que cada usuário (amigo/familiar) só vê os próprios dados,
 --   mesmo estando todos no mesmo projeto Supabase.

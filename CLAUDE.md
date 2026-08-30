@@ -19,7 +19,7 @@ na tela `/dashboard/goals`, não fixas no código.
   `src/app/globals.css`) + Recharts para gráficos
 - Sem ORM extra — queries via `@supabase-js` / `@supabase/ssr` direto
 
-## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) completos, não validados em produção
+## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) + Fase 4.2 (conquistas) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -838,14 +838,109 @@ Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 4 —
 Gamificação e engajamento → "Sequência de registros") e atualizar os
 checkboxes acima.
 
+## Fase 4.2 — Conquistas (achievements) (implementada 30/08/2026)
+
+Spec completo em `claude_fase4_achievements_v2.md` (na raiz do repo, não
+versionado — mesmo padrão dos specs anteriores; v2 já auditada contra o
+código real, achados no Apêndice A do próprio arquivo). Implementado nesta
+sessão: `tsc --noEmit` e `npm run build` limpos. **Ainda não testado contra
+Supabase real nem visto num navegador** — ver checklist abaixo. Patch
+aplicado ao pé da letra do spec, sem desvios. Segunda de 4 sub-fases da
+Fase 4 (Gamificação e engajamento): streak (4.1, já implementada) →
+**conquistas** (4.2) → check-in preferido → guia de ajuda (as 2 seguintes
+ainda não speccadas).
+
+- **Conquistas são persistidas** (diferente do streak, que é recalculado a
+  cada load) — tabela nova `user_achievements`
+  (`supabase/migrations/0006_user_achievements.sql`, também adicionada a
+  `supabase/schema.sql`): `unique(user_id, achievement_key)` impede
+  duplicata, RLS por `auth.uid() = user_id`, **sem policy de update/delete**
+  — uma vez desbloqueada, uma conquista nunca é revogada (mesmo que o peso
+  suba depois), decisão deliberada. **Ainda precisa ser rodada manualmente
+  no Supabase Dashboard > SQL Editor.**
+- **7 conquistas no total**, definidas como constante em
+  `src/lib/achievements.ts` (`ACHIEVEMENT_RULES`) — código, não banco, já
+  que a regra é igual pra todo mundo:
+  - Perda absoluta (`first_entry.weight_kg - latest_entry.weight_kg`):
+    `lost_1kg`/`lost_5kg`/`lost_10kg`.
+  - Progresso percentual em relação a `goals.target_weight_kg`
+    (`pct_25`/`pct_50`/`pct_75`/`pct_100`) — só avaliável com peso alvo
+    definido **e** peso inicial acima do alvo; se `target_weight_kg` for
+    `null`, aparece como **bloqueada** ("Defina um peso alvo em Metas"),
+    não escondida silenciosamente; se o peso inicial já estava no/abaixo do
+    alvo, bloqueada com "Peso alvo já alcançado".
+  - `evaluateAchievements(entries, goals, existing)` é função pura: cruza as
+    regras com os dados atuais e a lista já persistida, retorna `all`
+    (status `unlocked`/`locked`/`blocked` de cada uma) + `newlyUnlocked`
+    (keys cuja condição foi atingida agora mas ainda não estão no banco —
+    o caller persiste). Uma conquista já em `existing` **nunca é
+    reavaliada** — vira `unlocked` direto, sem checar a condição de novo,
+    o que garante que não é perdida se o peso subir depois.
+- `src/components/AchievementsCard.tsx` — client component (`"use client"`,
+  precisa de `useEffect` pra persistir sem bloquear o render inicial),
+  renderizado em `/dashboard` logo abaixo do `StreakCard`, antes do
+  `KpiWeeklyTeaser` (streak = sinal de hábito, conquistas = sinal de
+  resultado acumulado, KPI = sinal de progresso — nessa ordem). Grid de 7
+  quadrados com ícone (emoji); desbloqueadas usam `bg-[var(--accent-tint)]`
+  + `border-accent` (mesma var já usada pelo dropzone de import CSV, Fase
+  2.1, item 15); bloqueadas/não-alcançadas ficam opacas. Persistência é
+  **fire-and-forget**: o `useEffect` insere `newlyUnlocked` em
+  `user_achievements` e chama `router.refresh()` no sucesso;
+  `useRef(didPersist)` evita reexecução em StrictMode/re-render, e o
+  `createClient()` do Supabase é criado **dentro** do efeito (não no corpo
+  do componente) pra não virar dep instável — lista de deps
+  `[newlyUnlocked, userId]` com `router` omitido (estável na prática, guard
+  por ref é a barreira primária). Tooltip nativo (`title`) mostra
+  rótulo+descrição+data de desbloqueio ou motivo do bloqueio — sem lib de
+  tooltip. **`grayscale` do Tailwind nos ícones locked/blocked é só
+  cosmético**: `filter: grayscale()` pode não afetar emoji renderizado
+  nativamente pelo OS em alguns browsers (iOS Safari/macOS); a
+  diferenciação visual real é pelo fundo/borda/opacity, não pelo filtro.
+- `loadUserData()` agora também carrega `achievements` (`user_achievements`
+  sem ordenação — no máximo 7 linhas por usuário), em paralelo com
+  profile/entries/goals/measurements/goalsHistory.
+- `dashboard/page.tsx` passou a desestruturar `user` de `loadUserData()`
+  (não desestruturava antes, diferente de entries/goals/import/settings,
+  que já o faziam) — necessário pra passar `userId` ao `AchievementsCard`.
+- **Fora de escopo desta sub-fase** (idem spec): conquistas baseadas em
+  streak ou em medidas corporais, animação/confetti ao desbloquear, tela
+  dedicada `/dashboard/achievements`, conquistas no PDF exportado
+  (`api/export/pdf` não mudou).
+
+- [ ] Rodar `supabase/migrations/0006_user_achievements.sql` no Supabase
+      Dashboard — conferir que a tabela foi criada e RLS está ativo.
+- [ ] Conta nova sem pesagens: card mostra "0/7", todos os 7 ícones em
+      locked/blocked; conquistas de % mostram "🔒" com tooltip "Defina um
+      peso alvo em Metas".
+- [ ] Conta com pesagens mas sem peso alvo: conquistas absolutas avaliam
+      normalmente; conquistas de % continuam bloqueadas.
+- [ ] Definir peso alvo em `/dashboard/goals`, voltar ao dashboard →
+      conquistas de % saem de bloqueadas e passam a avaliar de verdade.
+- [ ] Perder 1 kg desde o primeiro registro → "Primeiro kg" desbloqueia
+      automaticamente (fundo tintado, tooltip com data); conferir em
+      `user_achievements` que o registro foi criado.
+- [ ] Recarregar após desbloqueio → conquista continua desbloqueada (vem do
+      banco, não recalculada); peso subir depois → conquista NÃO é
+      revogada.
+- [ ] Conta já abaixo do peso alvo desde o primeiro registro → conquistas
+      de % bloqueadas com "Peso alvo já alcançado".
+- [ ] RLS: usuário A não consegue ler `user_achievements` do usuário B.
+- [ ] Alternar tema claro/escuro com o card visível — contraste adequado
+      dos ícones desbloqueados e locked nos dois temas.
+- [ ] Mobile: grid de 7 colunas sem overflow horizontal.
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 4 —
+Gamificação e engajamento → "Conquistas") e atualizar os checkboxes acima.
+
 ## Pendências / próximos passos sugeridos (não iniciados)
 
 - [ ] Testar o app fim a fim contra um projeto Supabase real (criar projeto, rodar
       `schema.sql` + `migrations/0002_onboarding.sql` + `migrations/0003_body_measurements.sql`
-      + `migrations/0004_goals_history.sql` + `migrations/0005_period_mode.sql`,
+      + `migrations/0004_goals_history.sql` + `migrations/0005_period_mode.sql`
+      + `migrations/0006_user_achievements.sql`,
       configurar `.env.local`, testar signup/login/registro de peso, exportação
-      CSV/PDF, importação CSV, medidas corporais, metas + histórico, e a tela
-      de Configurações/período de meta).
+      CSV/PDF, importação CSV, medidas corporais, metas + histórico, tela
+      de Configurações/período de meta, e conquistas.
 - [ ] Deploy real na Vercel + configurar Site URL / Redirect URLs no Supabase Auth.
 - [ ] Testes unitários para `src/lib/analytics.ts` (funções puras, fáceis de testar).
 - [ ] Massa magra/composição corporal mais completa (bioimpedância avançada) — hoje

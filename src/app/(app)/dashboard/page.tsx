@@ -5,6 +5,7 @@ import NavBar from "@/components/NavBar";
 import KpiCard from "@/components/KpiCard";
 import KpiWeeklyTeaser from "@/components/KpiWeeklyTeaser";
 import StreakCard from "@/components/StreakCard";
+import AchievementsCard from "@/components/AchievementsCard";
 import TrendBadge from "@/components/TrendBadge";
 import WeightChart from "@/components/WeightChart";
 import Link from "next/link";
@@ -12,7 +13,7 @@ import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default async function DashboardPage() {
-  const { profile, entries, goals, goalsHistory } = await loadUserData();
+  const { user, profile, entries, goals, goalsHistory, achievements } = await loadUserData();
   const theme = await getTheme();
 
   const kpis = computeAllKpis(entries, goalsHistory, new Date(), profile.period_mode, profile.week_starts_on);
@@ -69,6 +70,12 @@ export default async function DashboardPage() {
         </div>
 
         <StreakCard entries={entries} />
+        <AchievementsCard
+          entries={entries}
+          goals={goals}
+          achievements={achievements}
+          userId={user.id}
+        />
 
         {weekKpi && <KpiWeeklyTeaser kpi={weekKpi} />}
 

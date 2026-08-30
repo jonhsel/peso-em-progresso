@@ -54,6 +54,13 @@ export type BodyMeasurement = {
   created_at: string;
 };
 
+export type UserAchievement = {
+  id: string;
+  user_id: string;
+  achievement_key: string;
+  unlocked_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -91,6 +98,12 @@ export type Database = {
           semester_loss_kg: number;
         };
         Update: never; // append-only, sem policy de update
+        Relationships: [];
+      };
+      user_achievements: {
+        Row: UserAchievement;
+        Insert: Partial<UserAchievement> & { user_id: string; achievement_key: string };
+        Update: never; // conquistas não são editáveis
         Relationships: [];
       };
     };

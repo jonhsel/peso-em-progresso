@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { Goals, GoalsHistoryEntry, Profile, WeightEntry, BodyMeasurement } from "@/types/database";
+import type {
+  Goals, GoalsHistoryEntry, Profile, WeightEntry, BodyMeasurement, UserAchievement
+} from "@/types/database";
 
 export async function loadUserData() {
   const supabase = createClient();
@@ -10,7 +12,7 @@ export async function loadUserData() {
 
   if (!user) redirect("/login");
 
-  const [{ data: profile }, { data: entries }, { data: goals }, { data: measurements }, { data: goalsHistory }] =
+  const [{ data: profile }, { data: entries }, { data: goals }, { data: measurements }, { data: goalsHistory }, { data: achievements }] =
     await Promise.all([
       supabase.from("profiles").select("*").eq("id", user.id).single(),
       supabase
@@ -29,6 +31,10 @@ export async function loadUserData() {
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false }),
+      supabase
+        .from("user_achievements")
+        .select("*")
+        .eq("user_id", user.id),
     ]);
 
   // Fase 0: quem nunca concluiu o onboarding é redirecionado antes de ver
@@ -76,5 +82,6 @@ export async function loadUserData() {
         target_weight_kg: null,
         updated_at: "",
       } as Goals),
+    achievements: (achievements as UserAchievement[]) ?? [],
   };
 }
