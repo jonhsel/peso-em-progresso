@@ -4,6 +4,7 @@ import { computeAllKpis, computeTrend } from "@/lib/analytics";
 import NavBar from "@/components/NavBar";
 import KpiCard from "@/components/KpiCard";
 import KpiWeeklyTeaser from "@/components/KpiWeeklyTeaser";
+import StreakCard from "@/components/StreakCard";
 import TrendBadge from "@/components/TrendBadge";
 import WeightChart from "@/components/WeightChart";
 import Link from "next/link";
@@ -66,6 +67,8 @@ export default async function DashboardPage() {
             Registrar pesagem
           </Link>
         </div>
+
+        <StreakCard entries={entries} />
 
         {weekKpi && <KpiWeeklyTeaser kpi={weekKpi} />}
 

@@ -19,7 +19,7 @@ na tela `/dashboard/goals`, não fixas no código.
   `src/app/globals.css`) + Recharts para gráficos
 - Sem ORM extra — queries via `@supabase-js` / `@supabase/ssr` direto
 
-## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) completos, não validados em produção
+## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -747,6 +747,80 @@ renumerar os specs já escritos; só ter isso em mente ao ler o histórico.
       de forma ilegível (fix aplicado por inferência, não visto rodando).
 - [ ] `display_name` vazio/só espaços e `height_cm` inválido (0, -10, 999) →
       erro de validação, nada salvo; `height_cm` vazio → salva como `null`.
+
+## Fase 4.1 — Streak de registros (implementada 30/08/2026)
+
+Spec completo em `claude_fase4_streak_v2.md` (na raiz do repo, não
+versionado — mesmo padrão dos specs anteriores; v2 já auditada contra o
+código real, achados no Apêndice A do próprio arquivo). Implementado nesta
+sessão: `tsc --noEmit` e `npm run build` limpos. **Ainda não testado contra
+Supabase real nem visto num navegador** — ver checklist abaixo. Patch
+aplicado ao pé da letra do spec, sem desvios. Primeira de 4 sub-fases da
+Fase 4 (Gamificação e engajamento): streak → conquistas → check-in
+preferido → guia de ajuda (as 3 seguintes ainda não speccadas).
+
+- **Sem tabela nova, sem migração** — decisão deliberada. `src/lib/streak.ts`
+  (`computeStreak`, função pura) deriva tudo de `weight_entries.measured_at`,
+  já carregado por `loadUserData()`. Nada é persistido em `profiles`/tabela
+  nova: recalcular sempre evita dessincronia se um registro for editado ou
+  apagado depois.
+- **Regra de tolerância de 1 dia**: a sequência atual conta a partir de hoje
+  se já houve registro hoje; se não, mas houve ontem, a sequência continua
+  contando (ainda dá tempo de registrar mais tarde no dia) — só zera quando
+  faltam hoje **e** ontem. Evita o streak parecer "quebrado" de manhã antes
+  de a pessoa abrir o app.
+- **Fuso horário fixo em `America/Sao_Paulo`** via
+  `Intl.DateTimeFormat("en-CA", ...)` em toda conversão de data pra string
+  `YYYY-MM-DD` neste arquivo (`todayInSaoPaulo` e `daysBefore`) — mesmo
+  cuidado já usado em `ExportDocument.tsx`/`dashboard/page.tsx`. Nunca
+  `.toISOString()` nem `formatISO` do `date-fns` (ambos formatam em UTC),
+  que causaria off-by-one perto da meia-noite em SP (achado da auditoria do
+  próprio spec, Apêndice A2 do `claude_fase4_streak_v2.md`).
+- `src/components/StreakCard.tsx` — Server Component (sem `"use client"`,
+  só exibe dados já calculados), mesmo padrão de `ExportButtons.tsx`.
+  Renderizado em `/dashboard` (`src/app/(app)/dashboard/page.tsx`) logo após
+  o bloco de peso atual/botão "Registrar pesagem", antes do
+  `KpiWeeklyTeaser` — streak é o sinal de hábito (mais imediato), o teaser
+  de KPI é o sinal de progresso (vem em seguida).
+  Mostra sequência atual, aviso "registre hoje pra manter" (só quando não
+  há registro hoje e a sequência ainda é >0), melhor sequência histórica, e
+  7 pontos dos últimos 7 dias (preenchido se houve registro naquele dia).
+  Usa `text-accent`/`bg-accent` (streak é categoria visual separada dos KPIs
+  — sinal de hábito, não de status) e
+  `text-[var(--badge-caution-text)]` no aviso (não `text-signal-caution`,
+  que tem contraste ~1.9:1 sobre `--base-surface` light — mesmo padrão já
+  consolidado em `KpiCard.tsx`/`kpi-status.ts`).
+- Registros com `source = 'import'` (Fase 2.1) contam pra sequência igual a
+  `'manual'` — o streak mede "há dado desse dia", não "o usuário abriu o
+  app nesse dia".
+- **Fora de escopo desta sub-fase** (deixado explícito no spec): persistir
+  streak em tabela, conquistas/badges por streak (próxima sub-fase da Fase
+  4, `user_achievements`), notificação de streak prestes a quebrar (depende
+  de lembrete por e-mail, Fase 1, ainda não implementado), e mostrar o
+  streak em qualquer tela além de `/dashboard`.
+
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
+      dev — **ainda não visto rodando num navegador real**).
+- [ ] Conta sem nenhuma pesagem: card mostra "Registre hoje pra começar sua
+      sequência", 7 pontos vazios.
+- [ ] Registrar pesagem hoje: `currentStreak` vira pelo menos 1, ponto de
+      hoje preenchido.
+- [ ] Pesagens em dias consecutivos → `currentStreak` soma corretamente;
+      pular um dia no meio → `currentStreak` reflete só a sequência mais
+      recente, `bestStreak` guarda a maior já vista.
+- [ ] Sem registro hoje mas com registro ontem → `currentStreak` continua
+      contando (tolerância de 1 dia) + aviso "registre hoje pra manter";
+      sem hoje NEM ontem → volta a 0.
+- [ ] Teste de fuso: registrar por volta de 21h-23h horário de Brasília e
+      confirmar que o dia contado é o dia local correto (não UTC).
+- [ ] Importação de CSV contando pra sequência: dia importado aparece
+      preenchido no indicador de 7 dias.
+- [ ] Alternar tema claro/escuro com o card visível — `accent`/aviso
+      caution/pontos vazios com contraste adequado nos dois temas.
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 4 —
+Gamificação e engajamento → "Sequência de registros") e atualizar os
+checkboxes acima.
 
 ## Pendências / próximos passos sugeridos (não iniciados)
 
