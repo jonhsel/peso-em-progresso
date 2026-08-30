@@ -1,0 +1,23 @@
+<svg width="460" height="380" viewBox="0 0 460 380" xmlns="http://www.w3.org/2000/svg">
+<style>
+  .bg { fill: #0F1512; }
+  .ring { fill: none; stroke: #1C2521; stroke-width: 2; }
+  .track { fill: none; stroke: #2A3833; stroke-width: 6; stroke-linecap: round; }
+  .progress { fill: none; stroke: #34D399; stroke-width: 6; stroke-linecap: round; }
+  .dotStart { fill: #0F1512; stroke: #34D399; stroke-width: 3; }
+  .dotEnd { fill: #34D399; }
+  .word1 { font-family: var(--font-space-grotesk), sans-serif; font-size: 40px; font-weight: 700; fill: currentColor; }
+  .word2 { font-family: var(--font-space-grotesk), sans-serif; font-size: 40px; font-weight: 700; fill: #34D399; }
+</style>
+
+<rect x="140" y="30" width="180" height="180" rx="36" class="bg"/>
+<rect x="140" y="30" width="180" height="180" rx="36" class="ring"/>
+
+<path d="M 175 80 Q 200 80 210 110 Q 220 140 250 140 Q 275 140 285 160" class="track"/>
+<path d="M 175 80 Q 198 80 208 108 Q 218 138 250 140 Q 270 141 285 160" class="progress"/>
+<circle cx="175" cy="80" r="6" class="dotStart"/>
+<circle cx="285" cy="160" r="8" class="dotEnd"/>
+
+<text x="230" y="300" text-anchor="middle" class="word1">peso em</text>
+<text x="230" y="345" text-anchor="middle" class="word2">progresso</text>
+</svg>
