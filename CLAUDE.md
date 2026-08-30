@@ -19,7 +19,7 @@ na tela `/dashboard/goals`, não fixas no código.
   `src/app/globals.css`) + Recharts para gráficos
 - Sem ORM extra — queries via `@supabase-js` / `@supabase/ssr` direto
 
-## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) + Fase 4.2 (conquistas) + Fase 4.3 (próximo check-in) completos, não validados em produção
+## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) + Fase 4.2 (conquistas) + Fase 4.3 (próximo check-in) + Fase 4.4 (guia de ajuda) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -1041,6 +1041,95 @@ Gamificação e engajamento → "Próximo check-in") e atualizar os checkboxes
 acima. `claude_fases.md` não foi localizado neste repo nesta sessão (não
 versionado, mesmo caso dos specs `claude_fase*.md`) — se reaparecer numa
 sessão futura, aplicar essa marcação lá também.
+
+## Fase 4.4 — Guia de ajuda revisitável (implementada 30/08/2026)
+
+Spec completo em `claude_fase4_ajuda_v2.md` (na raiz do repo, não
+versionado — mesmo padrão dos specs anteriores; v2 auditada só como revisão
+de consistência interna, sem acesso aos arquivos reais na sessão em que foi
+escrita — os 5 itens "pendente de confirmação" do Apêndice A foram
+resolvidos nesta sessão contra o código real, ver abaixo). Implementado
+nesta sessão: `tsc --noEmit` e `npm run build` limpos. **Ainda não testado
+num navegador real** — ver checklist abaixo. Patch aplicado ao pé da letra
+do spec, sem desvios de lógica. Quarta e última sub-fase da Fase 4
+(Gamificação e engajamento): streak (4.1) → conquistas (4.2) → próximo
+check-in (4.3) → **guia de ajuda (4.4)**. Com essa sub-fase, **a Fase 4
+fecha por completo**.
+
+- **Sem migração, sem mudança de tipos** — sub-fase mais isolada da Fase 4,
+  só conteúdo + UI. Não mexe em `loadUserData.ts`, `database.ts`,
+  `dashboard/page.tsx` nem nenhuma rota de API.
+- **Resolução do Apêndice A do spec (itens pendentes de confirmação contra o
+  código real):**
+  1. `NavBar.tsx` já é client component (`"use client"`) — `useState` de
+     `isHelpOpen` cabe direto, sem sub-componente client-only. O array
+     `links` é só `{ href, label }[]`, todo item vira `<Link>`, sem campo
+     discriminador existente. Em vez de introduzir um campo `action`/`href`
+     pra um único caso, "Ajuda" ficou como `<button>` avulso fora do
+     `.map()`, com as mesmas classes visuais do estado "inativo" dos
+     `<Link>` — mais simples que o discriminador proposto no spec.
+  2. `ConfirmDialog.tsx` usa `open`/`onCancel`/`onConfirm`, não
+     `isOpen`/`onClose`. `HelpModal` adotou `open` (mesmo nome do booleano,
+     pra não criar uma segunda convenção de "modal aberto" no projeto) +
+     `onClose` (em vez de `onCancel`, mais preciso pra um modal que só
+     fecha, sem cancelar nada — não tem `onConfirm`).
+  3. `ConfirmDialog` fecha ao clicar fora (`onClick={onCancel}` na `div`
+     do overlay) — `HelpModal` replica o mesmo comportamento.
+  4. `KPI_STATUSES` (`src/lib/kpi-status.ts`) tem os campos `key`, `label`,
+     `dot`, `text`, `hex`, `description` — `HelpModal` usa `dot`/`text` pra
+     cor (classes literais já resolvidas, nunca `` `bg-${status.tone}` ``,
+     mesma armadilha já documentada na landing/`KpiWeeklyTeaser`) e
+     `label`/`description` pro texto de cada card, em vez de hardcodar.
+  5. `ConfirmDialog` **não** tem close-on-Escape — não havia padrão
+     existente pra replicar; `HelpModal` é o primeiro modal do projeto com
+     esse handler (`useEffect` com listener de `keydown` global). Dívida
+     técnica anotada: bom seria fazer o mesmo backport no `ConfirmDialog`,
+     fora do escopo desta sub-fase.
+- `src/components/HelpModal.tsx` (novo) — client component, overlay
+  `bg-black/50` fixo + painel `rounded-card border-base-border bg-base-surface`
+  (mesmo visual do `ConfirmDialog`), `max-h-[85vh] overflow-y-auto` no
+  painel (não no overlay). Conteúdo, nessa ordem: título, parágrafo do
+  conceito central (mesma narrativa de 3 passos da landing/`HowItWorks`,
+  texto reescrito, não JSX copiado), grid dos 4 `KPI_STATUSES`, seção
+  "Acompanhamento diário" com 3 blocos de texto estático (sequência de
+  registros, conquistas, horário de check-in — cobre as 3 novidades da
+  Fase 4, não só o KPI original do roadmap), botão "Fechar"
+  (`bg-accent hover:bg-accent-hover`, centralizado). `role="dialog"`,
+  `aria-modal="true"`, `aria-label` com o título.
+- `src/components/NavBar.tsx` — novo `useState(isHelpOpen)` + botão "Ajuda"
+  (desktop e mobile, ao lado dos `<Link>` existentes, dentro dos dois
+  `<nav>`) + `<HelpModal open={isHelpOpen} onClose={...} />` renderizado
+  fora de ambos os `<nav>` (o componente passou a retornar um Fragment
+  envolvendo `<header>` + `<HelpModal>`, já que é overlay `fixed`, não faz
+  parte do fluxo de navegação semântico). Nada gravado em `profiles` —
+  `isHelpOpen` é estado 100% local, reseta ao navegar (novo `NavBar` é
+  remontado por rota).
+- `src/lib/kpi-status.ts` — nenhuma mudança, só reaproveitado (3º lugar que
+  importa `KPI_STATUSES`, depois de `HowItWorks`/landing e onboarding).
+
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
+      dev — **ainda não visto rodando num navegador real**).
+- [ ] Link "Ajuda" aparece no `NavBar` (desktop e mobile), sem quebrar o
+      layout — mobile com scroll horizontal funcionando (6 itens agora).
+- [ ] Clicar em "Ajuda" abre o modal; "Fechar", clique fora e tecla Escape
+      fecham.
+- [ ] Grid dos 4 status de KPI com cores/textos consistentes com a mesma
+      grid da landing/onboarding.
+- [ ] Seção de streak/conquistas/check-in compreensível pra conta nova sem
+      nenhum dado.
+- [ ] Conteúdo cabe em mobile sem overflow horizontal; scroll vertical
+      interno funciona se passar de `max-h-[85vh]`.
+- [ ] Abrir o modal, navegar pra outra página do dashboard, voltar — modal
+      fechado por padrão.
+- [ ] Nenhuma escrita no banco ao abrir/fechar (conferir Network/Supabase
+      logs).
+- [ ] Alternar tema claro/escuro com o modal aberto — contraste do overlay
+      e da grid de KPI adequado nos dois temas (`--badge-*-text` em light).
+
+Depois de validar em produção: marcar os 4 itens da Fase 4 (streak,
+conquistas, check-in, guia de ajuda) como concluídos no `claude_fases.md`
+(não localizado neste repo nesta sessão) e atualizar os checkboxes acima.
+**Fase 4 (Gamificação e engajamento) fechada por completo.**
 
 ## Pendências / próximos passos sugeridos (não iniciados)
 
