@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { type Theme } from "@/lib/theme";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import HelpModal from "@/components/HelpModal";
+import { LogoIcon } from "@/components/Logo";
 
 const links = [
   { href: "/dashboard", label: "Visão geral" },
@@ -33,7 +34,9 @@ export default function NavBar({ displayName, theme }: { displayName: string; th
       <header className="border-b border-base-border">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-8">
-            <span className="font-display font-bold text-lg">Peso em Progresso</span>
+            <Link href="/dashboard" className="flex items-center" aria-label="Peso em Progresso">
+              <LogoIcon className="h-9 w-9 shrink-0" />
+            </Link>
             <nav className="hidden sm:flex gap-1">
               {links.map((l) => (
                 <Link

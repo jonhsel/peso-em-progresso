@@ -4,6 +4,7 @@ import { TrajectoryGraphic } from "@/components/marketing/TrajectoryGraphic";
 import { plans } from "@/lib/pricing";
 import { KPI_STATUSES } from "@/lib/kpi-status";
 import { appPath } from "@/lib/app-url";
+import { LogoHorizontal, LogoIcon } from "@/components/Logo";
 
 // Todo CTA desta página aponta pro subdomínio do app (appPath), não pra rota
 // relativa — landing (apex) e app (app.*) são origens diferentes. Por isso
@@ -43,7 +44,9 @@ export default async function Home() {
 function Header() {
   return (
     <header className="max-w-4xl mx-auto px-4 py-6 flex items-center justify-between">
-      <span className="font-display font-bold text-lg">Peso em Progresso</span>
+      <a href="/" aria-label="Peso em Progresso" className="flex items-center">
+        <LogoHorizontal className="h-8 sm:h-9 w-auto" />
+      </a>
       <nav className="flex items-center gap-6 text-sm text-ink-muted">
         <a href="#como-funciona" className="hidden sm:inline hover:text-ink transition">
           Como funciona
@@ -272,7 +275,10 @@ function Footer() {
   return (
     <footer className="border-t border-base-border py-8 px-4">
       <div className="max-w-4xl mx-auto flex items-center justify-between font-mono text-xs text-ink-faint">
-        <span>Peso em Progresso</span>
+        <span className="flex items-center gap-2">
+          <LogoIcon className="h-5 w-5 shrink-0" />
+          Peso em Progresso
+        </span>
         <a href={appPath("/login")} className="hover:text-ink-muted transition">
           entrar
         </a>
