@@ -769,13 +769,29 @@ preferido → guia de ajuda (as 3 seguintes ainda não speccadas).
   contando (ainda dá tempo de registrar mais tarde no dia) — só zera quando
   faltam hoje **e** ontem. Evita o streak parecer "quebrado" de manhã antes
   de a pessoa abrir o app.
-- **Fuso horário fixo em `America/Sao_Paulo`** via
-  `Intl.DateTimeFormat("en-CA", ...)` em toda conversão de data pra string
-  `YYYY-MM-DD` neste arquivo (`todayInSaoPaulo` e `daysBefore`) — mesmo
-  cuidado já usado em `ExportDocument.tsx`/`dashboard/page.tsx`. Nunca
-  `.toISOString()` nem `formatISO` do `date-fns` (ambos formatam em UTC),
-  que causaria off-by-one perto da meia-noite em SP (achado da auditoria do
-  próprio spec, Apêndice A2 do `claude_fase4_streak_v2.md`).
+- **Fuso horário:** `todayInSaoPaulo` (converte o instante real `new Date()`
+  em "que dia é hoje") usa `Intl.DateTimeFormat("en-CA", { timeZone:
+  "America/Sao_Paulo" })` — única conversão de fuso do arquivo, mesmo
+  cuidado já usado em `ExportDocument.tsx`/`dashboard/page.tsx`.
+  **Bug real encontrado e corrigido no mesmo dia** (reportado pelo usuário
+  vendo o card em produção: sequência real de 6 dias mostrando 4): o spec
+  original (Apêndice A2, corrigindo a v1) trocou `.toISOString()` por
+  `SP_FMT.format(subDays(parseISO(dateStr), days))` em `daysBefore`, achando
+  que isso propagava o mesmo cuidado de fuso — mas é uma combinação quebrada.
+  `parseISO("2026-08-30")` (string sem hora) vira meia-noite no fuso *local
+  do processo Node* (UTC no servidor), não em São Paulo; formatar esse
+  resultado em `America/Sao_Paulo` (UTC-3) subtrai um dia *extra*, porque
+  meia-noite UTC cai às 21h do dia anterior em SP. Cada chamada de
+  `daysBefore(x, 1)` andava 2 dias pra trás, não 1 — o loop da sequência
+  atual pulava metade dos dias e quebrava cedo demais. Corrigido trocando
+  `daysBefore` para aritmética pura em UTC (`Date.UTC` + `setUTCDate`, sem
+  nenhuma conversão de fuso): como `measured_at` é uma data-calendário sem
+  hora, não há "instante" pra converter — só `todayInSaoPaulo` (que parte de
+  um instante real) precisa do fuso de SP. Comentário deixado em
+  `streak.ts` explicando, mesmo padrão do comentário sobre o bug do
+  `AreaChart`/`ComposedChart` em `WeightChart.tsx` — é fácil reintroduzir
+  esse tipo de bug "correto na leitura, errado na composição" numa mudança
+  futura sem entender o porquê.
 - `src/components/StreakCard.tsx` — Server Component (sem `"use client"`,
   só exibe dados já calculados), mesmo padrão de `ExportButtons.tsx`.
   Renderizado em `/dashboard` (`src/app/(app)/dashboard/page.tsx`) logo após
