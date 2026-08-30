@@ -8,6 +8,11 @@ export type StreakResult = {
 };
 
 const SP_FMT = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" });
+const SP_HOUR_FMT = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Sao_Paulo",
+  hour: "numeric",
+  hour12: false,
+});
 
 /**
  * Data de hoje em "YYYY-MM-DD" no fuso de referência do produto
@@ -41,6 +46,37 @@ function daysBefore(dateStr: string, days: number): string {
   const date = new Date(Date.UTC(year, month - 1, day));
   date.setUTCDate(date.getUTCDate() - days);
   return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Hora atual (0–23) no fuso de São Paulo, a partir de um instante real.
+ *
+ * Fase 4.3 (`isPastCheckinHour` abaixo): o spec original propunha receber um
+ * `Date` já convertido pro fuso de SP, reaproveitando algum helper existente
+ * cujo `.getHours()` já refletisse a hora local de SP. Esse helper não
+ * existe — `todayInSaoPaulo` acima só expõe uma *string* de data, não um
+ * `Date`. `Date.getHours()` sempre usa o fuso do processo Node (UTC em
+ * produção na Vercel), então criar um "Date deslocado" pra depois chamar
+ * `.getHours()` nele é exatamente o tipo de conversão dupla/paralela que já
+ * causou o bug de `daysBefore` documentado acima — não repetir esse padrão
+ * aqui. Em vez disso, extrai a hora de SP diretamente do instante real via
+ * `Intl.DateTimeFormat`, mesmo mecanismo já usado por `todayInSaoPaulo`.
+ */
+function currentHourInSaoPaulo(reference: Date): number {
+  // hour12: false pode formatar meia-noite como "24" em alguns runtimes;
+  // normaliza pra 0.
+  const hour = Number(SP_HOUR_FMT.format(reference));
+  return hour === 24 ? 0 : hour;
+}
+
+/**
+ * "Já passou da hora de check-in configurada?" — comparação simples de hora
+ * cheia (`>=`), não uma janela de 1h: `checkin_hour = 7` conta como passado
+ * a partir de 7h00 (7h32 já é "passado").
+ */
+export function isPastCheckinHour(checkinHour: number | null, reference: Date): boolean {
+  if (checkinHour === null) return false;
+  return currentHourInSaoPaulo(reference) >= checkinHour;
 }
 
 export function computeStreak(entries: WeightEntry[], reference: Date = new Date()): StreakResult {

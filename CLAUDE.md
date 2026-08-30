@@ -19,7 +19,7 @@ na tela `/dashboard/goals`, não fixas no código.
   `src/app/globals.css`) + Recharts para gráficos
 - Sem ORM extra — queries via `@supabase-js` / `@supabase/ssr` direto
 
-## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) + Fase 4.2 (conquistas) completos, não validados em produção
+## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) + Fase 4.2 (conquistas) + Fase 4.3 (próximo check-in) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -932,15 +932,125 @@ ainda não speccadas).
 Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 4 —
 Gamificação e engajamento → "Conquistas") e atualizar os checkboxes acima.
 
+## Fase 4.3 — Próximo check-in (horário preferido de registro) (implementada 30/08/2026)
+
+Spec completo em `claude_fase4_checkin_v2.md` (na raiz do repo, não
+versionado — mesmo padrão dos specs anteriores; v2 auditada só como revisão
+de consistência interna, sem acesso aos arquivos reais na sessão em que foi
+escrita — os 5 itens "pendente de confirmação" do Apêndice A foram
+resolvidos nesta sessão contra o código real, ver abaixo). Implementado
+nesta sessão: `tsc --noEmit` e `npm run build` limpos. **Ainda não testado
+contra Supabase real nem visto num navegador** — ver checklist abaixo.
+Última de 3 sub-fases já speccadas da Fase 4 (Gamificação e engajamento):
+streak (4.1) → conquistas (4.2) → **próximo check-in (4.3)**; guia de ajuda
+(4.4) segue não speccada.
+
+- **Novo campo em `profiles`**, não tabela dedicada: `checkin_hour smallint`,
+  nullable, sem default — diferente de `period_mode`/`week_starts_on` (Fase
+  3), não é perguntado no onboarding, só configurável depois. Migração
+  `supabase/migrations/0007_checkin_hour.sql` (idempotente, `ADD COLUMN IF
+  NOT EXISTS` + `CHECK (checkin_hour IS NULL OR checkin_hour BETWEEN 0 AND
+  23)`), replicada em `supabase/schema.sql`. **Ainda precisa ser rodada
+  manualmente no Supabase Dashboard > SQL Editor.**
+- **Granularidade: só a hora (0–23), semântica de "hora cheia"** — `checkin_hour
+  = 7` conta como "já passou" a partir das 7h00 (7h32 já é passado), não é
+  uma janela de 1h.
+- **Resolução do Apêndice A do spec (itens pendentes de confirmação contra o
+  código real):**
+  1. `loadUserData.ts` faz `select("*")` em `profiles` — zero mudança de
+     linha no select; só o fallback sintético (usado quando `profile` vem
+     `null` do banco) precisou ganhar `checkin_hour: null` explícito.
+  2. **Assinatura de `isPastCheckinHour`:** o spec propunha receber um
+     `Date` já convertido pro fuso de SP, reaproveitando um helper existente
+     — esse helper não existe em `streak.ts`; `todayInSaoPaulo` só expõe uma
+     *string* de data (`YYYY-MM-DD`), não um `Date` cujo `.getHours()`
+     reflita a hora de SP (que sempre usa o fuso do processo Node — UTC na
+     Vercel). Criar um "Date deslocado" só pra chamar `.getHours()` nele
+     seria a mesma classe de bug (conversão de fuso dupla/paralela) do
+     `daysBefore` documentado na Fase 4.1. A função implementada recebe o
+     `Date` **bruto** (o instante real) e extrai a hora de SP direto via
+     `Intl.DateTimeFormat` (`currentHourInSaoPaulo`, mesmo mecanismo de
+     `todayInSaoPaulo`, com normalização de `"24"` pra `0` que alguns
+     runtimes retornam à meia-noite). `StreakCard` cria **um único**
+     `reference = new Date()` e passa pra `computeStreak` e
+     `isPastCheckinHour` — nunca duas instâncias de "agora".
+  3. Tipo confirmado como `Profile` mesmo (`src/types/database.ts`), sem
+     variação de nome.
+  4. **Posição do JSX em `StreakCard.tsx`:** texto fixo do horário
+     (`"Seu horário de registro: 07:00"`) numa linha própria, logo abaixo do
+     contador de sequência atual; aviso de horário passado agrupado no mesmo
+     bloco visual do aviso de streak existente (duas linhas empilhadas
+     quando os dois aparecem juntos), em vez de espalhados — igual à
+     proposta do spec.
+  5. Sem precedente de formatação de hora em outro componente do projeto
+     (confirmado por busca no repo) — `"07:00"` (zero-padded, `HH:00`)
+     adotado como definido no spec, único padrão agora.
+- `src/lib/streak.ts::isPastCheckinHour(checkinHour, reference)` — função
+  pura nova, mesmo padrão de `computeTrend`/`computePeriodKpi` em
+  `analytics.ts` (lógica de decisão isolada e testável, sem depender de
+  React/Supabase).
+- `StreakCard.tsx` continua Server Component — nova prop `checkinHour:
+  number | null`; sem mudança nenhuma quando `checkin_hour` é `null`
+  (comportamento idêntico à Fase 4.1).
+- `SettingsForm.tsx` — novo `<select>` de 24 horas + opção "Não definir"
+  (→ `null`), no mesmo cartão "Perfil" onde já está `height_cm`. Parser
+  nomeado `parseOptionalCheckinHour` (convenção de `parseOptionalHeight`,
+  Fase 3) trata `""` como `null` explicitamente antes de qualquer
+  `Number()` — aqui o efeito de pular essa checagem seria pior que meta
+  zerada: `checkin_hour = 0` (meia-noite) sendo salvo por engano em vez de
+  "não definido". Update direto `supabase.from("profiles").update(...)` +
+  `router.refresh()`, mesmo padrão do resto do form; **não** abre
+  `ConfirmDialog` (só `period_mode` justifica o modal, decisão já registrada
+  na Fase 3 — mudar só o horário de check-in não recalcula KPI nenhum).
+- `dashboard/page.tsx` passa `profile.checkin_hour` pro `StreakCard`, mesmo
+  lugar onde já passa `entries`.
+- **Fora de escopo desta sub-fase** (idem spec): lembrete por e-mail (Fase 1
+  de e-mail nunca implementada), notificação push/browser, granularidade de
+  minuto, múltiplos horários, `checkin_hour` no PDF exportado (`api/export/pdf`
+  não mudou — faz query própria de profile, mas não usa `checkin_hour`),
+  perguntar no onboarding, timezone customizável (SP fixo, mesma decisão já
+  implícita em `streak.ts`), índice em `checkin_hour`.
+
+- [ ] Rodar `supabase/migrations/0007_checkin_hour.sql` no Supabase
+      Dashboard — conferir que contas existentes ganharam `checkin_hour =
+      null` e que a `CHECK` rejeita valores fora de 0–23.
+- [ ] Conta nova, `checkin_hour` nunca definido: `StreakCard` não mostra
+      nada relacionado a horário (comportamento idêntico à Fase 4.1).
+- [ ] Definir `checkin_hour = 7` em `/dashboard/settings`, salvar sem modal
+      aparecer, `router.refresh()` reflete a mudança.
+- [ ] Com `checkin_hour` definido e antes desse horário (SP): sem aviso de
+      "já passou", só o texto fixo do horário.
+- [ ] Com `checkin_hour` definido, já passou da hora (inclusive minutos
+      após a hora cheia, ex. 7h32 com `checkin_hour=7`), sem registro hoje:
+      aviso extra aparece, junto (ou não) do aviso de streak conforme o
+      estado da sequência.
+- [ ] Registrar peso hoje após o aviso aparecer → aviso de horário some no
+      próximo refresh.
+- [ ] Selecionar "Não definir" depois de já ter um valor salvo → grava
+      `null` corretamente (conferir no banco que não virou `0` por engano).
+- [ ] Teste de fuso: alterar `checkin_hour` pra hora próxima do horário
+      atual em SP e conferir que o aviso aparece/desaparece no limite
+      certo, não em UTC.
+- [ ] RLS: usuário A não consegue ler/editar `checkin_hour` de `profiles`
+      de usuário B.
+- [ ] Alternar tema claro/escuro com o aviso visível — contraste adequado
+      (mesma classe de cor já validada na Fase 4.1).
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 4 —
+Gamificação e engajamento → "Próximo check-in") e atualizar os checkboxes
+acima. `claude_fases.md` não foi localizado neste repo nesta sessão (não
+versionado, mesmo caso dos specs `claude_fase*.md`) — se reaparecer numa
+sessão futura, aplicar essa marcação lá também.
+
 ## Pendências / próximos passos sugeridos (não iniciados)
 
 - [ ] Testar o app fim a fim contra um projeto Supabase real (criar projeto, rodar
       `schema.sql` + `migrations/0002_onboarding.sql` + `migrations/0003_body_measurements.sql`
       + `migrations/0004_goals_history.sql` + `migrations/0005_period_mode.sql`
-      + `migrations/0006_user_achievements.sql`,
+      + `migrations/0006_user_achievements.sql` + `migrations/0007_checkin_hour.sql`,
       configurar `.env.local`, testar signup/login/registro de peso, exportação
       CSV/PDF, importação CSV, medidas corporais, metas + histórico, tela
-      de Configurações/período de meta, e conquistas.
+      de Configurações/período de meta, conquistas, e horário de check-in.
 - [ ] Deploy real na Vercel + configurar Site URL / Redirect URLs no Supabase Auth.
 - [ ] Testes unitários para `src/lib/analytics.ts` (funções puras, fáceis de testar).
 - [ ] Massa magra/composição corporal mais completa (bioimpedância avançada) — hoje

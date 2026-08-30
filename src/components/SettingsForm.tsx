@@ -17,6 +17,19 @@ function parseOptionalHeight(raw: string): number | null | "invalid" {
   return n;
 }
 
+// Mesma armadilha de Number("") === 0: aqui o efeito seria pior que meta
+// zerada — checkin_hour = 0 (meia-noite) sendo salvo por engano em vez de
+// null ("não definido"). "" tem que virar null antes de qualquer Number().
+function parseOptionalCheckinHour(value: string): number | null {
+  if (value === "") return null;
+  return Number(value);
+}
+
+const CHECKIN_HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
+  value: String(h),
+  label: `${String(h).padStart(2, "0")}:00`,
+}));
+
 const PERIOD_MODE_OPTIONS = [
   {
     value: "fixed" as const,
@@ -41,12 +54,14 @@ export default function SettingsForm({
   heightCm,
   periodMode,
   weekStartsOn,
+  checkinHour,
 }: {
   userId: string;
   displayName: string;
   heightCm: number | null;
   periodMode: PeriodMode;
   weekStartsOn: WeekStartsOn;
+  checkinHour: number | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -55,6 +70,7 @@ export default function SettingsForm({
   const [height, setHeight] = useState(heightCm !== null ? String(heightCm) : "");
   const [mode, setMode] = useState<PeriodMode>(periodMode);
   const [weekStart, setWeekStart] = useState<WeekStartsOn>(weekStartsOn);
+  const [checkinHourInput, setCheckinHourInput] = useState(checkinHour !== null ? String(checkinHour) : "");
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +83,7 @@ export default function SettingsForm({
     return () => clearTimeout(t);
   }, [saved]);
 
-  function validate(): { display_name: string; height_cm: number | null } | null {
+  function validate(): { display_name: string; height_cm: number | null; checkin_hour: number | null } | null {
     const trimmedName = name.trim();
     if (trimmedName === "") {
       setError("Nome: informe um valor.");
@@ -80,10 +96,12 @@ export default function SettingsForm({
       return null;
     }
 
-    return { display_name: trimmedName, height_cm: parsedHeight };
+    const parsedCheckinHour = parseOptionalCheckinHour(checkinHourInput);
+
+    return { display_name: trimmedName, height_cm: parsedHeight, checkin_hour: parsedCheckinHour };
   }
 
-  async function persist(values: { display_name: string; height_cm: number | null }) {
+  async function persist(values: { display_name: string; height_cm: number | null; checkin_hour: number | null }) {
     setLoading(true);
     setError(null);
 
@@ -94,6 +112,7 @@ export default function SettingsForm({
         height_cm: values.height_cm,
         period_mode: mode,
         week_starts_on: weekStart,
+        checkin_hour: values.checkin_hour,
       })
       .eq("id", userId);
 
@@ -161,6 +180,24 @@ export default function SettingsForm({
               placeholder="ex: 175"
               className="w-full rounded-lg bg-base-surface2 border border-base-border px-3 py-2 text-sm font-mono outline-none focus:border-accent"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs text-ink-muted mb-1.5">
+              Horário de registro — opcional
+            </label>
+            <select
+              value={checkinHourInput}
+              onChange={(e) => setCheckinHourInput(e.target.value)}
+              className="w-full rounded-lg bg-base-surface2 border border-base-border px-3 py-2 text-sm outline-none focus:border-accent"
+            >
+              <option value="">Não definir</option>
+              {CHECKIN_HOUR_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 

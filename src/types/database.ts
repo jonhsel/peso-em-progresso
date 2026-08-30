@@ -9,6 +9,7 @@ export type Profile = {
   onboarded_at: string | null;
   period_mode: PeriodMode;
   week_starts_on: WeekStartsOn;
+  checkin_hour: number | null;
 };
 
 export type WeightEntry = {

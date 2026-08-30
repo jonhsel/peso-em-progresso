@@ -69,7 +69,7 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
-        <StreakCard entries={entries} />
+        <StreakCard entries={entries} checkinHour={profile.checkin_hour} />
         <AchievementsCard
           entries={entries}
           goals={goals}

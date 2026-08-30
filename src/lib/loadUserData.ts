@@ -53,6 +53,7 @@ export async function loadUserData() {
       onboarded_at: null,
       period_mode: "fixed" as const,
       week_starts_on: "monday" as const,
+      checkin_hour: null,
     },
     entries: (entries as WeightEntry[]) ?? [],
     measurements: (measurements as BodyMeasurement[]) ?? [],

@@ -17,6 +17,7 @@ export default async function SettingsPage() {
           heightCm={profile.height_cm}
           periodMode={profile.period_mode}
           weekStartsOn={profile.week_starts_on}
+          checkinHour={profile.checkin_hour}
         />
       </main>
     </div>
