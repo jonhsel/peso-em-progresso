@@ -19,7 +19,7 @@ na tela `/dashboard/goals`, não fixas no código.
   `src/app/globals.css`) + Recharts para gráficos
 - Sem ORM extra — queries via `@supabase-js` / `@supabase/ssr` direto
 
-## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) + Fase 4.2 (conquistas) + Fase 4.3 (próximo check-in) + Fase 4.4 (guia de ajuda) completos, não validados em produção
+## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) + Fase 4.2 (conquistas) + Fase 4.3 (próximo check-in) + Fase 4.4 (guia de ajuda) + Fase 5.1 (previsão da meta) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -1130,6 +1130,86 @@ Depois de validar em produção: marcar os 4 itens da Fase 4 (streak,
 conquistas, check-in, guia de ajuda) como concluídos no `claude_fases.md`
 (não localizado neste repo nesta sessão) e atualizar os checkboxes acima.
 **Fase 4 (Gamificação e engajamento) fechada por completo.**
+
+## Fase 5.1 — Previsão da meta (implementada 31/08/2026)
+
+Spec completo em `claude_fase5_previsao_v2.md` (na raiz do repo, não
+versionado — mesmo padrão dos specs anteriores; v2 já auditada contra
+`analytics.ts`/`KpiCard.tsx`/`dashboard/page.tsx`/`loadUserData.ts`/
+`api/export/pdf/route.tsx`/`database.ts` reais). Implementado nesta sessão:
+`npx tsc --noEmit` e `npm run build` limpos. **Ainda não testado num
+navegador real** — ver checklist abaixo. Patch aplicado ao pé da letra do
+spec, sem desvios. Primeira sub-fase da Fase 5 (Inteligência sobre os
+dados).
+
+- **Sem migração, sem mudança de tipos em `database.ts`** — camada de
+  leitura pura sobre dados já calculados. Não mexe em `computeTrend`,
+  `computePeriodKpi`, `computeAllKpis`, `baselineWeight` nem
+  `BASELINE_MAX_DAYS_BEFORE`.
+- `src/lib/analytics.ts::computeGoalPrediction(trend, kpi, targetWeightKg)`
+  (nova, logo após `computeAllKpis`) — recebe o `TrendResult` de
+  `computeTrend(entries)` e o `PeriodKpi` já calculado (não acessa
+  `entries`/`baselineWeight`/`periodStart` diretamente, evitando duplicar
+  lógica já resolvida no KPI). Retorna `GoalPrediction`, union de 4 casos:
+  `insufficient_data` (menos de 2 pesagens nos últimos 21 dias, mesmo
+  critério de `computeTrend`), `wrong_direction` (tendência `estavel`/
+  `ganhando`), `already_reached` (peso atual já bateu o alvo/meta do
+  período — `withTarget` diferencia o copy), `projected` (`estimatedDate`
+  ISO + `daysFromNow`).
+  **Ponto crítico da conversão de sinal:** `slopeKgPerWeek` é **negativo**
+  quando perdendo peso (slope bruto da regressão) — a função usa
+  `Math.abs(trend.slopeKgPerWeek)` como taxa de perda semanal; dividir
+  direto por `slopeKgPerWeek` sem o `Math.abs` geraria data no passado
+  (bug silencioso, documentado no Apêndice A2 do spec).
+  Dois modos, mutuamente exclusivos por usuário (não por card): com
+  `goals.target_weight_kg` definido, semana e mês mostram a **mesma**
+  previsão (chegada no peso alvo); sem peso alvo, cada card projeta a
+  meta de perda *daquele período* (`kpi.targetLossKg`/`kpi.actualLossKg`,
+  já resolvidos por `computePeriodKpi` via `resolveGoalsForPeriod` —
+  a previsão nunca acessa `goalsHistory` diretamente).
+- `src/components/KpiCard.tsx` — nova prop opcional `prediction?:
+  GoalPrediction`, sem quebrar os callers existentes (trimestre/semestre
+  seguem sem passar a prop, `{prediction && ...}` não renderiza nada).
+  Linha nova de texto (`text-xs text-ink-faint`, mesma hierarquia visual
+  da linha "Hoje você está em X kg") inserida logo abaixo dela, dentro do
+  ramo `hasData`.
+- `src/app/(app)/dashboard/page.tsx` — reaproveita o `weekKpi` que já
+  existia (usado pelo `KpiWeeklyTeaser`), acrescenta `monthKpi` e calcula
+  `weekPrediction`/`monthPrediction` com `computeGoalPrediction`, passados
+  condicionalmente no `kpis.map(...)` que renderiza os 4 `KpiCard`
+  (`kpi.period === "week" | "month"` → previsão; senão `undefined`).
+- **Fora de escopo** (idem spec): previsão em trimestre/semestre, qualquer
+  mudança em `computeTrend`/`computePeriodKpi`/`computeAllKpis`/
+  `period_mode`/`week_starts_on`, exportação PDF (`api/export/pdf/route.tsx`
+  não mudou — previsão é só UI do dashboard), demais itens da Fase 5 (média
+  móvel, seletor de período do gráfico, relatórios, widget de medidas).
+
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
+      dev — **ainda não visto rodando num navegador real**).
+- [ ] Conta com `target_weight_kg` definido + tendência de perda: cards de
+      semana e mês mostram a **mesma** data estimada.
+- [ ] Conta sem `target_weight_kg` + tendência de perda: card de semana
+      usa `weekly_loss_kg`, card de mês usa `monthly_loss_kg` — datas
+      **diferentes** entre si.
+- [ ] Conta nova (< 2 pesagens nos últimos 21 dias): mensagem de
+      "sem dados suficientes" nos dois cards.
+- [ ] Conta ganhando peso ou estável: mensagem de "tendência não é de
+      perda".
+- [ ] Com target: peso atual <= alvo → "Meta de peso já alcançada! 🎉".
+- [ ] Sem target: perda real >= meta do período → "Meta deste período já
+      batida. ✅".
+- [ ] Trocar `period_mode` de `fixed` pra `rolling` em Configurações →
+      previsão sem-target recalcula (acompanha o `PeriodKpi` recalculado,
+      nenhum estado próprio).
+- [ ] Cards de trimestre/semestre inalterados visualmente (sem linha de
+      previsão).
+- [ ] Tema claro/escuro: contraste de `text-xs text-ink-faint` adequado.
+- [ ] Mobile: linha de previsão não quebra o layout do card.
+- [ ] Emoji 📈 renderiza corretamente (texto inline, não sob `grayscale`).
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 5 —
+Inteligência sobre os dados → "Previsão da meta") e atualizar os checkboxes
+acima.
 
 ## Pendências / próximos passos sugeridos (não iniciados)
 

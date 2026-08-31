@@ -349,3 +349,95 @@ export function computeAllKpis(
     computePeriodKpi(entries, goalsHistory, p, now, mode, weekStartsOn)
   );
 }
+
+/**
+ * Previsão de data estimada para bater a meta (Fase 5.1).
+ * - Com `targetWeightKg` definido: projeta a chegada no peso alvo, igual
+ *   para os cards de semana e mês (mesmo cálculo, independe do período).
+ * - Sem `targetWeightKg`: projeta quando a meta de perda *daquele período*
+ *   (targetLossKg do PeriodKpi recebido) será atingida no ritmo atual.
+ * Não faz nenhum acesso a `entries`/`baselineWeight`/`periodStart` — recebe
+ * o `PeriodKpi` já calculado por `computePeriodKpi`, que já traz tudo que é
+ * preciso (currentWeightKg, actualLossKg, targetLossKg).
+ */
+function formatISODate(d: Date): string {
+  return formatISO(d, { representation: "date" });
+}
+
+export type GoalPrediction =
+  | { kind: "insufficient_data" }
+  | { kind: "wrong_direction" }
+  | { kind: "already_reached"; withTarget: boolean }
+  | { kind: "projected"; estimatedDate: string; daysFromNow: number };
+
+export function computeGoalPrediction(
+  trend: TrendResult,
+  kpi: PeriodKpi,
+  targetWeightKg: number | null
+): GoalPrediction {
+  // 1. Dados insuficientes para tendência
+  if (trend.label === "insufficient_data") {
+    return { kind: "insufficient_data" };
+  }
+
+  // 2. Tendência não é de perda (estável ou ganhando)
+  const isLosing = trend.label === "perdendo" || trend.label === "perdendo_rapido";
+  if (!isLosing) {
+    return { kind: "wrong_direction" };
+  }
+
+  // 3. Taxa de perda por semana (positiva, em kg)
+  //    slopeKgPerWeek é NEGATIVO quando perdendo → Math.abs
+  const lossPerWeek = Math.abs(trend.slopeKgPerWeek);
+
+  // 4. Peso atual (do KPI já calculado)
+  const currentWeight = kpi.currentWeightKg;
+  if (currentWeight === null) {
+    return { kind: "insufficient_data" };
+  }
+
+  // 5. Modo com target_weight_kg
+  if (targetWeightKg !== null) {
+    if (currentWeight <= targetWeightKg) {
+      return { kind: "already_reached", withTarget: true };
+    }
+    const kgToLose = currentWeight - targetWeightKg;
+    const weeksToTarget = kgToLose / lossPerWeek;
+    const daysFromNow = Math.round(weeksToTarget * 7);
+    const estimated = new Date();
+    estimated.setDate(estimated.getDate() + daysFromNow);
+    return {
+      kind: "projected",
+      estimatedDate: formatISODate(estimated),
+      daysFromNow,
+    };
+  }
+
+  // 6. Modo sem target — projetar quando a meta de perda do período será batida
+  const actualLoss = kpi.actualLossKg; // positivo = perdeu peso
+  const targetLoss = kpi.targetLossKg; // meta de perda do período (sempre positivo)
+
+  if (actualLoss !== null && actualLoss >= targetLoss && targetLoss > 0) {
+    return { kind: "already_reached", withTarget: false };
+  }
+
+  if (targetLoss <= 0) {
+    // Sem meta de perda configurada para este período — não dá pra projetar
+    return { kind: "insufficient_data" };
+  }
+
+  const remaining = targetLoss - (actualLoss ?? 0);
+  if (remaining <= 0) {
+    return { kind: "already_reached", withTarget: false };
+  }
+
+  const weeksToGoal = remaining / lossPerWeek;
+  const daysFromNow = Math.round(weeksToGoal * 7);
+  const estimated = new Date();
+  estimated.setDate(estimated.getDate() + daysFromNow);
+  return {
+    kind: "projected",
+    estimatedDate: formatISODate(estimated),
+    daysFromNow,
+  };
+}

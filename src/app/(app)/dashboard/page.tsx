@@ -1,6 +1,6 @@
 import { loadUserData } from "@/lib/loadUserData";
 import { getTheme } from "@/lib/get-theme";
-import { computeAllKpis, computeTrend } from "@/lib/analytics";
+import { computeAllKpis, computeTrend, computeGoalPrediction } from "@/lib/analytics";
 import NavBar from "@/components/NavBar";
 import KpiCard from "@/components/KpiCard";
 import KpiWeeklyTeaser from "@/components/KpiWeeklyTeaser";
@@ -18,7 +18,10 @@ export default async function DashboardPage() {
 
   const kpis = computeAllKpis(entries, goalsHistory, new Date(), profile.period_mode, profile.week_starts_on);
   const weekKpi = kpis.find((kpi) => kpi.period === "week");
+  const monthKpi = kpis.find((kpi) => kpi.period === "month");
   const trend = computeTrend(entries);
+  const weekPrediction = weekKpi ? computeGoalPrediction(trend, weekKpi, goals.target_weight_kg) : undefined;
+  const monthPrediction = monthKpi ? computeGoalPrediction(trend, monthKpi, goals.target_weight_kg) : undefined;
   const latest = entries[entries.length - 1] ?? null;
   const first = entries[0] ?? null;
   const totalChange = latest && first ? Number(latest.weight_kg) - Number(first.weight_kg) : null;
@@ -94,7 +97,13 @@ export default async function DashboardPage() {
           <p className="text-xs uppercase tracking-wide text-ink-muted mb-3">Metas por período</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {kpis.map((kpi) => (
-              <KpiCard key={kpi.period} kpi={kpi} />
+              <KpiCard
+                key={kpi.period}
+                kpi={kpi}
+                prediction={
+                  kpi.period === "week" ? weekPrediction : kpi.period === "month" ? monthPrediction : undefined
+                }
+              />
             ))}
           </div>
         </div>

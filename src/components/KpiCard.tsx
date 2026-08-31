@@ -1,4 +1,4 @@
-import type { PeriodKpi } from "@/lib/analytics";
+import type { GoalPrediction, PeriodKpi } from "@/lib/analytics";
 
 // O dot/ring seguem os tokens signal-* (hex fixo, iguais nos dois temas).
 // O texto do status usa os pares --badge-*-text (globals.css) via valor
@@ -13,7 +13,13 @@ const STATUS_STYLES: Record<PeriodKpi["status"], { dot: string; text: string; ri
   behind: { dot: "bg-signal-behind", text: "text-[var(--badge-behind-text)]", ring: "border-signal-behind/30" },
 };
 
-export default function KpiCard({ kpi }: { kpi: PeriodKpi }) {
+export default function KpiCard({
+  kpi,
+  prediction,
+}: {
+  kpi: PeriodKpi;
+  prediction?: GoalPrediction;
+}) {
   const style = STATUS_STYLES[kpi.status];
   const hasData = kpi.currentWeightKg !== null && kpi.baselineWeightKg !== null;
 
@@ -50,6 +56,31 @@ export default function KpiCard({ kpi }: { kpi: PeriodKpi }) {
             <p className="text-xs text-ink-faint">
               Hoje você está em <span className="text-ink-muted">{kpi.currentWeightKg?.toFixed(1)} kg</span>{" "}
               · esperado pela meta: <span className="text-ink-muted">{kpi.expectedWeightNowKg.toFixed(1)} kg</span>
+            </p>
+          )}
+
+          {prediction && (
+            <p className="text-xs text-ink-faint">
+              {prediction.kind === "projected" && (
+                <>
+                  📈 No ritmo atual, meta em ~{prediction.daysFromNow} dias{" "}
+                  <span className="text-ink-muted">
+                    (previsão: {prediction.estimatedDate.split("-").reverse().join("/")})
+                  </span>
+                </>
+              )}
+              {prediction.kind === "insufficient_data" && (
+                <>Sem dados suficientes para projetar (mínimo 2 pesagens nos últimos 21 dias).</>
+              )}
+              {prediction.kind === "wrong_direction" && (
+                <>No ritmo atual, a meta não será alcançada — tendência dos últimos 21 dias não é de perda.</>
+              )}
+              {prediction.kind === "already_reached" && prediction.withTarget && (
+                <>Meta de peso já alcançada! 🎉</>
+              )}
+              {prediction.kind === "already_reached" && !prediction.withTarget && (
+                <>Meta deste período já batida. ✅</>
+              )}
             </p>
           )}
         </>
