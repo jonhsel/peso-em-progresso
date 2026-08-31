@@ -16,6 +16,7 @@ import { format, parseISO, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { WeightEntry } from "@/types/database";
 import type { PeriodKpi } from "@/lib/analytics";
+import { computeMovingAverage } from "@/lib/analytics";
 
 // Recharts recebe cor via prop (stroke/fill/style), não className — não dá
 // pra usar as classes Tailwind bg-base-*/text-ink-* aqui. Em vez disso lemos
@@ -35,6 +36,7 @@ const FALLBACK_CHART_COLORS = {
   tooltipBorder: "#26314A",
   tooltipLabel: "#8C97B4",
   accent: "#D97A45",
+  movingAvg: "#8C97B4",
 };
 
 function readChartColors(el: HTMLElement) {
@@ -47,6 +49,7 @@ function readChartColors(el: HTMLElement) {
     tooltipBorder: read("--base-border", FALLBACK_CHART_COLORS.tooltipBorder),
     tooltipLabel: read("--ink-muted", FALLBACK_CHART_COLORS.tooltipLabel),
     accent: read("--accent", FALLBACK_CHART_COLORS.accent),
+    movingAvg: read("--ink-muted", FALLBACK_CHART_COLORS.movingAvg),
   };
 }
 
@@ -87,19 +90,35 @@ export default function WeightChart({
 
   const totalElapsedDays = weekStart ? differenceInCalendarDays(new Date(), weekStart) : 0;
 
-  const data = [...entries]
-    .sort((a, b) => a.measured_at.localeCompare(b.measured_at))
-    .map((e) => {
+  // Média móvel (Fase 5.2): cálculo e critério de visibilidade.
+  // sorted é reutilizado abaixo para montar `data`, evitando sort duplo.
+  const sorted = [...entries].sort((a, b) => a.measured_at.localeCompare(b.measured_at));
+  const hasMovingAverage =
+    sorted.length >= 2 &&
+    differenceInCalendarDays(
+      parseISO(sorted[sorted.length - 1].measured_at),
+      parseISO(sorted[0].measured_at)
+    ) >= 6; // 6 dias de diferença = 7 dias corridos (ver decisão 2)
+  const movingAverage = computeMovingAverage(entries);
+  const movingAverageByDate = new Map(movingAverage.map((m) => [m.date, m.average]));
+
+  const data = sorted.map((e) => {
       const point: {
         date: string;
         label: string;
         peso: number;
         esperado?: number;
+        mediaMovel?: number;
       } = {
         date: e.measured_at,
         label: format(parseISO(e.measured_at), "dd/MM", { locale: ptBR }),
         peso: Number(e.weight_kg),
       };
+
+      const avg = movingAverageByDate.get(e.measured_at);
+      if (avg !== undefined) {
+        point.mediaMovel = avg;
+      }
 
       // Só marca "esperado" pra pesagens dentro da semana atual — fora
       // desse intervalo a reta não tem significado (é um KPI por período).
@@ -144,16 +163,24 @@ export default function WeightChart({
   return (
     <div ref={containerRef} className="bg-base-surface border border-base-border rounded-card p-4 h-96">
       <p className="text-xs uppercase tracking-wide text-ink-muted mb-2 px-1">Evolução do peso</p>
-      {hasWeeklyTrend && (
-        <div className="flex items-center gap-4 px-1 mb-1 font-mono text-[11px] text-ink-faint">
+      {(hasWeeklyTrend || hasMovingAverage) && (
+        <div className="flex items-center gap-4 px-1 mb-1 font-mono text-[11px] text-ink-faint flex-wrap">
           <span className="flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: colors.accent }} />
             peso real
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-0.5 w-3" style={{ backgroundColor: colors.axis, opacity: 0.8 }} />
-            ritmo da semana
-          </span>
+          {hasWeeklyTrend && (
+            <span className="flex items-center gap-1.5">
+              <span className="h-0.5 w-3" style={{ backgroundColor: colors.axis, opacity: 0.8 }} />
+              ritmo da semana
+            </span>
+          )}
+          {hasMovingAverage && (
+            <span className="flex items-center gap-1.5">
+              <span className="h-0.5 w-3" style={{ backgroundColor: colors.movingAvg, opacity: 0.8 }} />
+              média móvel (7)
+            </span>
+          )}
         </div>
       )}
       <ResponsiveContainer width="100%" height="90%">
@@ -231,6 +258,20 @@ export default function WeightChart({
               // visível mesmo quando o traço em si está colado na linha real.
               dot={{ r: 3, fill: colors.tooltipBg, stroke: colors.axis, strokeWidth: 2 }}
               activeDot={{ r: 5 }}
+              connectNulls
+              isAnimationActive={false}
+              legendType="none"
+            />
+          )}
+          {hasMovingAverage && (
+            <Line
+              type="monotone"
+              dataKey="mediaMovel"
+              name="Média móvel (7)"
+              stroke={colors.movingAvg}
+              strokeWidth={2}
+              strokeDasharray="2 3"
+              dot={false}
               connectNulls
               isAnimationActive={false}
               legendType="none"

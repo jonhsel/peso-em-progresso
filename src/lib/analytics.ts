@@ -441,3 +441,29 @@ export function computeGoalPrediction(
     daysFromNow,
   };
 }
+
+export type MovingAveragePoint = {
+  date: string; // measured_at ISO (YYYY-MM-DD), mesma chave usada por WeightChart
+  average: number;
+};
+
+/**
+ * Média móvel das últimas `windowSize` pesagens (por contagem, não por janela
+ * de dias corridos — ver decisão 1 do spec Fase 5.2).
+ * Janela expansiva no início: os primeiros pontos usam menos de `windowSize`
+ * pesagens (1, depois 2, etc.) até acumular o suficiente. Não decide sozinha
+ * se deve ser exibida — isso é responsabilidade do chamador (WeightChart),
+ * que aplica o critério de "pelo menos 7 dias corridos de histórico".
+ */
+export function computeMovingAverage(
+  entries: WeightEntry[],
+  windowSize = 7
+): MovingAveragePoint[] {
+  const points = toPoints(entries);
+  return points.map((p, i) => {
+    const windowPoints = points.slice(Math.max(0, i - windowSize + 1), i + 1);
+    const sum = windowPoints.reduce((acc, wp) => acc + wp.weight, 0);
+    const average = Number((sum / windowPoints.length).toFixed(2));
+    return { date: formatISO(p.date, { representation: "date" }), average };
+  });
+}

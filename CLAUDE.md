@@ -19,7 +19,7 @@ na tela `/dashboard/goals`, não fixas no código.
   `src/app/globals.css`) + Recharts para gráficos
 - Sem ORM extra — queries via `@supabase-js` / `@supabase/ssr` direto
 
-## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) + Fase 4.2 (conquistas) + Fase 4.3 (próximo check-in) + Fase 4.4 (guia de ajuda) + Fase 5.1 (previsão da meta) completos, não validados em produção
+## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) + Fase 4.2 (conquistas) + Fase 4.3 (próximo check-in) + Fase 4.4 (guia de ajuda) + Fase 5.1 (previsão da meta) + Fase 5.2 (média móvel de 7 dias) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -1210,6 +1210,90 @@ dados).
 Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 5 —
 Inteligência sobre os dados → "Previsão da meta") e atualizar os checkboxes
 acima.
+
+## Fase 5.2 — Média móvel de 7 dias no gráfico de evolução (implementada 31/08/2026)
+
+Spec completo em `claude_fase5_media_movel_v2.md` (na raiz do repo, não
+versionado — mesmo padrão dos specs anteriores; v2 já auditada contra
+`WeightChart.tsx`/`analytics.ts` reais, correções no Apêndice A do próprio
+arquivo). Implementado nesta sessão: `npx tsc --noEmit` e `npm run build`
+limpos. **Ainda não testado num navegador real** — ver checklist abaixo.
+Patch aplicado ao pé da letra do spec, sem desvios. Segunda sub-fase da
+Fase 5 (Inteligência sobre os dados): previsão da meta (5.1, já implementada)
+→ **média móvel de 7 dias (5.2)** → seletor de período do gráfico (5.3,
+ainda não specced) → relatórios/insights → widget de medidas corporais.
+
+- **Sem migração, sem mudança de schema/tipos, sem nova prop obrigatória em
+  `dashboard/page.tsx`** — terceira série do gráfico, ortogonal às duas já
+  existentes (`peso` real e `esperado`/ritmo da semana), derivada só de
+  `entries` (que `WeightChart` já recebia). `dashboard/page.tsx` não mudou.
+- `src/lib/analytics.ts::computeMovingAverage(entries, windowSize = 7)`
+  (nova, depois de `computeGoalPrediction`) — reaproveita `toPoints` (já
+  privada no arquivo). **Média das últimas N pesagens por contagem, não por
+  janela de dias corridos**: para a pesagem *i* (cronológica), é a média das
+  pesagens *i-6* a *i* (janela expansiva no início — 1, depois 2, etc.). Um
+  usuário que pesa a cada 2-3 dias tem essa "média das últimas 7 pesagens"
+  cobrindo mais de 7 dias de calendário — intencional, decisão do usuário. A
+  função não decide visibilidade — isso é do `WeightChart`.
+- `src/components/WeightChart.tsx` — nova série `mediaMovel` no
+  `ComposedChart`, `<Line type="monotone" dataKey="mediaMovel" ...>`
+  pontilhada (`strokeDasharray="2 3"`, mais curto que o `"4 4"` da linha
+  `esperado`, pra nunca serem confundidas quando aparecem juntas), sem `dot`
+  (diferente da `esperado`, que tem `dot` como âncora visual — a média se
+  afasta mais da linha real, não tem o mesmo problema de ficar colada nela),
+  cor `colors.movingAvg` (nova chave, lê `--ink-muted` — mesma var já lida
+  para `tooltipLabel`, sem CSS var nova). Visibilidade
+  (`hasMovingAverage`): só aparece com **>= 6 dias corridos de diferença**
+  entre a primeira e a última pesagem (= 7 dias corridos de calendário
+  inclusive), independente de quantas pesagens existam nesse intervalo —
+  mesmo padrão de ausência silenciosa (sem estado de erro) já usado por
+  `hasWeeklyTrend`. `sorted` (o array ordenado por data) foi extraído como
+  variável compartilhada entre esse cálculo e o `data = sorted.map(...)` que
+  já existia, evitando um segundo sort idêntico na mesma renderização.
+- **Legenda unificada**: a `<div>` condicional (antes só `hasWeeklyTrend`)
+  passou a aparecer com `hasWeeklyTrend || hasMovingAverage`, com "peso real"
+  sempre visível quando há qualquer segunda série, e "ritmo da semana"/"média
+  móvel (7)" condicionados individualmente — corrige o caso em que a média
+  móvel aparece sem meta semanal (antes, "peso real" ficava escondida por
+  depender só de `hasWeeklyTrend`). `flex-wrap` adicionado pra até 3 itens
+  não estourarem em mobile.
+- Domínio do `YAxis` **não mudou** — a média é sempre um subconjunto
+  aritmético dos pesos reais, logo cai dentro de `[min, max]` já calculado.
+- **Cálculo roda client-side** (`WeightChart.tsx` é `"use client"`) —
+  intencional, os dados já chegam como prop, sem motivo pra server action.
+- **Known behavior, aceito como está**: duas pesagens no mesmo dia geram duas
+  entradas em `computeMovingAverage` com a mesma chave `date`; o `Map` no
+  `WeightChart` guarda só a segunda. Diferença é frações de grama, sem
+  impacto visual.
+
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
+      dev — **ainda não visto rodando num navegador real**).
+- [ ] Conta com < 7 dias corridos de histórico: linha de média móvel e
+      legenda "média móvel (7)" não aparecem; "peso real" aparece se
+      `hasWeeklyTrend` (comportamento existente, inalterado).
+- [ ] Conta com >= 7 dias corridos e só 2-3 pesagens nesse intervalo: linha
+      aparece usando janela expansiva.
+- [ ] Conta com pesagens diárias por várias semanas: linha de média móvel
+      visivelmente mais suave que a `Area` de peso real.
+- [ ] Meta semanal ativa E >= 7 dias de histórico: as duas linhas (`esperado`
+      tracejada "4 4" e `mediaMovel` pontilhada "2 3") aparecem juntas,
+      visualmente distinguíveis.
+- [ ] Sem meta semanal MAS com >= 7 dias de histórico: legenda mostra "peso
+      real" + "média móvel (7)" (sem "ritmo da semana"); só a pontilhada
+      aparece.
+- [ ] Tooltip mostra "Média móvel (7): X.X kg" (nome correto, não confundido
+      com "Peso"/"Esperado").
+- [ ] Tema claro/escuro: `colors.movingAvg` muda de tom junto com o resto do
+      gráfico ao alternar `data-theme`.
+- [ ] Mobile: 3 itens de legenda com `flex-wrap` — quebra pra linha de baixo
+      sem estourar a largura do card, nada escondido.
+- [ ] Gráfico com só 1 pesagem (early return) e com 0 pesagens: comportamento
+      idêntico a antes, sem erro (`sorted.length >= 2` cobre o caso de 1
+      pesagem antes de chegar no `differenceInCalendarDays`).
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 5 —
+Inteligência sobre os dados → "Média móvel de 7 dias no gráfico de
+evolução") e atualizar os checkboxes acima.
 
 ## Pendências / próximos passos sugeridos (não iniciados)
 
