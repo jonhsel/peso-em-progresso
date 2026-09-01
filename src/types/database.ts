@@ -62,6 +62,14 @@ export type UserAchievement = {
   unlocked_at: string;
 };
 
+export type ProgressPhoto = {
+  id: string;
+  user_id: string;
+  photo_date: string; // formato YYYY-MM-DD
+  storage_path: string;
+  created_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -105,6 +113,12 @@ export type Database = {
         Row: UserAchievement;
         Insert: Partial<UserAchievement> & { user_id: string; achievement_key: string };
         Update: never; // conquistas não são editáveis
+        Relationships: [];
+      };
+      progress_photos: {
+        Row: ProgressPhoto;
+        Insert: Partial<ProgressPhoto> & { user_id: string; photo_date: string; storage_path: string };
+        Update: Partial<ProgressPhoto>;
         Relationships: [];
       };
     };

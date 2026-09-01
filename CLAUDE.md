@@ -20,7 +20,7 @@ na tela `/dashboard/goals`, não fixas no código.
 - Sem ORM extra — queries via `@supabase-js` / `@supabase/ssr` direto
 
 ## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) + Fase 4.2 (conquistas) + Fase 4.3 (próximo check-in) + Fase 4.4 (guia de ajuda) + Fase 5.1 (previsão da meta) + Fase 5.2 (média móvel de 7 dias) + Fase 5.3 (seletor de período do gráfico) + Fase 5.4 (relatórios) + Fase 5.5
-(widget-resumo de medidas corporais) completos, não validados em produção
+(widget-resumo de medidas corporais) + Fase 6.1 (fotos de progresso) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -45,6 +45,11 @@ na tela `/dashboard/goals`, não fixas no código.
   com diff dia a dia + exclusão
 - `/dashboard/measurements` — formulário de medidas corporais opcionais (cintura,
   quadril, braço, % gordura, upsert por dia) + histórico com diff neutro por campo
+- `/dashboard/photos` — upload de foto de progresso (1/dia, upsert por dia,
+  redimensionada/convertida pra JPEG no client) + comparação lado a lado por 2
+  datas escolhidas livremente + histórico em grid com exclusão. Fotos vivem em
+  bucket privado do Supabase Storage (`progress-photos`), servidas via signed URL
+  (1h) geradas a cada carregamento da página — ver Fase 6.1.
 - `/dashboard/goals` — formulário para editar as 4 metas de perda + peso alvo opcional
 
 Containers do dashboard usam `max-w-6xl` (landing usa `max-w-4xl`, design próprio).
@@ -1582,15 +1587,135 @@ Inteligência sobre os dados → "Widget-resumo de Medidas Corporais no
 dashboard") e atualizar os checkboxes acima. **Fase 5 (Inteligência sobre
 os dados) fechada por completo.**
 
+## Fase 6.1 — Fotos de progresso (implementada 01/09/2026)
+
+Spec completo em `claude_fase6_fotos_progresso_v2.md` (na raiz do repo, não
+versionado — mesmo padrão dos specs anteriores; v2 já auditada contra
+`NavBar.tsx`/`loadUserData.ts`/`database.ts`/`supabase/server.ts`/
+`supabase/client.ts`/`get-theme.ts`/`WeightEntryForm.tsx`/
+`BodyMeasurementForm.tsx`/`CsvImporter.tsx`/`GoalsForm.tsx`/`goals/page.tsx`/
+`api/export/pdf/route.tsx`/`streak.ts`/`schema.sql` reais). Implementado
+nesta sessão: `npx tsc --noEmit` e `npm run build` limpos. **Ainda não
+testado contra Supabase real nem visto num navegador** — ver checklist
+abaixo. Patch aplicado ao pé da letra do spec, sem desvios. Primeiro item da
+Fase 6 (Ticket alto).
+
+- **Bucket privado** `progress-photos` no Supabase Storage (não público) —
+  mesma filosofia de RLS-first do resto do projeto (decisão 3). Leitura via
+  signed URL, geradas no server a cada carregamento de `/dashboard/photos`
+  (expiração 1h) — sem sessão gravada de URL, sem cache.
+- **1 foto por dia por usuário**, mesmo padrão de `weight_entries`/
+  `body_measurements` — garantido pelo próprio path do arquivo
+  (`{user_id}/{photo_date}.jpg`, sempre `.jpg`) com `upload(..., { upsert:
+  true })`, sem lógica extra de "deletar o antigo antes de subir o novo".
+  Tabela nova `progress_photos` (`supabase/migrations/0008_progress_photos.sql`,
+  também adicionada a `supabase/schema.sql` seção 9) espelha os metadados:
+  `unique(user_id, photo_date)`, RLS por `auth.uid() = user_id` nas 4
+  operações (select/insert/update/delete — diferente de `goals_history`/
+  `user_achievements`, que são append-only; aqui exclusão é uma feature
+  pedida). **Também precisa das 4 políticas de RLS em `storage.objects`**
+  (`(storage.foldername(name))[1] = auth.uid()::text`) — sem elas, mesmo com
+  RLS na tabela de metadados OK, qualquer usuário logado conseguiria
+  ler/escrever arquivos de qualquer pasta no bucket. **Ainda precisa ser
+  rodada manualmente no Supabase Dashboard > SQL Editor** — sem isso,
+  `/dashboard/photos` quebra em produção (bucket e tabela inexistentes).
+- **Redimensionamento + conversão pra JPEG no client** (`src/lib/image.ts`,
+  função pura `resizeImageToJpeg`, via `<canvas>`, sem dependência nova):
+  lado maior limitado a 1600px, qualidade 0.85. Roda inteiramente no
+  browser antes do upload — reduz o tamanho de fotos de celular (>5MB) para
+  um JPEG bem menor, sem gastar banda/tempo de upload do arquivo bruto.
+- **Comparação lado a lado por escolha livre de 2 datas** (`PhotoComparisonView.tsx`,
+  dois `<select>` independentes com todas as datas que têm foto, default
+  mais antiga à esquerda / mais recente à direita) — não uma comparação fixa
+  "primeira vs mais recente", decisão fechada com o usuário. Os dois selects
+  não se bloqueiam mutuamente (podem apontar pra mesma data), caso
+  inofensivo aceito deliberadamente.
+- **Página nova dedicada `/dashboard/photos`** (não uma aba dentro de
+  `/dashboard/measurements`), com link próprio "Fotos" no `NavBar` entre
+  "Medidas" e "Metas" (registros físicos periódicos, mesma vizinhança
+  temática). Mesmo padrão de `goals/page.tsx`: chama `loadUserData()` só
+  pelo que precisa (`user`/`profile`) + `getTheme()`, e faz sua própria
+  query de `progress_photos` + `createSignedUrls` direto na página — fotos
+  não entraram em `loadUserData()` nem são consumidas por nenhuma outra
+  tela. `createClient()` (server e client) chamado sem `await`, mesmo padrão
+  confirmado em todo o resto do projeto (ambos são síncronos).
+  Link "Fotos" leva o `NavBar` a 7 links no array + "Ajuda" (`<button>` fora
+  do `.map()`) = 8 elementos visuais em mobile; `overflow-x-auto` já
+  existente cobre, sem mudança de CSS (mesma solução já usada quando
+  "Relatórios" levou o total a 7 na Fase 5.4).
+- `PhotoUploadForm.tsx` — client component, mesmo padrão de update direto
+  ao Supabase de `WeightEntryForm`/`BodyMeasurementForm` (sem Server
+  Action). Input de data com `max` = hoje em São Paulo via
+  `Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" })` (mesmo
+  mecanismo de `streak.ts`, não `date-fns` — mais explícito em fuso que
+  `format(new Date(), ...)`, que usa o fuso do processo). Input de arquivo é
+  um `<label>` estilizado com `cursor-pointer` (não `<input type="file">`
+  nativo), mesmo padrão visual de botão do resto do app. Erro usa
+  `text-sm text-signal-behind` — não existe token de erro dedicado no
+  projeto, esse é o padrão replicado de todo form (`WeightEntryForm`/
+  `BodyMeasurementForm`/`GoalsForm`/`CsvImporter`).
+- `DeletePhotoButton.tsx` — client component isolado, `window.confirm` antes
+  de excluir (mesmo padrão de `EntriesList`/`BodyMeasurementsList`), mostra
+  "..." durante a exclusão. Remove o arquivo do Storage e a linha da tabela
+  em sequência (não é atômico — se a remoção do Storage falhar depois de já
+  ter apagado a linha, ou vice-versa, pode ficar órfão; aceito como está,
+  fora de escopo tratar).
+- `PhotoHistoryGrid.tsx` — Server Component (única interação é o
+  `DeletePhotoButton`, isolado como client), grid responsivo
+  (`grid-cols-2 sm:grid-cols-3 md:grid-cols-4`), mais recente primeiro (a
+  query em `photos/page.tsx` já ordena `photo_date desc`). Thumbnails com
+  `aspect-[3/4]` (retrato, comum pra foto de corpo inteiro) — primeiro
+  precedente de aspect ratio fixo em imagem no projeto; classe estática
+  (sem template literal), segura pro JIT do Tailwind.
+- `dashboard/page.tsx` **não muda** — fotos são descobertas só via link do
+  `NavBar`, sem teaser/widget no dashboard principal (diferente do padrão já
+  usado por `KpiWeeklyTeaser`/`BodyMeasurementsSummaryCard`), decisão
+  implícita do spec (não pedida, fora do escopo desta sub-fase).
+- `src/types/database.ts` — tipo `ProgressPhoto` novo (depois de
+  `UserAchievement`) + entrada `progress_photos` em `Database.Tables`
+  (depois de `user_achievements`).
+
+- [ ] Rodar `supabase/migrations/0008_progress_photos.sql` no Supabase
+      Dashboard — conferir bucket `progress-photos` privado, tabela
+      `progress_photos` criada, 8 políticas de RLS ativas (4 tabela +
+      4 storage).
+- [ ] Link "Fotos" aparece no `NavBar` (desktop e mobile), entre "Medidas"
+      e "Metas" — 8 elementos visuais em mobile, sem overflow ilegível.
+- [ ] Upload de foto grande (celular, >5MB): completa sem erro, arquivo no
+      Storage é bem menor (~JPEG redimensionado a 1600px).
+- [ ] Upload de segunda foto na mesma data: sobrescreve (mesmo path), não
+      duplica na tabela nem no bucket.
+- [ ] Upload em datas diferentes: registros separados no histórico,
+      ordenados do mais recente pro mais antigo.
+- [ ] Tentar data futura no input: bloqueado pelo `max`.
+- [ ] Comparação: 2 `<select>` listam todas as datas; trocar qualquer um
+      atualiza a imagem sem nova query.
+- [ ] 0 ou 1 foto: seção "Comparar" mostra mensagem, sem quebrar.
+- [ ] Excluir foto: `window.confirm`, some do histórico e da comparação,
+      arquivo removido do bucket.
+- [ ] RLS: usuário A não vê/edita fotos do usuário B (tabela e bucket).
+- [ ] Signed URLs expiram em 1h — reabrir a página gera novas URLs.
+- [ ] Tema claro/escuro: bordas, `ink-faint`, botão de excluir com
+      contraste adequado.
+- [ ] Mobile: grid histórico (2 colunas) e selects de comparação sem
+      overflow horizontal.
+- [ ] Conta nova (nunca fez upload): página carrega sem erro, mostra
+      formulário de upload + "Nenhuma foto ainda" no histórico + mensagem
+      de "envie 2 datas" na comparação.
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 6 —
+Ticket alto → "Fotos de progresso") e atualizar os checkboxes acima.
+
 ## Pendências / próximos passos sugeridos (não iniciados)
 
 - [ ] Testar o app fim a fim contra um projeto Supabase real (criar projeto, rodar
       `schema.sql` + `migrations/0002_onboarding.sql` + `migrations/0003_body_measurements.sql`
       + `migrations/0004_goals_history.sql` + `migrations/0005_period_mode.sql`
-      + `migrations/0006_user_achievements.sql` + `migrations/0007_checkin_hour.sql`,
-      configurar `.env.local`, testar signup/login/registro de peso, exportação
-      CSV/PDF, importação CSV, medidas corporais, metas + histórico, tela
-      de Configurações/período de meta, conquistas, e horário de check-in.
+      + `migrations/0006_user_achievements.sql` + `migrations/0007_checkin_hour.sql`
+      + `migrations/0008_progress_photos.sql`, configurar `.env.local`, testar
+      signup/login/registro de peso, exportação CSV/PDF, importação CSV,
+      medidas corporais, metas + histórico, tela de Configurações/período de
+      meta, conquistas, horário de check-in, e fotos de progresso.
 - [ ] Deploy real na Vercel + configurar Site URL / Redirect URLs no Supabase Auth.
 - [ ] Testes unitários para `src/lib/analytics.ts` (funções puras, fáceis de testar).
 - [ ] Massa magra/composição corporal mais completa (bioimpedância avançada) — hoje

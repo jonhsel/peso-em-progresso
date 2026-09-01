@@ -13,6 +13,7 @@ const links = [
   { href: "/dashboard", label: "Visão geral" },
   { href: "/dashboard/entries", label: "Pesagens" },
   { href: "/dashboard/measurements", label: "Medidas" },
+  { href: "/dashboard/photos", label: "Fotos" },
   { href: "/dashboard/goals", label: "Metas" },
   { href: "/dashboard/reports", label: "Relatórios" },
   { href: "/dashboard/settings", label: "Configurações" },
