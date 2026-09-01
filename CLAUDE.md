@@ -19,7 +19,7 @@ na tela `/dashboard/goals`, não fixas no código.
   `src/app/globals.css`) + Recharts para gráficos
 - Sem ORM extra — queries via `@supabase-js` / `@supabase/ssr` direto
 
-## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) + Fase 4.2 (conquistas) + Fase 4.3 (próximo check-in) + Fase 4.4 (guia de ajuda) + Fase 5.1 (previsão da meta) + Fase 5.2 (média móvel de 7 dias) + Fase 5.3 (seletor de período do gráfico) completos, não validados em produção
+## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) + Fase 4.2 (conquistas) + Fase 4.3 (próximo check-in) + Fase 4.4 (guia de ajuda) + Fase 5.1 (previsão da meta) + Fase 5.2 (média móvel de 7 dias) + Fase 5.3 (seletor de período do gráfico) + Fase 5.4 (relatórios) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -1372,6 +1372,75 @@ insights → widget de medidas corporais (as 2 últimas ainda não speccadas).
 Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 5 —
 Inteligência sobre os dados → "Seletor de período no gráfico de evolução")
 e atualizar os checkboxes acima.
+
+## Fase 5.4 — Relatórios (implementada 01/09/2026)
+
+Spec completo em `claude_fase5_relatorios_v3.md` (na raiz do repo, não
+versionado — mesmo padrão dos specs anteriores; v3 já auditada contra
+`NavBar.tsx`/`KpiCard.tsx`/`WeightChart.tsx`/`analytics.ts`/`loadUserData.ts`
+reais, todas as pendências do Apêndice A da v2 fechadas). Implementado nesta
+sessão: `npx tsc --noEmit` e `npm run build` limpos. **Ainda não testado num
+navegador real** — ver checklist abaixo. Patch aplicado ao pé da letra do
+spec, sem desvios de lógica (só tipagem `weekPrediction`/`monthPrediction`
+como opcionais, ver nota abaixo). Quarta sub-fase da Fase 5 (Inteligência
+sobre os dados): previsão da meta (5.1) → média móvel de 7 dias (5.2) →
+seletor de período do gráfico (5.3) → **relatórios (5.4)** → widget de
+medidas corporais (5.5, ainda não specced).
+
+- **Sem migração, sem mudança de tipos** — leitura pura sobre dados já
+  existentes (mesmos calculados por `computeAllKpis`/`computeTrend`/
+  `computeGoalPrediction`, já usados por `dashboard/page.tsx`).
+- Rota nova `/dashboard/reports` — Server Component
+  (`src/app/(app)/dashboard/reports/page.tsx`) chama `loadUserData()` +
+  `getTheme()`, calcula os 4 KPIs + `weekPrediction`/`monthPrediction`
+  (mesma lógica de `dashboard/page.tsx`), renderiza `NavBar` e passa tudo
+  já calculado para `ReportsClient` (Client Component, único motivo do
+  `"use client"` é o `useState` da tab selecionada).
+- `ReportsClient.tsx` — 4 tabs por extenso (Semana/Mês/Trimestre/Semestre,
+  tipo `Period` de `analytics.ts`) acima de um único `KpiCard` (troca com a
+  tab, sem nova query) e do `WeightChart` completo (fixo, com suas próprias
+  pills 1s/1m/3m/6m da Fase 5.3, independente da tab do relatório).
+  Componente de tabs é local, não reaproveita o `PeriodPills` privado do
+  `WeightChart.tsx` (tipo/labels/sizing diferentes — ver decisão 3 do spec).
+  **Nota sobre o spec:** `weekPrediction`/`monthPrediction` foram tipados
+  como opcionais (`GoalPrediction | undefined`), não obrigatórios como no
+  snippet original — `dashboard/page.tsx` já guarda `weekKpi`/`monthKpi`
+  com `?.` antes de chamar `computeGoalPrediction` (padrão real do código,
+  mais defensivo que o `!` do spec), e `reports/page.tsx` replica esse
+  mesmo padrão em vez do non-null assertion; `KpiCard.prediction` já era
+  opcional, então nada muda no comportamento renderizado.
+- `NavBar.tsx` — "Relatórios" adicionado ao array `links`, entre "Metas" e
+  "Configurações" (6 itens no array + "Ajuda" como `<button>` fora do
+  `.map()` = 7 elementos visuais em mobile; `overflow-x-auto` já cobre,
+  sem mudança de CSS necessária).
+- **Fora de escopo** (idem spec): geração de texto de insight automático,
+  qualquer mudança em `analytics.ts`/`WeightChart.tsx`/`KpiCard.tsx`,
+  exportação PDF nova, unificação dos dois seletores de período, widget de
+  medidas corporais (5.5).
+
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
+      dev — **ainda não visto rodando num navegador real**).
+- [ ] Link "Relatórios" aparece no `NavBar` (desktop e mobile), entre
+      "Metas" e "Configurações", sem quebrar layout — mobile com 7
+      elementos visuais, overflow horizontal funcionando.
+- [ ] Rota `/dashboard/reports` carrega com tab "Semana" selecionada por
+      padrão; trocar de tab atualiza o `KpiCard` instantaneamente, sem
+      reload/nova query.
+- [ ] Tab "Semana"/"Mês" mostram previsão (mesmas regras da Fase 5.1);
+      "Trimestre"/"Semestre" nunca mostram previsão.
+- [ ] Gráfico de evolução aparece abaixo, pills 1s/1m/3m/6m funcionando
+      independente da tab do relatório.
+- [ ] Conta nova (sem pesagens suficientes): `KpiCard` e `WeightChart`
+      mostram os mesmos estados de "sem dados" do dashboard.
+- [ ] Tema claro/escuro: contraste da tab ativa/inativa e do `KpiCard`
+      consistentes com o resto do app.
+- [ ] Nenhuma escrita no banco ao trocar de tab ou carregar a página.
+- [ ] Mobile: tabs + `KpiCard` + `WeightChart` empilham sem overflow
+      horizontal; labels por extenso cabem em telas >= 360px.
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 5 —
+Inteligência sobre os dados → "Relatórios e Insights") e atualizar os
+checkboxes acima.
 
 ## Pendências / próximos passos sugeridos (não iniciados)
 

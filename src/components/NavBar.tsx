@@ -14,6 +14,7 @@ const links = [
   { href: "/dashboard/entries", label: "Pesagens" },
   { href: "/dashboard/measurements", label: "Medidas" },
   { href: "/dashboard/goals", label: "Metas" },
+  { href: "/dashboard/reports", label: "Relatórios" },
   { href: "/dashboard/settings", label: "Configurações" },
 ];
 
