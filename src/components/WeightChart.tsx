@@ -12,7 +12,7 @@ import {
   Tooltip,
   ReferenceLine,
 } from "recharts";
-import { format, parseISO, differenceInCalendarDays } from "date-fns";
+import { format, parseISO, differenceInCalendarDays, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { WeightEntry } from "@/types/database";
 import type { PeriodKpi } from "@/lib/analytics";
@@ -39,6 +39,54 @@ const FALLBACK_CHART_COLORS = {
   movingAvg: "#8C97B4",
 };
 
+type ChartPeriod = "week" | "month" | "3months" | "6months";
+
+const CHART_PERIOD_OPTIONS: { value: ChartPeriod; label: string }[] = [
+  { value: "week", label: "1s" },
+  { value: "month", label: "1m" },
+  { value: "3months", label: "3m" },
+  { value: "6months", label: "6m" },
+];
+
+const CHART_PERIOD_STORAGE_KEY = "pesoemprogresso:chartPeriod";
+
+const CHART_PERIOD_DAYS: Record<Exclude<ChartPeriod, "week">, number> = {
+  month: 30,
+  "3months": 90,
+  "6months": 180,
+};
+
+/**
+ * true se a pesagem cai dentro da janela do período selecionado.
+ *
+ * "week" reaproveita weekKpi.periodStart, que já foi calculado por
+ * computePeriodKpi respeitando profile.period_mode/week_starts_on (Fase 3):
+ *   - fixed: semana a partir de segunda ou domingo conforme configurado
+ *   - rolling: últimos 7 dias corridos
+ * Sem lógica nova aqui — quem decide o que "1 semana" significa é o
+ * periodStart do analytics.ts, já propagado e testado.
+ *
+ * "month"/"3months"/"6months": sempre N dias corridos a partir de hoje,
+ * sem equivalente civil — mesma regra pros 3, não dependem de period_mode.
+ */
+function isWithinChartPeriod(
+  measuredAt: string,
+  period: ChartPeriod,
+  weekKpi: PeriodKpi | null,
+  now: Date
+): boolean {
+  const entryDate = parseISO(measuredAt);
+  if (period === "week") {
+    // weekKpi.periodStart é string ISO (confirmado: PeriodKpi.periodStart
+    // é formatISO(start, { representation: "date" }) em analytics.ts).
+    const weekStart = weekKpi?.periodStart
+      ? parseISO(weekKpi.periodStart)
+      : subDays(now, 6);
+    return differenceInCalendarDays(entryDate, weekStart) >= 0;
+  }
+  return differenceInCalendarDays(now, entryDate) <= CHART_PERIOD_DAYS[period];
+}
+
 function readChartColors(el: HTMLElement) {
   const cs = getComputedStyle(el);
   const read = (name: string, fallback: string) => cs.getPropertyValue(name).trim() || fallback;
@@ -53,6 +101,33 @@ function readChartColors(el: HTMLElement) {
   };
 }
 
+function PeriodPills({
+  selected,
+  onChange,
+}: {
+  selected: ChartPeriod;
+  onChange: (period: ChartPeriod) => void;
+}) {
+  return (
+    <div className="flex gap-0.5 rounded-lg border border-base-border bg-base-surface2 p-0.5">
+      {CHART_PERIOD_OPTIONS.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={() => onChange(opt.value)}
+          className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition ${
+            selected === opt.value
+              ? "bg-accent text-base-bg"
+              : "text-ink-faint hover:text-ink-muted"
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function WeightChart({
   entries,
   targetWeightKg,
@@ -64,6 +139,29 @@ export default function WeightChart({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [colors, setColors] = useState(FALLBACK_CHART_COLORS);
+  const [selectedPeriod, setSelectedPeriod] = useState<ChartPeriod>("month");
+
+  // Restaura a última escolha do usuário (client-only — primeiro paint do
+  // servidor sempre usa o default "month", sem mismatch de hidratação).
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(CHART_PERIOD_STORAGE_KEY);
+      if (stored && CHART_PERIOD_OPTIONS.some((o) => o.value === stored)) {
+        setSelectedPeriod(stored as ChartPeriod);
+      }
+    } catch {
+      // localStorage indisponível (iframe sandboxed, modo privado restrito)
+    }
+  }, []);
+
+  function handlePeriodChange(period: ChartPeriod) {
+    setSelectedPeriod(period);
+    try {
+      window.localStorage.setItem(CHART_PERIOD_STORAGE_KEY, period);
+    } catch {
+      // mesma proteção
+    }
+  }
 
   useEffect(() => {
     const el = containerRef.current;
@@ -102,7 +200,12 @@ export default function WeightChart({
   const movingAverage = computeMovingAverage(entries);
   const movingAverageByDate = new Map(movingAverage.map((m) => [m.date, m.average]));
 
-  const data = sorted.map((e) => {
+  const now = new Date();
+  const visibleEntries = sorted.filter((e) =>
+    isWithinChartPeriod(e.measured_at, selectedPeriod, weekKpi, now)
+  );
+
+  const data = visibleEntries.map((e) => {
       const point: {
         date: string;
         label: string;
@@ -142,7 +245,9 @@ export default function WeightChart({
       return point;
     });
 
-  if (data.length < 2) {
+  // Caso A — conta nova, sem dados suficientes em lugar nenhum.
+  // Sem pills (sem sentido oferecer "3 meses" pra quem não tem 2 pesagens).
+  if (sorted.length < 2) {
     return (
       <div
         ref={containerRef}
@@ -155,6 +260,27 @@ export default function WeightChart({
     );
   }
 
+  // Caso B — histórico suficiente, mas a janela filtrada tem < 2 pesagens.
+  // Pills continuam visíveis pra trocar de período sem recarregar.
+  if (data.length < 2) {
+    return (
+      <div
+        ref={containerRef}
+        className="bg-base-surface border border-base-border rounded-card p-4 h-96"
+      >
+        <div className="flex items-center justify-between mb-2 px-1">
+          <p className="text-xs uppercase tracking-wide text-ink-muted">Evolução do peso</p>
+          <PeriodPills selected={selectedPeriod} onChange={handlePeriodChange} />
+        </div>
+        <div className="flex-1 flex items-center justify-center h-[calc(100%-2.5rem)]">
+          <p className="text-sm text-ink-faint">
+            Registre pelo menos 2 pesagens para ver o gráfico de evolução.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const weights = data.map((d) => d.peso);
   const min = Math.min(...weights, targetWeightKg ?? Infinity);
   const max = Math.max(...weights, targetWeightKg ?? -Infinity);
@@ -162,7 +288,10 @@ export default function WeightChart({
 
   return (
     <div ref={containerRef} className="bg-base-surface border border-base-border rounded-card p-4 h-96">
-      <p className="text-xs uppercase tracking-wide text-ink-muted mb-2 px-1">Evolução do peso</p>
+      <div className="flex items-center justify-between mb-2 px-1">
+        <p className="text-xs uppercase tracking-wide text-ink-muted">Evolução do peso</p>
+        <PeriodPills selected={selectedPeriod} onChange={handlePeriodChange} />
+      </div>
       {(hasWeeklyTrend || hasMovingAverage) && (
         <div className="flex items-center gap-4 px-1 mb-1 font-mono text-[11px] text-ink-faint flex-wrap">
           <span className="flex items-center gap-1.5">

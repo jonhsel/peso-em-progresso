@@ -19,7 +19,7 @@ na tela `/dashboard/goals`, não fixas no código.
   `src/app/globals.css`) + Recharts para gráficos
 - Sem ORM extra — queries via `@supabase-js` / `@supabase/ssr` direto
 
-## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) + Fase 4.2 (conquistas) + Fase 4.3 (próximo check-in) + Fase 4.4 (guia de ajuda) + Fase 5.1 (previsão da meta) + Fase 5.2 (média móvel de 7 dias) completos, não validados em produção
+## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) + Fase 4.2 (conquistas) + Fase 4.3 (próximo check-in) + Fase 4.4 (guia de ajuda) + Fase 5.1 (previsão da meta) + Fase 5.2 (média móvel de 7 dias) + Fase 5.3 (seletor de período do gráfico) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -227,6 +227,15 @@ sintético de `loadUserData.ts`, então o app não quebra, mas `/dashboard/goals
     do item 13). Padrão de referência para qualquer confirmação destrutiva ou
     de mudança de comportamento futura: só dispara quando o valor em questão
     de fato mudou (não em todo submit do formulário que o contém).
+18. **Primeiro uso de `localStorage` no projeto** (Fase 5.3, chave
+    `pesoemprogresso:chartPeriod`) — distinto do tema, que usa cookie
+    SSR-read (decisão 11) porque o toggle precisa acertar a cor já no HTML
+    do primeiro paint. O período do gráfico é estado 100% client-side sem
+    impacto em SSR (o `useState` inicial já é `"month"`, igual ao default,
+    então não há mismatch de hidratação — o valor salvo só é restaurado
+    depois do mount, via `useEffect` separado). `try/catch` em `getItem`/
+    `setItem`; se indisponível (iframe sandboxed, modo privado restrito),
+    degrada pro default `"month"` silenciosamente, sem crash.
 
 ## Auditoria de código (sessão de 25/08/2026 — bugs corrigidos)
 
@@ -1295,6 +1304,75 @@ Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 5 —
 Inteligência sobre os dados → "Média móvel de 7 dias no gráfico de
 evolução") e atualizar os checkboxes acima.
 
+## Fase 5.3 — Seletor de período do gráfico (implementada 01/09/2026)
+
+Spec completo em `claude_fase5_seletor_periodo_v2.md` (na raiz do repo, não
+versionado — mesmo padrão dos specs anteriores; v2 já auditada contra
+`WeightChart.tsx`/`analytics.ts` reais, correções no Apêndice A do próprio
+arquivo). Implementado nesta sessão: `npx tsc --noEmit` e `npm run build`
+limpos. **Ainda não testado num navegador real** — ver checklist abaixo.
+Patch aplicado ao pé da letra do spec, sem desvios. Terceira sub-fase da
+Fase 5 (Inteligência sobre os dados): previsão da meta (5.1) → média móvel
+de 7 dias (5.2) → **seletor de período do gráfico (5.3)** → relatórios/
+insights → widget de medidas corporais (as 2 últimas ainda não speccadas).
+
+- **Sem migração, sem mudança de schema/tipos, sem nova prop em
+  `dashboard/page.tsx`, sem mudança em `analytics.ts`** — trabalho 100%
+  local a `WeightChart.tsx`. Filtro puramente client-side sobre o array
+  `entries` que o componente já recebia inteiro; nenhuma query nova é
+  disparada ao trocar de período.
+- Pills segmentadas ("1s"/"1m"/"3m"/"6m") no cabeçalho do card, ao lado do
+  título "Evolução do peso", componente local `PeriodPills`. Default "1
+  mês" (`selectedPeriod` inicial `"month"`), restaurado depois via
+  `localStorage` (ver decisão 18) — não perguntado no onboarding nem
+  persistido no banco.
+- `isWithinChartPeriod(measuredAt, period, weekKpi, now)` — helper puro no
+  próprio arquivo: "1s" reaproveita `weekKpi.periodStart` (já resolvido por
+  `computePeriodKpi` respeitando `period_mode`/`week_starts_on` da Fase 3,
+  nenhuma lógica de semana nova aqui); "1m"/"3m"/"6m" são sempre N dias
+  corridos a partir de hoje (30/90/180), sem equivalente civil e sem
+  depender de `period_mode`.
+- **O filtro só recorta o que é desenhado, não o domínio de cálculo**: a
+  variável usada no `.map()` que monta `data` passou de `sorted` (histórico
+  completo) para `visibleEntries` (filtrado). `sorted`, `hasMovingAverage`,
+  `movingAverageByDate`, `hasWeeklyTrend`, `weekStart`, `totalElapsedDays`
+  continuam todos derivados do histórico inteiro — a média móvel e a linha
+  "esperado" nunca "resetam" nas bordas do período visível, só os pontos
+  que aparecem no gráfico mudam.
+- **Dois early returns distintos**: conta nova (`sorted.length < 2`) não
+  mostra pills, mesma mensagem de sempre; histórico suficiente mas janela
+  filtrada vazia (`data.length < 2`, ex.: "1m" numa conta com 8 meses de
+  histórico mas nada nos últimos 30 dias) mostra as pills (pra trocar de
+  período sem reload) + a mesma mensagem no corpo do card.
+- `ReferenceLine` da meta (`targetWeightKg`) continua aparecendo em todos
+  os períodos, sem depender do filtro.
+- `const now = new Date()` é recalculado a cada render do componente
+  (não é constante de módulo) — usado tanto no `filter` quanto dentro de
+  `isWithinChartPeriod`, uma única instância de "agora" por render.
+
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
+      dev — **ainda não visto rodando num navegador real**).
+- [ ] Pills aparecem no cabeçalho, "1 mês" selecionado por padrão sem
+      escolha salva em `localStorage`; trocar de pill filtra o gráfico sem
+      nova query; F5 mantém a última escolha.
+- [ ] "1s" com `period_mode = fixed` respeita `week_starts_on`; com
+      `period_mode = rolling` mostra exatamente os últimos 7 dias corridos.
+- [ ] Conta nova (< 2 pesagens no total): sem pills (Caso A). Conta com
+      histórico longo mas nada nos últimos 30 dias: "1m" mostra pills +
+      mensagem (Caso B), trocar pra "6m" mostra o gráfico sem reload.
+- [ ] Linha "esperado" e média móvel continuam estáveis ao trocar de
+      período (calculadas sobre o histórico completo, não a janela visível).
+- [ ] `ReferenceLine` da meta aparece em todos os períodos.
+- [ ] Tema claro/escuro: pill ativa (`bg-accent text-base-bg`) e inativas
+      (`text-ink-faint`) com contraste adequado.
+- [ ] Mobile: 4 pills cabem no cabeçalho sem quebrar linha; `localStorage`
+      indisponível (iframe privado/bloqueado) degrada pro default "1m" sem
+      crash.
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 5 —
+Inteligência sobre os dados → "Seletor de período no gráfico de evolução")
+e atualizar os checkboxes acima.
+
 ## Pendências / próximos passos sugeridos (não iniciados)
 
 - [ ] Testar o app fim a fim contra um projeto Supabase real (criar projeto, rodar
@@ -1310,9 +1388,6 @@ evolução") e atualizar os checkboxes acima.
       `body_measurements.body_fat_pct` cobre só % de gordura manual; sem cálculo ou
       import automático de balança.
 - [ ] Notificação (e-mail) quando um KPI fecha "atrás da meta".
-- [ ] Seletor de período no gráfico de evolução (1 semana/1 mês/3 meses/6
-      meses) — Fase 5, depende de `period_mode`/`week_starts_on` (Fase 3
-      período, já implementada).
 - [ ] Fase 3 planos (não iniciada — nome de fase em conflito com a "Fase 3"
       de período/Configurações acima, ver nota lá): ligar os planos pagos
       (`src/lib/pricing.ts`) a cobrança real (Stripe) — hoje todo CTA de
