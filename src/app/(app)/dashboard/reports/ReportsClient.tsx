@@ -41,22 +41,33 @@ export default function ReportsClient({
 
   return (
     <div className="space-y-6">
-      {/* Tabs de período */}
-      <div className="flex gap-0.5 rounded-lg border border-base-border bg-base-surface2 p-0.5 w-fit">
-        {PERIOD_TABS.map((t) => (
-          <button
-            key={t.value}
-            type="button"
-            onClick={() => setSelected(t.value)}
-            className={`px-3 py-1 rounded-md text-xs font-medium transition ${
-              selected === t.value
-                ? "bg-accent text-base-bg"
-                : "text-ink-faint hover:text-ink-muted"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* Tabs de período + botão de exportação do período selecionado */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex gap-0.5 rounded-lg border border-base-border bg-base-surface2 p-0.5 w-fit">
+          {PERIOD_TABS.map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => setSelected(t.value)}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition ${
+                selected === t.value
+                  ? "bg-accent text-base-bg"
+                  : "text-ink-faint hover:text-ink-muted"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {/* Link, não fetch — mesmo padrão de ExportButtons.tsx (o navegador
+            trata a resposta application/pdf como download). ?period reflete
+            a tab selecionada no momento do clique. */}
+        <a
+          href={`/api/export/report-pdf?period=${selected}`}
+          className="text-xs border border-base-border rounded-lg px-3 py-1.5 text-ink-muted hover:text-ink transition"
+        >
+          Salvar em PDF
+        </a>
       </div>
 
       {/* KPI do período selecionado */}

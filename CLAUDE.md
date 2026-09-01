@@ -1415,8 +1415,76 @@ medidas corporais (5.5, ainda não specced).
   sem mudança de CSS necessária).
 - **Fora de escopo** (idem spec): geração de texto de insight automático,
   qualquer mudança em `analytics.ts`/`WeightChart.tsx`/`KpiCard.tsx`,
-  exportação PDF nova, unificação dos dois seletores de período, widget de
-  medidas corporais (5.5).
+  unificação dos dois seletores de período, widget de medidas corporais
+  (5.5).
+
+**Adendo 01/09/2026 (mesmo dia, pedido direto do usuário): botão "Salvar em
+PDF" em `/dashboard/reports`.** O spec original marcava "sem exportação PDF
+nova" como decisão fechada — revista a pedido do usuário, que queria um PDF
+específico do relatório (não o `/api/export/pdf` genérico já existente).
+Duas escolhas fechadas com o usuário antes de implementar: (1) rota nova
+dedicada, não reaproveitar `/api/export/pdf`; (2) incluir um gráfico no PDF,
+não só o resumo do KPI.
+
+- Rota nova `GET /api/export/report-pdf?period=week|month|quarter|semester`
+  (`src/app/api/export/report-pdf/route.tsx`), mesmo padrão de
+  `api/export/pdf/route.tsx` (auth check, `runtime = "nodejs"`,
+  `dynamic = "force-dynamic"`, `Cache-Control: no-store, private`,
+  `renderToBuffer` envolvido em `new Uint8Array(...)`). `period` inválido/
+  ausente cai em `"week"`. Calcula os 4 KPIs (`computeAllKpis`), pega só o
+  do período pedido, e a previsão (`computeGoalPrediction`) só para
+  `week`/`month` — mesma regra da Fase 5.1, sem previsão em trimestre/
+  semestre. Query extra em `goals` (`target_weight_kg`, não usada pelo
+  `api/export/pdf` original) porque a previsão com peso alvo depende dele.
+- `src/lib/pdf/ReportDocument.tsx` (novo, ao lado de `ExportDocument.tsx`,
+  sem compartilhar código entre os dois — layouts diferentes o suficiente
+  pra não valer a pena extrair um componente comum agora): título
+  "Relatórios", card do KPI do período (mesmo conteúdo visual do `KpiCard`:
+  perda real/meta, barra de progresso, status colorido, previsão), e um
+  **gráfico de linha desenhado à mão** com os primitivos SVG do
+  `@react-pdf/renderer` (`Svg`/`Polyline`/`Line`/`Circle`) — **não** é
+  `WeightChart.tsx`/Recharts, que não roda nesse motor de renderização.
+  Pontos espaçados igualmente por índice (eixo X categórico, mesmo efeito
+  visual do `WeightChart`), com linha tracejada verde de referência da meta
+  de peso quando definida e dentro do domínio visível. Cobre só as
+  pesagens dentro do período selecionado (`measured_at >= kpi.periodStart`),
+  coerente com o KPI mostrado acima — diferente do `WeightChart` da própria
+  tela de Relatórios, que sempre mostra o histórico completo (ou a janela
+  1s/1m/3m/6m independente). `STATUS_COLOR`/`STATUS_LABEL` duplicados de
+  `ExportDocument.tsx` (mesmo valor, mesmo comentário de sincronização
+  manual — ver decisão 8) porque cada `Document` do `@react-pdf/renderer` é
+  autocontido.
+  **Sem** linha "esperado"/média móvel no gráfico do PDF — fora de escopo
+  do "gráfico simplificado" pedido.
+- Botão "Salvar em PDF" em `ReportsClient.tsx` — `<a href>` puro (mesmo
+  padrão de `ExportButtons.tsx`, não fetch/blob), `?period=` reflete a tab
+  selecionada no momento do clique. Ao lado das tabs, mesmo container
+  flex com `justify-between`.
+- `next.config.js::experimental.outputFileTracingIncludes` ganhou uma
+  segunda entrada `"/api/export/report-pdf"` idêntica à de
+  `"/api/export/pdf"` — mesma dependência nativa do `pdfkit`
+  (`require()` dinâmico de fontes em runtime, não rastreado pelo bundler
+  por padrão), documentada em detalhe na decisão 8. Sem isso, essa segunda
+  rota cairia no mesmo 500 (`Cannot find module
+  'pdfkit/js/standard-fonts/Helvetica.cjs'`) já corrigido uma vez pro
+  `/api/export/pdf` original — só não testado ainda contra a Vercel real
+  (mesma pendência geral do projeto).
+
+- [ ] Botão "Salvar em PDF" baixa um PDF válido, título "Relatórios",
+      refletindo o período da tab selecionada no momento do clique.
+- [ ] PDF de "Semana"/"Mês" mostra a previsão (mesmo texto do `KpiCard`);
+      "Trimestre"/"Semestre" não mostram.
+- [ ] PDF de um período sem pesagens suficientes dentro dele (mas com
+      histórico fora do período): card do KPI mostra "Registre pesagens
+      para ver o progresso deste período." e a seção de gráfico mostra
+      "Registre pelo menos 2 pesagens dentro deste período".
+- [ ] Meta de peso definida e dentro da faixa do gráfico → linha tracejada
+      verde aparece; meta fora da faixa ou não definida → gráfico sem ela,
+      sem erro.
+- [ ] Deploy na Vercel: `/api/export/report-pdf` não retorna 500 por
+      `pdfkit` ausente (validar o `outputFileTracingIncludes` novo, mesmo
+      teste que faltou originalmente pro `/api/export/pdf`).
+- [ ] Deslogado → 401.
 
 - [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
       dev — **ainda não visto rodando num navegador real**).

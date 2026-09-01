@@ -15,6 +15,17 @@ const nextConfig = {
         "./node_modules/@react-pdf/font/**/*",
         "./node_modules/pdfkit/**/*",
       ],
+      // Mesma dependência nativa (pdfkit carrega fontes padrão via require()
+      // dinâmico em runtime, que o bundler não rastreia sozinho) — /api/export/
+      // report-pdf (Fase 5.4) também usa @react-pdf/renderer, então precisa do
+      // mesmo include ou cai no mesmo 500 documentado no CLAUDE.md (item 8).
+      "/api/export/report-pdf": [
+        "./node_modules/@react-pdf/renderer/**/*",
+        "./node_modules/@react-pdf/pdfkit/**/*",
+        "./node_modules/@react-pdf/layout/**/*",
+        "./node_modules/@react-pdf/font/**/*",
+        "./node_modules/pdfkit/**/*",
+      ],
     },
   },
 };
