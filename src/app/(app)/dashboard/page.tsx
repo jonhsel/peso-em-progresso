@@ -8,12 +8,13 @@ import StreakCard from "@/components/StreakCard";
 import AchievementsCard from "@/components/AchievementsCard";
 import TrendBadge from "@/components/TrendBadge";
 import WeightChart from "@/components/WeightChart";
+import BodyMeasurementsSummaryCard from "@/components/BodyMeasurementsSummaryCard";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default async function DashboardPage() {
-  const { user, profile, entries, goals, goalsHistory, achievements } = await loadUserData();
+  const { user, profile, entries, measurements, goals, goalsHistory, achievements } = await loadUserData();
   const theme = await getTheme();
 
   const kpis = computeAllKpis(entries, goalsHistory, new Date(), profile.period_mode, profile.week_starts_on);
@@ -107,6 +108,8 @@ export default async function DashboardPage() {
             ))}
           </div>
         </div>
+
+        <BodyMeasurementsSummaryCard measurements={measurements} />
       </main>
     </div>
   );

@@ -19,7 +19,8 @@ na tela `/dashboard/goals`, não fixas no código.
   `src/app/globals.css`) + Recharts para gráficos
 - Sem ORM extra — queries via `@supabase-js` / `@supabase/ssr` direto
 
-## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) + Fase 4.2 (conquistas) + Fase 4.3 (próximo check-in) + Fase 4.4 (guia de ajuda) + Fase 5.1 (previsão da meta) + Fase 5.2 (média móvel de 7 dias) + Fase 5.3 (seletor de período do gráfico) + Fase 5.4 (relatórios) completos, não validados em produção
+## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) + Fase 4.2 (conquistas) + Fase 4.3 (próximo check-in) + Fase 4.4 (guia de ajuda) + Fase 5.1 (previsão da meta) + Fase 5.2 (média móvel de 7 dias) + Fase 5.3 (seletor de período do gráfico) + Fase 5.4 (relatórios) + Fase 5.5
+(widget-resumo de medidas corporais) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -1509,6 +1510,77 @@ não só o resumo do KPI.
 Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 5 —
 Inteligência sobre os dados → "Relatórios e Insights") e atualizar os
 checkboxes acima.
+
+## Fase 5.5 — Widget-resumo de medidas corporais (implementada 01/09/2026)
+
+Spec completo em `claude_fase5_widget_medidas_v2.md` (na raiz do repo, não
+versionado — mesmo padrão dos specs anteriores; v2 já auditada contra
+`dashboard/page.tsx`/`BodyMeasurementsList.tsx`/`database.ts` reais).
+Implementado nesta sessão: `npx tsc --noEmit` e `npm run build` limpos.
+**Ainda não testado num navegador real** — ver checklist abaixo. Patch
+aplicado ao pé da letra do spec, sem desvios. Última sub-fase da Fase 5
+(Inteligência sobre os dados): previsão da meta (5.1) → média móvel de 7
+dias (5.2) → seletor de período do gráfico (5.3) → relatórios (5.4) →
+**widget-resumo de medidas corporais (5.5)**. Com essa sub-fase, **a Fase 5
+fecha por completo**.
+
+- **Sem migração, sem mudança de schema/tipos, sem mudança em
+  `loadUserData.ts`** — a página `/dashboard/measurements` já existe desde a
+  Fase 2.2; este widget é só a superfície de descoberta que faltava em
+  `/dashboard` (antes, só era encontrada clicando em "Medidas" na `NavBar`).
+- `src/components/BodyMeasurementsSummaryCard.tsx` (novo) — Server
+  Component (sem `"use client"`; a única interação é navegação via
+  `<Link>`, que não precisa de client). `return null` quando
+  `measurements.length === 0` — ausência silenciosa, mesmo padrão de
+  `hasWeeklyTrend`/`hasMovingAverage` (`WeightChart.tsx`). Para cada um dos
+  4 campos (`waist_cm`/`hip_cm`/`arm_cm`/`body_fat_pct`), mostra o valor do
+  registro mais recente **que tenha aquele campo preenchido** (não o
+  registro mais recente genérico) + diff contra o próximo registro mais
+  antigo que também tenha aquele campo — mesma lógica por-campo já usada em
+  `BodyMeasurementsList.tsx` (Fase 2.2), sem cor semântica no diff (mesma
+  decisão: cintura menor é "bom", braço menor geralmente não é, varia por
+  pessoa). Cabeçalho mostra a data do registro mais recente da tabela; cada
+  campo só reexibe sua própria data quando ela diverge desse cabeçalho
+  (evita repetir a mesma data 4× quando tudo foi medido junto). Card inteiro
+  é um `<Link href="/dashboard/measurements">` com `hover:border-ink-faint`
+  (mesmo tratamento do `KpiWeeklyTeaser`).
+- `dashboard/page.tsx` — `loadUserData()` já retornava `measurements`
+  (ordenado por `measured_at` ascendente, carregado desde a Fase 2.2), mas
+  a página nunca desestruturava essa chave; agora desestrutura
+  (`const { user, profile, entries, measurements, goals, goalsHistory,
+  achievements } = await loadUserData();`) e renderiza
+  `<BodyMeasurementsSummaryCard measurements={measurements} />` como último
+  bloco dentro de `<main>`, depois da seção `id="kpi-details"` (4
+  `KpiCard`) — posição deliberada: é o card menos acionável no dia a dia
+  (medidas mudam devagar comparado a peso), fica abaixo de tudo que já
+  compete pela atenção acima da dobra.
+- **Fora de escopo** (idem spec): qualquer mudança em `body_measurements`
+  (schema), RLS, `BodyMeasurementForm.tsx`, `BodyMeasurementsList.tsx`, rota
+  `/dashboard/measurements`, gráfico/série temporal dentro do card (é um
+  resumo pontual, não visualização histórica), e `api/export/pdf` (não
+  mudou).
+
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
+      dev — **ainda não visto rodando num navegador real**).
+- [ ] Conta sem nenhuma medida: nada aparece abaixo dos 4 `KpiCard`, sem
+      espaço em branco residual, sem erro.
+- [ ] Conta com 1 único registro preenchendo os 4 campos: mostra os 4
+      valores, sem nenhuma linha de diff (não há registro anterior).
+- [ ] Conta com 2+ registros preenchendo campos diferentes em datas
+      diferentes: cada campo mostra seu próprio valor mais recente e sua
+      própria data quando ela diverge da data do cabeçalho.
+- [ ] Diff correto: aumentar mostra `↑`, diminuir mostra `↓`, valor igual
+      não mostra linha de diff.
+- [ ] Clicar em qualquer ponto do card navega para `/dashboard/measurements`.
+- [ ] Tema claro/escuro: contraste de `text-ink-faint`/`text-ink-muted`
+      adequado nos dois temas.
+- [ ] Mobile: grid 2 colunas não aperta os 4 campos; "% gordura" cabe no
+      espaço reduzido.
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 5 —
+Inteligência sobre os dados → "Widget-resumo de Medidas Corporais no
+dashboard") e atualizar os checkboxes acima. **Fase 5 (Inteligência sobre
+os dados) fechada por completo.**
 
 ## Pendências / próximos passos sugeridos (não iniciados)
 
