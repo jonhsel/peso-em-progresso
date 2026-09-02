@@ -1,4 +1,4 @@
-import type { WeightEntry, Goals, UserAchievement } from "@/types/database";
+import type { WeightEntry, Goal, UserAchievement } from "@/types/database";
 
 // --- Definição das regras ---
 
@@ -90,10 +90,15 @@ export type EvaluatedAchievement = {
  * Retorna também `newlyUnlocked`: conquistas cuja condição é atingida
  * agora mas que ainda não estão em `user_achievements` — o caller
  * (dashboard page) deve persistir essas no banco.
+ *
+ * Conquistas continuam peso-only (fora de escopo generalizar por métrica,
+ * ver decisão técnica da Fase 6.2) — avaliadas sempre contra a meta de
+ * peso "primária" (a mais antiga ativa), nunca contra metas de outras
+ * métricas.
  */
 export function evaluateAchievements(
   entries: WeightEntry[],
-  goals: Goals,
+  primaryWeightGoal: Goal | null,
   existing: UserAchievement[]
 ): {
   all: EvaluatedAchievement[];
@@ -112,7 +117,7 @@ export function evaluateAchievements(
   const totalLostKg =
     first && latest ? Number(first.weight_kg) - Number(latest.weight_kg) : 0;
 
-  const targetWeight = goals.target_weight_kg;
+  const targetWeight = primaryWeightGoal?.target_value ?? null;
   const hasTarget = targetWeight !== null && targetWeight > 0;
   const firstAboveTarget =
     hasTarget && first ? Number(first.weight_kg) > targetWeight : false;

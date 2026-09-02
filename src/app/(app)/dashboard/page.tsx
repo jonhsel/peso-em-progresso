@@ -1,28 +1,75 @@
 import { loadUserData } from "@/lib/loadUserData";
 import { getTheme } from "@/lib/get-theme";
-import { computeAllKpis, computeTrend, computeGoalPrediction } from "@/lib/analytics";
+import {
+  extractMetricPoints,
+  computeAllKpis,
+  computeTrend,
+  computeGoalPrediction,
+  getPrimaryWeightGoal,
+  METRIC_UNIT,
+  type PeriodKpi,
+} from "@/lib/analytics";
 import NavBar from "@/components/NavBar";
-import KpiCard from "@/components/KpiCard";
+import GoalTabs, { type GoalPredictions } from "@/components/GoalTabs";
 import KpiWeeklyTeaser from "@/components/KpiWeeklyTeaser";
 import StreakCard from "@/components/StreakCard";
 import AchievementsCard from "@/components/AchievementsCard";
 import TrendBadge from "@/components/TrendBadge";
-import WeightChart from "@/components/WeightChart";
+import WeightChart, { type WeightGoalKpi } from "@/components/WeightChart";
 import BodyMeasurementsSummaryCard from "@/components/BodyMeasurementsSummaryCard";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default async function DashboardPage() {
-  const { user, profile, entries, measurements, goals, goalsHistory, achievements } = await loadUserData();
+  const { user, profile, entries, measurements, activeGoals, goalsHistory, achievements } = await loadUserData();
   const theme = await getTheme();
 
-  const kpis = computeAllKpis(entries, goalsHistory, new Date(), profile.period_mode, profile.week_starts_on);
-  const weekKpi = kpis.find((kpi) => kpi.period === "week");
-  const monthKpi = kpis.find((kpi) => kpi.period === "month");
+  // KPIs por meta ativa (Fase 6.2): cada meta é avaliada de forma
+  // independente, contra a série temporal da sua própria métrica.
+  const kpisByGoal: Record<string, PeriodKpi[]> = Object.fromEntries(
+    activeGoals.map((goal) => {
+      const points = extractMetricPoints(goal.metric, entries, measurements);
+      const history = goalsHistory.filter((h) => h.goal_id === goal.id);
+      return [
+        goal.id,
+        computeAllKpis(points, history, new Date(), profile.period_mode, profile.week_starts_on, METRIC_UNIT[goal.metric]),
+      ];
+    })
+  );
+
+  // Previsão (Fase 5.1) continua exclusiva de peso — computeTrend só opera
+  // sobre weight_entries (fora de escopo generalizar pra outras métricas
+  // nesta sub-fase). Uma previsão por meta de peso ativa.
   const trend = computeTrend(entries);
-  const weekPrediction = weekKpi ? computeGoalPrediction(trend, weekKpi, goals.target_weight_kg) : undefined;
-  const monthPrediction = monthKpi ? computeGoalPrediction(trend, monthKpi, goals.target_weight_kg) : undefined;
+  const predictionsByGoal: Record<string, GoalPredictions> = {};
+  for (const goal of activeGoals) {
+    if (goal.metric !== "weight") continue;
+    const kpis = kpisByGoal[goal.id] ?? [];
+    const weekKpi = kpis.find((k) => k.period === "week");
+    const monthKpi = kpis.find((k) => k.period === "month");
+    predictionsByGoal[goal.id] = {
+      week: weekKpi ? computeGoalPrediction(trend, weekKpi, goal.target_value) : undefined,
+      month: monthKpi ? computeGoalPrediction(trend, monthKpi, goal.target_value) : undefined,
+    };
+  }
+
+  // Meta de peso "primária" (mais antiga ativa) — alimenta o teaser da
+  // semana, o gráfico (índice 0, cores/visual idênticos a antes) e as
+  // conquistas, que continuam peso-only.
+  const primaryWeightGoal = getPrimaryWeightGoal(activeGoals);
+  const primaryWeekKpi = primaryWeightGoal
+    ? kpisByGoal[primaryWeightGoal.id]?.find((k) => k.period === "week") ?? null
+    : null;
+
+  // Todas as metas de peso ativas (não só a primária) alimentam o gráfico —
+  // 1 linha "esperado" por meta (Fase 6.2).
+  const weightGoals = activeGoals.filter((g) => g.metric === "weight");
+  const weightGoalKpis: WeightGoalKpi[] = weightGoals.map((goal) => ({
+    goal,
+    weekKpi: kpisByGoal[goal.id]?.find((k) => k.period === "week") ?? null,
+  }));
+
   const latest = entries[entries.length - 1] ?? null;
   const first = entries[0] ?? null;
   const totalChange = latest && first ? Number(latest.weight_kg) - Number(first.weight_kg) : null;
@@ -76,38 +123,21 @@ export default async function DashboardPage() {
         <StreakCard entries={entries} checkinHour={profile.checkin_hour} />
         <AchievementsCard
           entries={entries}
-          goals={goals}
+          primaryWeightGoal={primaryWeightGoal}
           achievements={achievements}
           userId={user.id}
         />
 
-        {weekKpi && <KpiWeeklyTeaser kpi={weekKpi} />}
+        {primaryWeekKpi && <KpiWeeklyTeaser kpi={primaryWeekKpi} />}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2">
-            <WeightChart
-              entries={entries}
-              targetWeightKg={goals.target_weight_kg}
-              weekKpi={weekKpi ?? null}
-            />
+            <WeightChart entries={entries} weightGoals={weightGoalKpis} />
           </div>
           <TrendBadge trend={trend} />
         </div>
 
-        <div id="kpi-details">
-          <p className="text-xs uppercase tracking-wide text-ink-muted mb-3">Metas por período</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {kpis.map((kpi) => (
-              <KpiCard
-                key={kpi.period}
-                kpi={kpi}
-                prediction={
-                  kpi.period === "week" ? weekPrediction : kpi.period === "month" ? monthPrediction : undefined
-                }
-              />
-            ))}
-          </div>
-        </div>
+        <GoalTabs goals={activeGoals} kpisByGoal={kpisByGoal} predictionsByGoal={predictionsByGoal} />
 
         <BodyMeasurementsSummaryCard measurements={measurements} />
       </main>

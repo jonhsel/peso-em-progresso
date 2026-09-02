@@ -1,5 +1,4 @@
 import { Document, Page, Text, View, StyleSheet, Svg, Polyline, Line, Circle } from "@react-pdf/renderer";
-import type { WeightEntry } from "@/types/database";
 import type { PeriodKpi, GoalPrediction } from "@/lib/analytics";
 
 const styles = StyleSheet.create({
@@ -68,10 +67,10 @@ function fmtDate(iso: string) {
  */
 function SimpleWeightChart({
   points,
-  targetWeightKg,
+  targetValue,
 }: {
   points: { label: string; weight: number }[];
-  targetWeightKg: number | null;
+  targetValue: number | null;
 }) {
   const width = 500;
   const height = 170;
@@ -82,8 +81,8 @@ function SimpleWeightChart({
   const plotHeight = height - padTop - padBottom;
 
   const weights = points.map((p) => p.weight);
-  const min = Math.min(...weights, targetWeightKg ?? Infinity);
-  const max = Math.max(...weights, targetWeightKg ?? -Infinity);
+  const min = Math.min(...weights, targetValue ?? Infinity);
+  const max = Math.max(...weights, targetValue ?? -Infinity);
   const pad = Math.max(0.5, (max - min) * 0.15);
   const domainMin = min - pad;
   const domainMax = max + pad;
@@ -106,12 +105,12 @@ function SimpleWeightChart({
           stroke="#D1D5DB"
           strokeWidth={1}
         />
-        {targetWeightKg !== null && targetWeightKg >= domainMin && targetWeightKg <= domainMax && (
+        {targetValue !== null && targetValue >= domainMin && targetValue <= domainMax && (
           <Line
             x1={padX}
-            y1={yFor(targetWeightKg)}
+            y1={yFor(targetValue)}
             x2={padX + plotWidth}
-            y2={yFor(targetWeightKg)}
+            y2={yFor(targetValue)}
             stroke="#34D399"
             strokeWidth={1}
             strokeDasharray="4,3"
@@ -134,14 +133,16 @@ export function ReportDocument({
   displayName,
   kpi,
   prediction,
-  periodEntries,
-  targetWeightKg,
+  chartPoints,
+  targetValue,
+  unit = "kg",
 }: {
   displayName: string;
   kpi: PeriodKpi;
   prediction?: GoalPrediction;
-  periodEntries: WeightEntry[];
-  targetWeightKg: number | null;
+  chartPoints: { label: string; weight: number }[];
+  targetValue: number | null;
+  unit?: string;
 }) {
   const generatedAt = new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "long",
@@ -151,11 +152,6 @@ export function ReportDocument({
 
   const hasData = kpi.currentWeightKg !== null && kpi.baselineWeightKg !== null;
   const color = STATUS_COLOR[kpi.status];
-
-  const chartPoints = periodEntries.map((e) => ({
-    label: fmtDate(e.measured_at),
-    weight: Number(e.weight_kg),
-  }));
 
   return (
     <Document>
@@ -180,7 +176,7 @@ export function ReportDocument({
                     ? `-${kpi.actualLossKg.toFixed(2)}`
                     : `+${Math.abs(kpi.actualLossKg ?? 0).toFixed(2)}`}
                 </Text>
-                <Text style={styles.numbersTarget}>/ -{kpi.targetLossKg.toFixed(2)} kg meta</Text>
+                <Text style={styles.numbersTarget}>/ -{kpi.targetLossKg.toFixed(2)} {unit} meta</Text>
               </View>
 
               <View style={styles.progressTrack}>
@@ -199,8 +195,8 @@ export function ReportDocument({
 
               {kpi.expectedWeightNowKg !== null && (
                 <Text style={styles.detailText}>
-                  Hoje você está em {kpi.currentWeightKg?.toFixed(1)} kg · esperado pela meta:{" "}
-                  {kpi.expectedWeightNowKg.toFixed(1)} kg
+                  Hoje você está em {kpi.currentWeightKg?.toFixed(1)} {unit} · esperado pela meta:{" "}
+                  {kpi.expectedWeightNowKg.toFixed(1)} {unit}
                 </Text>
               )}
 
@@ -211,12 +207,12 @@ export function ReportDocument({
                       prediction.estimatedDate
                     )})`}
                   {prediction.kind === "insufficient_data" &&
-                    "Sem dados suficientes para projetar (mínimo 2 pesagens nos últimos 21 dias)."}
+                    "Sem dados suficientes para projetar (mínimo 2 registros nos últimos 21 dias)."}
                   {prediction.kind === "wrong_direction" &&
                     "No ritmo atual, a meta não será alcançada — tendência dos últimos 21 dias não é de perda."}
                   {prediction.kind === "already_reached" &&
                     prediction.withTarget &&
-                    "Meta de peso já alcançada!"}
+                    "Meta já alcançada!"}
                   {prediction.kind === "already_reached" &&
                     !prediction.withTarget &&
                     "Meta deste período já batida."}
@@ -231,7 +227,7 @@ export function ReportDocument({
         <Text style={styles.sectionTitle}>Evolução no período</Text>
         <View style={styles.chartBox}>
           {chartPoints.length >= 2 ? (
-            <SimpleWeightChart points={chartPoints} targetWeightKg={targetWeightKg} />
+            <SimpleWeightChart points={chartPoints} targetValue={targetValue} />
           ) : (
             <Text style={styles.empty}>
               Registre pelo menos 2 pesagens dentro deste período para ver o gráfico.

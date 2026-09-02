@@ -20,7 +20,8 @@ na tela `/dashboard/goals`, não fixas no código.
 - Sem ORM extra — queries via `@supabase-js` / `@supabase/ssr` direto
 
 ## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) + Fase 4.2 (conquistas) + Fase 4.3 (próximo check-in) + Fase 4.4 (guia de ajuda) + Fase 5.1 (previsão da meta) + Fase 5.2 (média móvel de 7 dias) + Fase 5.3 (seletor de período do gráfico) + Fase 5.4 (relatórios) + Fase 5.5
-(widget-resumo de medidas corporais) + Fase 6.1 (fotos de progresso) completos, não validados em produção
+(widget-resumo de medidas corporais) + Fase 6.1 (fotos de progresso) + Fase 6.2
+(múltiplas metas simultâneas) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -1599,14 +1600,19 @@ sobre a v2 já implementada, o overlay de peso do dia na tela de comparação �
 `claude_fase6_fotos_progresso_v2.md` apagado do repo após confirmar a v3,
 conforme instrução do próprio spec). Implementado em duas sessões: base
 (bucket/tabela/upload/histórico/comparação) em 01/09/2026, overlay de peso em
-02/09/2026. `npx tsc --noEmit` e `npm run build` limpos nas duas. **Testado
+02/09/2026, gradiente do overlay em 02/09/2026 (mesmo dia, correção pós-teste
+real). `npx tsc --noEmit` e `npm run build` limpos em todas. **Testado
 contra Supabase real em 02/09/2026** (migração 0008 rodada no Dashboard,
-confirmada por print real de `/dashboard/photos` logado: link "Fotos" ativo
+confirmado por print real de `/dashboard/photos` logado: link "Fotos" ativo
 no `NavBar`, upload de foto funcionando, `PhotoComparisonView` listando e
-trocando entre 2 datas distintas) — **overlay de peso, exclusão de foto e
-sobrescrita no mesmo dia ainda não testados**, ver checklist abaixo. Patch
-aplicado ao pé da letra do spec, sem desvios. Primeiro item da Fase 6
-(Ticket alto).
+trocando entre 2 datas distintas, exclusão de foto funcionando). **Achado
+real de teste (overlay de peso):** o texto `text-white/70` sem nada atrás
+ficava imperceptível em fotos de fundo claro — `drop-shadow-md` sozinho não
+bastou (a ressalva já deixada no checklist da sessão anterior se confirmou).
+Corrigido com um gradiente escurecendo a base da foto (ver detalhe abaixo);
+**sobrescrita no mesmo dia ainda não testada**, ver checklist. Patch
+aplicado ao pé da letra do spec (mais a correção de legibilidade, fora do
+spec original), sem outros desvios. Primeiro item da Fase 6 (Ticket alto).
 
 - **Bucket privado** `progress-photos` no Supabase Storage (não público) —
   mesma filosofia de RLS-first do resto do projeto (decisão 3). Leitura via
@@ -1645,11 +1651,24 @@ aplicado ao pé da letra do spec, sem desvios. Primeiro item da Fase 6
   sem ambiguidade) em overlay `absolute bottom-3 left-3 text-2xl sm:text-3xl
   font-display font-bold text-white/70 drop-shadow-md` sobre a foto; sem
   pesagem naquele dia exato, nenhum overlay aparece (não busca a mais
-  próxima). `text-white/70` é branco fixo, não os tokens `ink-*`/`accent` do
-  tema — uma foto tem fundo imprevisível, não o fundo do app; `/70` funciona
-  aqui porque `white` é cor literal do Tailwind, não uma CSS var como
-  `accent` (limitação de opacity modifier documentada no item 13). Formato
-  `92,4 kg` (vírgula decimal, mesmo padrão do CSV export). Fonte do dado:
+  próxima). Texto em branco fixo, não os tokens `ink-*`/`accent` do tema —
+  uma foto tem fundo imprevisível, não o fundo do app.
+  **Correção de legibilidade (02/09/2026, achado de teste real):** a v3
+  original usava só `text-white/70` + `drop-shadow-md`, sem nada atrás —
+  em teste real numa foto de fundo claro (parede/quadro branco), o número
+  ficou praticamente ilegível; o `drop-shadow-md` sozinho não compensa
+  fundo claro (ele suaviza borda, não inverte contraste). Corrigido com um
+  gradiente escurecendo a base da foto: `<div className="pointer-events-none
+  absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/70
+  to-transparent" />` posicionado atrás do `<span>` do peso (só renderizado
+  junto com ele — sem peso, sem gradiente), e o texto voltou a `text-white`
+  opaco (a transparência do texto não fazia mais sentido tendo um scrim
+  garantindo contraste). O wrapper de cada `PhotoSlot` ganhou
+  `rounded-card border border-base-border overflow-hidden` (antes essas
+  classes viviam no próprio `<img>`) — precisa do `overflow-hidden` pra o
+  gradiente respeitar os cantos arredondados do card, senão ele vaza reto
+  por baixo da borda arredondada. Formato do número inalterado: `92,4 kg`
+  (vírgula decimal, mesmo padrão do CSV export). Fonte do dado:
   `entries` já vinha de `loadUserData()` — `photos/page.tsx` passou a
   desestruturá-lo e montar um `Map` (`weightByDate`) sem query nova.
   Restrito à comparação, deliberadamente: `PhotoHistoryGrid` recebe o mesmo
@@ -1735,9 +1754,9 @@ aplicado ao pé da letra do spec, sem desvios. Primeiro item da Fase 6
       não verificada visualmente (comportamento client-side esperado pelo
       código, não conferido via Network).
 - [ ] 0 ou 1 foto: seção "Comparar" mostra mensagem, sem quebrar.
-- [ ] Excluir foto: `window.confirm`, some do histórico e da comparação,
-      arquivo removido do bucket. **Ainda não testado** (confirmado pelo
-      usuário).
+- [x] Excluir foto: `window.confirm`, some do histórico e da comparação,
+      arquivo removido do bucket. **Confirmado pelo usuário em 02/09/2026,
+      funcionando.**
 - [ ] RLS: usuário A não vê/edita fotos do usuário B (tabela e bucket).
 - [ ] Signed URLs expiram em 1h — reabrir a página gera novas URLs.
 - [ ] Tema claro/escuro: bordas, `ink-faint`, botão de excluir com
@@ -1749,32 +1768,188 @@ aplicado ao pé da letra do spec, sem desvios. Primeiro item da Fase 6
       formulário de upload + "Nenhuma foto ainda" no histórico + mensagem
       de "envie 2 datas" na comparação. Não aplicável à conta usada no
       teste (já tinha fotos), não verificado com conta zerada.
-- [ ] Comparação: foto de um dia **com** pesagem registrada mostra o peso
+- [x] Comparação: foto de um dia **com** pesagem registrada mostra o peso
       em overlay, canto inferior esquerdo, formatado como "92,4 kg".
-      **Ainda não testado** (confirmado pelo usuário) — no print real, as
-      2 fotos comparadas não mostram overlay, mas não se sabe se é porque
-      não há pesagem nas datas `2026-08-30`/`2026-09-01` (comportamento
-      correto) ou se o overlay não está funcionando; precisa de teste
-      dedicado com uma pesagem registrada numa dessas datas exatas.
+      **Testado pelo usuário em 02/09/2026** — funcionando (achado de
+      legibilidade abaixo, já corrigido).
 - [ ] Comparação: foto de um dia **sem** pesagem registrada não mostra
       overlay nenhum (sem placeholder, sem "—", nada).
 - [ ] Trocar a data no `<select>` atualiza o overlay de peso junto com a
       imagem, instantaneamente.
-- [ ] Overlay legível em foto de fundo claro e em foto de fundo escuro
-      (testar com 2 fotos de exemplo diferentes) — o `drop-shadow-md`
-      deve bastar nos dois casos; se não bastar em produção, a correção
-      é somar um scrim `bg-black/30` atrás do número, não trocar a cor.
+- [x] Overlay legível em foto de fundo claro e em foto de fundo escuro —
+      **achado real de teste (02/09/2026): não estava.** `text-white/70` +
+      `drop-shadow-md` sozinho ficava imperceptível em foto de fundo claro.
+      Corrigido com gradiente escurecendo a base da foto (`bg-gradient-to-t
+      from-black/70 to-transparent`, `h-24`, atrás do texto) + texto voltou
+      a `text-white` opaco — ver detalhe técnico acima. **Correção aplicada
+      e validada via `tsc`/`build`; ainda não re-testada visualmente pelo
+      usuário no navegador** — próximo item a confirmar.
 - [ ] Grid de histórico (`PhotoHistoryGrid`) **não** mostra peso —
       confirmar que o escopo do overlay ficou restrito à comparação.
 
-**Pendência ativa desta sub-fase, aberta em 02/09/2026:** overlay de peso,
-exclusão de foto e sobrescrita no mesmo dia — os 3 itens que o usuário
-sinalizou explicitamente como ainda não testados após a primeira rodada de
-testes reais. Retomar por aqui na próxima sessão antes de considerar a
-Fase 6.1 validada em produção.
+**Pendência ativa desta sub-fase, atualizada em 02/09/2026:** exclusão e
+overlay já testados e confirmados funcionando (overlay com o achado de
+legibilidade acima, já corrigido). Falta: (1) re-testar visualmente o
+gradiente novo do overlay numa foto de fundo claro — a correção só foi
+validada por `tsc`/`build`, não vista rodando; (2) sobrescrita de foto no
+mesmo dia, ainda não testada. Retomar por aqui na próxima sessão antes de
+considerar a Fase 6.1 validada em produção.
 
 Depois de validar o restante em produção: marcar o item no `claude_fases.md`
 (Fase 6 — Ticket alto → "Fotos de progresso") e atualizar os checkboxes
+acima.
+
+## Fase 6.2 — Múltiplas metas simultâneas (implementada 02/09/2026)
+
+Spec completo em `claude_fase6_metas_simultaneas_v3.md` (na raiz do repo, não
+versionado — mesmo padrão dos specs anteriores; v3 já é resultado de 2ª
+auditoria contra o repo real, substituindo v1/v2). Implementado nesta sessão:
+`npx tsc --noEmit` e `npm run build` limpos. **Ainda não testado contra
+Supabase real nem visto num navegador** — ver checklist abaixo. Patch
+aplicado ao pé da letra do spec (22 arquivos), com 2 decisões de arquitetura
+deixadas explicitamente a cargo desta sessão pelo próprio spec (seção 8.5).
+Segundo item da Fase 6 (Ticket alto), depois de fotos de progresso (6.1).
+
+- **`goals` deixa de ser singleton** (1 linha/usuário) — agora até **3
+  linhas ativas simultâneas** por usuário, cada uma com sua própria métrica
+  (`metric`: `weight | waist | hip | arm | body_fat`), rótulo opcional
+  (`label`) e `is_active`. Migração `supabase/migrations/0009_multi_goals.sql`
+  (também refletida em `supabase/schema.sql`): renomeia os 4 campos de ritmo
+  + `target_weight_kg` pra nomes genéricos (`weekly_rate`/`monthly_rate`/
+  `quarterly_rate`/`semester_rate`/`target_value`), troca a PK de `user_id`
+  pra `id` (uuid novo), e adiciona um trigger `enforce_max_active_goals`
+  (`before insert or update`) que rejeita a 4ª meta ativa com exceção
+  Postgres. `goals_history` ganha `goal_id`/`metric` e passa a ser
+  filtrável por meta — a migração faz backfill de `goal_id` a partir do
+  `user_id` (seguro nesse momento da migração: cada usuário ainda tem
+  exatamente 1 linha em `goals`, o singleton pré-existente). **Ainda
+  precisa ser rodada manualmente no Supabase Dashboard > SQL Editor.**
+- `src/lib/analytics.ts::extractMetricPoints(metric, weightEntries,
+  measurements)` (nova) — generaliza a origem da série temporal: peso vem
+  de `weight_entries`, as outras 4 métricas vêm de `body_measurements`
+  (mesmo critério por-campo já usado em `BodyMeasurementsSummaryCard`:
+  só registros em que aquele campo específico foi preenchido).
+  `computePeriodKpi`/`computeAllKpis` passaram a receber `points:
+  EntryPoint[]` (já extraídos pelo caller) em vez de `entries`, e ganharam
+  um parâmetro `unit` (default `"kg"`) que generaliza os textos antes
+  hardcoded em "kg" (`statusLabel`, mensagens de "sem registros"/"sem
+  registro recente"). **`PeriodKpi` mantém os nomes de campo em `*Kg`**
+  (`targetLossKg`, `baselineWeightKg`, etc.) por decisão explícita do spec —
+  débito técnico documentado, não renomear. `computeTrend`/
+  `computeMovingAverage` **não mudaram** — continuam exclusivos de peso
+  (operam sobre `WeightEntry[]` bruto), fora de escopo generalizar nesta
+  sub-fase; por consequência, **previsão da meta (Fase 5.1) só existe para
+  metas de métrica `weight`** — nas demais, `predictionsByGoal[goal.id]`
+  simplesmente não é preenchido, e nenhuma previsão é mostrada.
+  Novos helpers: `METRIC_UNIT`/`METRIC_LABEL` (Record por `GoalMetric`) e
+  `getPrimaryWeightGoal(activeGoals)` (a meta de peso ativa mais antiga —
+  alimenta `WeightChart` índice 0, `KpiWeeklyTeaser` e as conquistas).
+- **Conquistas continuam peso-only** (decisão fechada do spec, sem badges
+  novos por métrica) — `evaluateAchievements`/`AchievementsCard` trocaram o
+  parâmetro `goals: Goals` por `primaryWeightGoal: Goal | null`, sempre a
+  meta de peso primária, nunca outras métricas.
+- **`GoalsForm.tsx` refatorado pra 1 meta por vez** (recebe `goal: Goal`,
+  não mais o singleton) — **bug real do v2 corrigido no v3 antes de
+  implementar**: o `upsert(..., { onConflict: "user_id" })` original
+  quebraria com `user_id` deixando de ser único: trocado por
+  `update(...).eq("id", goal.id)`. Mesma correção em
+  `OnboardingFlow.tsx` (que só edita a meta de peso já criada pelo trigger
+  de signup — faz um `select` por `metric='weight' and is_active=true`
+  antes do `update` por id) e implícita em `GoalsManager.tsx` (novo,
+  decisão de arquitetura deixada a cargo desta sessão pelo spec): lista as
+  metas ativas, seleciona qual `GoalsForm`/`GoalsHistoryList` mostrar,
+  desativa (`update is_active=false`, com `window.confirm`) e cria meta
+  nova por métrica (insert simples, valores começam nos defaults de
+  coluna 0.25/1/3/6, editáveis depois no próprio `GoalsForm`). Bloqueia
+  "Adicionar meta" no client quando `activeGoals.length >= 3` (a trava de
+  verdade é o trigger Postgres — o client só evita a viagem ao banco).
+  `GoalsHistoryList` ganhou prop `unit` e passou a receber `history` já
+  filtrado por `goal_id` (antes mostrava tudo misturado, sem sentido agora
+  que existe mais de 1 meta).
+- **`GoalTabs.tsx` (novo)** substitui o grid fixo de 4 `KpiCard` do
+  dashboard — 1 aba por meta ativa; abas ficam escondidas com só 1 meta
+  ativa (visual idêntico a antes). `KpiCard` ganhou prop `unit` (default
+  `"kg"`) usada nos 3 pontos que exibiam "kg" fixo, e o texto de previsão
+  "Meta de peso já alcançada!" virou "Meta já alcançada!" (genérico pra
+  qualquer métrica).
+- **`WeightChart.tsx` passou a receber `weightGoals: { goal: Goal; weekKpi:
+  PeriodKpi | null }[]`** em vez de `targetWeightKg`/`weekKpi` únicos — 1
+  linha "esperado" (`esperado_0`, `esperado_1`, `esperado_2`) e 1
+  `ReferenceLine` de meta por meta de peso ativa (metas de outras métricas
+  não aparecem no gráfico de peso, por natureza). Cores por posição
+  (`EXPECTED_LINE_COLORS`/`TARGET_LINE_COLORS`, hex fixo) para a 2ª/3ª meta
+  de peso; a 1ª mantém exatamente as cores de hoje (`colors.axis`
+  reativo ao tema, `#34D399` fixo) — **zero mudança visual pra quem só tem
+  1 meta de peso**, que é o caso de toda conta existente até aqui. O
+  seletor "1s" do próprio gráfico usa o `weekKpi` da meta de peso
+  *primária* (índice 0), não de todas.
+- `dashboard/page.tsx` e `reports/page.tsx`/`ReportsClient.tsx` recalculam
+  `kpisByGoal`/`predictionsByGoal` (`Record<goalId, ...>`) iterando
+  `activeGoals`, e derivam `weightGoalKpis` (só as metas de peso) pro
+  `WeightChart`. `ReportsClient` ganhou uma 2ª dimensão de seleção (aba de
+  **meta**, acima da aba de **período** já existente) — só aparece com
+  mais de 1 meta ativa.
+- **PDF geral** (`/api/export/pdf`) — `ExportDocument.tsx` passou a
+  renderizar 1 seção "Metas por período" por meta ativa (antes, 1 tabela
+  única). **PDF de relatório** (`/api/export/report-pdf`) ganhou um
+  parâmetro `?goalId=` (além do `?period=` já existente) — sem ele (ou se
+  o id não pertencer ao usuário), cai na meta de peso primária; o gráfico
+  simplificado (`ReportDocument.tsx`, SVG desenhado à mão) passou a plotar
+  os pontos da métrica da meta selecionada (`extractMetricPoints`), não
+  mais só peso. `next.config.js::outputFileTracingIncludes` não precisou
+  de mudança (as 2 rotas de PDF já estavam listadas desde a Fase 5.4).
+- **Fora de escopo** (idem spec): direção da meta (perder/ganhar/manter),
+  tela de metas desativadas, generalizar `computeTrend`/
+  `computeMovingAverage`, badges de conquista por métrica, reordenar abas
+  manualmente, gate de plano por quantidade de metas (Fase 7/pricing),
+  editar a métrica de uma meta existente (só desativar + criar nova).
+
+- [ ] Rodar `supabase/migrations/0009_multi_goals.sql` no Supabase
+      Dashboard — conferir que o backfill preservou a meta de peso
+      existente de cada usuário como 1 meta ativa (`is_active=true`,
+      `metric='weight'`) e que `goals_history` ganhou `goal_id`/`metric`
+      preenchidos em todo registro antigo.
+  Assim que a migração 0009 rodar em produção, o campo `goals` retornado
+  por `loadUserData()` deixa de ser um singleton — se alguma tela nova for
+  criada no futuro sem passar por este arquivo, buscar `activeGoals`
+  (array), nunca reintroduzir um `.single()` em `goals`.
+- [ ] Trigger de limite de 3 rejeita a 4ª ativação (testar via
+      `GoalsManager` e, se possível, via SQL direto pra confirmar que a
+      trava é do banco, não só do client).
+- [ ] Trigger de signup cria a meta de peso sem erro de conflito (era o
+      bug do `on conflict (user_id) do nothing`, que não fazia mais
+      sentido com `user_id` deixando de ser único).
+- [ ] Criar meta de cintura + peso: 2 abas aparecem no dashboard
+      (`GoalTabs`) e em `/dashboard/reports`; KPIs com unidade certa
+      (cm vs kg) nos textos de status/previsão.
+- [ ] Criar 2 metas de peso ativas: `WeightChart` desenha 2 linhas
+      "esperado" de cores diferentes + 2 `ReferenceLine` (se ambas tiverem
+      `target_value`); com só 1 meta de peso, visual idêntico ao de antes
+      da Fase 6.2.
+- [ ] Desativar uma meta em `GoalsManager`: some do dashboard/relatórios/
+      gráfico; histórico (`goals_history`) permanece intacto.
+- [ ] `/dashboard/goals`: `GoalsForm` salva via `update(...).eq("id", ...)`
+      sem erro (não mais upsert); `GoalsManager` cria/desativa sem
+      recarregar a página manualmente (`router.refresh()`).
+- [ ] `KpiWeeklyTeaser` continua mostrando o status da meta de peso
+      primária, sem regressão visual/textual.
+- [ ] Conquistas continuam funcionando sem regressão (contra a meta de
+      peso primária).
+- [ ] **PDF geral** (`/api/export/pdf`) mostra 1 seção de metas por meta
+      ativa.
+- [ ] **PDF de relatório** (`/api/export/report-pdf`) com `?goalId=`
+      funciona pra uma meta não-peso (gráfico simplificado plota a
+      métrica certa, com a unidade certa no texto).
+- [ ] Onboarding (conta nova): cria 1 meta de peso, fluxo idêntico ao de
+      antes (o `select` por `metric='weight' and is_active=true` antes do
+      `update` não deve gerar erro visível pro usuário).
+- [ ] RLS: usuário A não consegue ler/editar/desativar metas do usuário B;
+      a trava de 3 metas ativas também não é burlável entre contas.
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
+      dev — **ainda não visto rodando num navegador real**).
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 6 —
+Ticket alto → "Múltiplas metas simultâneas") e atualizar os checkboxes
 acima.
 
 ## Pendências / próximos passos sugeridos (não iniciados)
@@ -1783,10 +1958,11 @@ acima.
       `schema.sql` + `migrations/0002_onboarding.sql` + `migrations/0003_body_measurements.sql`
       + `migrations/0004_goals_history.sql` + `migrations/0005_period_mode.sql`
       + `migrations/0006_user_achievements.sql` + `migrations/0007_checkin_hour.sql`
-      + `migrations/0008_progress_photos.sql`, configurar `.env.local`, testar
-      signup/login/registro de peso, exportação CSV/PDF, importação CSV,
-      medidas corporais, metas + histórico, tela de Configurações/período de
-      meta, conquistas, horário de check-in, e fotos de progresso.
+      + `migrations/0008_progress_photos.sql` + `migrations/0009_multi_goals.sql`,
+      configurar `.env.local`, testar signup/login/registro de peso,
+      exportação CSV/PDF, importação CSV, medidas corporais, metas + histórico,
+      tela de Configurações/período de meta, conquistas, horário de check-in,
+      fotos de progresso, e múltiplas metas simultâneas.
 - [ ] Deploy real na Vercel + configurar Site URL / Redirect URLs no Supabase Auth.
 - [ ] Testes unitários para `src/lib/analytics.ts` (funções puras, fáceis de testar).
 - [ ] Massa magra/composição corporal mais completa (bioimpedância avançada) — hoje

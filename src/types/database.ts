@@ -22,24 +22,33 @@ export type WeightEntry = {
   created_at: string;
 };
 
-export type Goals = {
+export type GoalMetric = "weight" | "waist" | "hip" | "arm" | "body_fat";
+
+export type Goal = {
+  id: string;
   user_id: string;
-  weekly_loss_kg: number;
-  monthly_loss_kg: number;
-  quarterly_loss_kg: number;
-  semester_loss_kg: number;
-  target_weight_kg: number | null;
+  metric: GoalMetric;
+  label: string | null;
+  weekly_rate: number;
+  monthly_rate: number;
+  quarterly_rate: number;
+  semester_rate: number;
+  target_value: number | null;
+  is_active: boolean;
+  created_at: string;
   updated_at: string;
 };
 
 export type GoalsHistoryEntry = {
   id: string;
+  goal_id: string;
   user_id: string;
-  weekly_loss_kg: number;
-  monthly_loss_kg: number;
-  quarterly_loss_kg: number;
-  semester_loss_kg: number;
-  target_weight_kg: number | null;
+  metric: GoalMetric;
+  weekly_rate: number;
+  monthly_rate: number;
+  quarterly_rate: number;
+  semester_rate: number;
+  target_value: number | null;
   created_at: string;
 };
 
@@ -86,9 +95,9 @@ export type Database = {
         Relationships: [];
       };
       goals: {
-        Row: Goals;
-        Insert: Partial<Goals> & { user_id: string };
-        Update: Partial<Goals>;
+        Row: Goal;
+        Insert: Partial<Goal> & { user_id: string; metric: GoalMetric };
+        Update: Partial<Goal>;
         Relationships: [];
       };
       body_measurements: {
@@ -100,11 +109,12 @@ export type Database = {
       goals_history: {
         Row: GoalsHistoryEntry;
         Insert: Partial<GoalsHistoryEntry> & {
+          goal_id: string;
           user_id: string;
-          weekly_loss_kg: number;
-          monthly_loss_kg: number;
-          quarterly_loss_kg: number;
-          semester_loss_kg: number;
+          weekly_rate: number;
+          monthly_rate: number;
+          quarterly_rate: number;
+          semester_rate: number;
         };
         Update: never; // append-only, sem policy de update
         Relationships: [];

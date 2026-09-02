@@ -8,25 +8,25 @@ import {
   ACHIEVEMENT_RULES,
   type EvaluatedAchievement,
 } from "@/lib/achievements";
-import type { WeightEntry, Goals, UserAchievement } from "@/types/database";
+import type { WeightEntry, Goal, UserAchievement } from "@/types/database";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default function AchievementsCard({
   entries,
-  goals,
+  primaryWeightGoal,
   achievements,
   userId,
 }: {
   entries: WeightEntry[];
-  goals: Goals;
+  primaryWeightGoal: Goal | null;
   achievements: UserAchievement[];
   userId: string;
 }) {
   const router = useRouter();
   const didPersist = useRef(false);
 
-  const { all, newlyUnlocked } = evaluateAchievements(entries, goals, achievements);
+  const { all, newlyUnlocked } = evaluateAchievements(entries, primaryWeightGoal, achievements);
 
   // Persistir conquistas novas (fire-and-forget, sem bloquear o render).
   // useRef evita re-execução em StrictMode / re-renders.

@@ -7,7 +7,15 @@ import {
   formatISO,
   subDays,
 } from "date-fns";
-import type { WeightEntry, GoalsHistoryEntry, PeriodMode, WeekStartsOn } from "@/types/database";
+import type {
+  WeightEntry,
+  GoalsHistoryEntry,
+  PeriodMode,
+  WeekStartsOn,
+  GoalMetric,
+  BodyMeasurement,
+  Goal,
+} from "@/types/database";
 
 export type Period = "week" | "month" | "quarter" | "semester";
 
@@ -18,14 +26,14 @@ const PERIOD_LABEL: Record<Period, string> = {
   semester: "Semestre",
 };
 
-// Campos de meta de perda que existem tanto em Goals quanto em GoalsHistoryEntry.
-type GoalFieldKey = "weekly_loss_kg" | "monthly_loss_kg" | "quarterly_loss_kg" | "semester_loss_kg";
+// Campos de ritmo de meta que existem tanto em Goal quanto em GoalsHistoryEntry.
+type GoalFieldKey = "weekly_rate" | "monthly_rate" | "quarterly_rate" | "semester_rate";
 
 const GOAL_FIELD: Record<Period, GoalFieldKey> = {
-  week: "weekly_loss_kg",
-  month: "monthly_loss_kg",
-  quarter: "quarterly_loss_kg",
-  semester: "semester_loss_kg",
+  week: "weekly_rate",
+  month: "monthly_rate",
+  quarter: "quarterly_rate",
+  semester: "semester_rate",
 };
 
 /**
@@ -106,6 +114,37 @@ export type EntryPoint = { date: Date; weight: number };
 function toPoints(entries: WeightEntry[]): EntryPoint[] {
   return entries
     .map((e) => ({ date: parseISO(e.measured_at), weight: Number(e.weight_kg) }))
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+}
+
+// Campo de body_measurements correspondente a cada métrica não-peso.
+const MEASUREMENT_FIELD: Record<Exclude<GoalMetric, "weight">, keyof BodyMeasurement> = {
+  waist: "waist_cm",
+  hip: "hip_cm",
+  arm: "arm_cm",
+  body_fat: "body_fat_pct",
+};
+
+/**
+ * Extrai a série temporal (EntryPoint[]) correspondente à métrica de uma
+ * meta — peso vem de weight_entries, as demais (cintura/quadril/braço/
+ * %gordura) vêm de body_measurements, filtrando só os registros em que
+ * aquele campo específico foi preenchido (mesmo critério por-campo já
+ * usado em BodyMeasurementsList/BodyMeasurementsSummaryCard).
+ * `computePeriodKpi`/`computeAllKpis` recebem o resultado desta função,
+ * nunca `entries`/`measurements` diretamente — mantém a generalização num
+ * único lugar.
+ */
+export function extractMetricPoints(
+  metric: GoalMetric,
+  weightEntries: WeightEntry[],
+  measurements: BodyMeasurement[]
+): EntryPoint[] {
+  if (metric === "weight") return toPoints(weightEntries);
+  const key = MEASUREMENT_FIELD[metric];
+  return measurements
+    .filter((m) => m[key] != null)
+    .map((m) => ({ date: parseISO(m.measured_at), weight: Number(m[key]) }))
     .sort((a, b) => a.date.getTime() - b.date.getTime());
 }
 
@@ -264,14 +303,14 @@ export function resolveGoalsForPeriod(
  * vez de projetar a partir de referência velha.
  */
 export function computePeriodKpi(
-  entries: WeightEntry[],
+  points: EntryPoint[],
   goalsHistory: GoalsHistoryEntry[],
   period: Period,
   now: Date = new Date(),
   mode: PeriodMode = "fixed",
-  weekStartsOn: WeekStartsOn = "monday"
+  weekStartsOn: WeekStartsOn = "monday",
+  unit: string = "kg"
 ): PeriodKpi {
-  const points = toPoints(entries);
   const start = periodStart(period, now, mode, weekStartsOn);
   const activeGoals = resolveGoalsForPeriod(goalsHistory, start);
   const targetLossKg = Number(activeGoals?.[GOAL_FIELD[period]] ?? 0);
@@ -303,23 +342,23 @@ export function computePeriodKpi(
     status = "caution";
     statusLabel =
       current === null
-        ? "Sem pesagens registradas"
-        : "Sem pesagem recente para servir de referência";
+        ? "Sem registros"
+        : "Sem registro recente para servir de referência";
   } else if (deltaVsExpected <= -0.15) {
     status = "ahead";
-    statusLabel = `${Math.abs(deltaVsExpected).toFixed(2)} kg à frente da meta`;
+    statusLabel = `${Math.abs(deltaVsExpected).toFixed(2)} ${unit} à frente da meta`;
   } else if (deltaVsExpected <= 0.15) {
     status = "on_pace";
     statusLabel = "No ritmo da meta";
   } else if (deltaVsExpected <= 0.5) {
     status = "caution";
-    statusLabel = `${deltaVsExpected.toFixed(2)} kg atrás da meta`;
+    statusLabel = `${deltaVsExpected.toFixed(2)} ${unit} atrás da meta`;
   } else {
     status = "behind";
     statusLabel =
       actualLoss !== null && actualLoss < 0
-        ? `Ganhou ${Math.abs(actualLoss).toFixed(2)} kg no período — ${deltaVsExpected.toFixed(2)} kg atrás da meta`
-        : `${deltaVsExpected.toFixed(2)} kg atrás da meta`;
+        ? `Ganhou ${Math.abs(actualLoss).toFixed(2)} ${unit} no período — ${deltaVsExpected.toFixed(2)} ${unit} atrás da meta`
+        : `${deltaVsExpected.toFixed(2)} ${unit} atrás da meta`;
   }
 
   return {
@@ -339,22 +378,23 @@ export function computePeriodKpi(
 }
 
 export function computeAllKpis(
-  entries: WeightEntry[],
+  points: EntryPoint[],
   goalsHistory: GoalsHistoryEntry[],
   now: Date = new Date(),
   mode: PeriodMode = "fixed",
-  weekStartsOn: WeekStartsOn = "monday"
+  weekStartsOn: WeekStartsOn = "monday",
+  unit: string = "kg"
 ): PeriodKpi[] {
   return (["week", "month", "quarter", "semester"] as Period[]).map((p) =>
-    computePeriodKpi(entries, goalsHistory, p, now, mode, weekStartsOn)
+    computePeriodKpi(points, goalsHistory, p, now, mode, weekStartsOn, unit)
   );
 }
 
 /**
  * Previsão de data estimada para bater a meta (Fase 5.1).
- * - Com `targetWeightKg` definido: projeta a chegada no peso alvo, igual
+ * - Com `targetValue` definido: projeta a chegada no valor alvo, igual
  *   para os cards de semana e mês (mesmo cálculo, independe do período).
- * - Sem `targetWeightKg`: projeta quando a meta de perda *daquele período*
+ * - Sem `targetValue`: projeta quando a meta de perda *daquele período*
  *   (targetLossKg do PeriodKpi recebido) será atingida no ritmo atual.
  * Não faz nenhum acesso a `entries`/`baselineWeight`/`periodStart` — recebe
  * o `PeriodKpi` já calculado por `computePeriodKpi`, que já traz tudo que é
@@ -373,7 +413,7 @@ export type GoalPrediction =
 export function computeGoalPrediction(
   trend: TrendResult,
   kpi: PeriodKpi,
-  targetWeightKg: number | null
+  targetValue: number | null
 ): GoalPrediction {
   // 1. Dados insuficientes para tendência
   if (trend.label === "insufficient_data") {
@@ -396,12 +436,12 @@ export function computeGoalPrediction(
     return { kind: "insufficient_data" };
   }
 
-  // 5. Modo com target_weight_kg
-  if (targetWeightKg !== null) {
-    if (currentWeight <= targetWeightKg) {
+  // 5. Modo com target_value
+  if (targetValue !== null) {
+    if (currentWeight <= targetValue) {
       return { kind: "already_reached", withTarget: true };
     }
-    const kgToLose = currentWeight - targetWeightKg;
+    const kgToLose = currentWeight - targetValue;
     const weeksToTarget = kgToLose / lossPerWeek;
     const daysFromNow = Math.round(weeksToTarget * 7);
     const estimated = new Date();
@@ -466,4 +506,38 @@ export function computeMovingAverage(
     const average = Number((sum / windowPoints.length).toFixed(2));
     return { date: formatISO(p.date, { representation: "date" }), average };
   });
+}
+
+// --- Fase 6.2 — múltiplas metas simultâneas: helpers de métrica ---
+
+export const METRIC_UNIT: Record<GoalMetric, string> = {
+  weight: "kg",
+  waist: "cm",
+  hip: "cm",
+  arm: "cm",
+  body_fat: "p.p.",
+};
+
+export const METRIC_LABEL: Record<GoalMetric, string> = {
+  weight: "Peso",
+  waist: "Cintura",
+  hip: "Quadril",
+  arm: "Braço",
+  body_fat: "% Gordura",
+};
+
+/**
+ * Meta de peso "primária" entre as metas ativas — a mais antiga
+ * (`created_at` mais baixo) entre as de métrica "weight". É a que alimenta
+ * WeightChart (linha "esperado"/meta), KpiWeeklyTeaser e as conquistas
+ * (evaluateAchievements), que continuam peso-only (fora de escopo desta
+ * sub-fase generalizar isso). Retorna null se não houver nenhuma meta de
+ * peso ativa.
+ */
+export function getPrimaryWeightGoal(activeGoals: Goal[]): Goal | null {
+  return (
+    activeGoals
+      .filter((g) => g.metric === "weight")
+      .sort((a, b) => a.created_at.localeCompare(b.created_at))[0] ?? null
+  );
 }

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type {
-  Goals, GoalsHistoryEntry, Profile, WeightEntry, BodyMeasurement, UserAchievement
+  Goal, GoalsHistoryEntry, Profile, WeightEntry, BodyMeasurement, UserAchievement
 } from "@/types/database";
 
 export async function loadUserData() {
@@ -12,7 +12,7 @@ export async function loadUserData() {
 
   if (!user) redirect("/login");
 
-  const [{ data: profile }, { data: entries }, { data: goals }, { data: measurements }, { data: goalsHistory }, { data: achievements }] =
+  const [{ data: profile }, { data: entries }, { data: activeGoals }, { data: measurements }, { data: goalsHistory }, { data: achievements }] =
     await Promise.all([
       supabase.from("profiles").select("*").eq("id", user.id).single(),
       supabase
@@ -20,7 +20,12 @@ export async function loadUserData() {
         .select("*")
         .eq("user_id", user.id)
         .order("measured_at", { ascending: true }),
-      supabase.from("goals").select("*").eq("user_id", user.id).single(),
+      supabase
+        .from("goals")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .order("created_at"),
       supabase
         .from("body_measurements")
         .select("*")
@@ -43,6 +48,27 @@ export async function loadUserData() {
     redirect("/onboarding");
   }
 
+  const typedActiveGoals: Goal[] = (activeGoals as Goal[]) ?? [];
+
+  // Fallback sintético de goalsHistory — só pro caso de a migração 0009
+  // ainda não ter rodado (goals_history vem vazio). Um registro por meta
+  // ativa, com os defaults 0.25/1/3/6 e created_at na época Unix, pra
+  // resolveGoalsForPeriod nunca receber lista vazia pra nenhuma meta.
+  const typedGoalsHistory: GoalsHistoryEntry[] = (goalsHistory as GoalsHistoryEntry[])?.length
+    ? (goalsHistory as GoalsHistoryEntry[])
+    : typedActiveGoals.map((goal) => ({
+        id: `fallback-${goal.id}`,
+        goal_id: goal.id,
+        user_id: user.id,
+        metric: goal.metric,
+        weekly_rate: goal.weekly_rate,
+        monthly_rate: goal.monthly_rate,
+        quarterly_rate: goal.quarterly_rate,
+        semester_rate: goal.semester_rate,
+        target_value: goal.target_value,
+        created_at: new Date(0).toISOString(),
+      }));
+
   return {
     user,
     profile: (profile as Profile) ?? {
@@ -57,32 +83,8 @@ export async function loadUserData() {
     },
     entries: (entries as WeightEntry[]) ?? [],
     measurements: (measurements as BodyMeasurement[]) ?? [],
-    goalsHistory:
-      (goalsHistory as GoalsHistoryEntry[])?.length
-        ? (goalsHistory as GoalsHistoryEntry[])
-        : [
-            {
-              id: "fallback",
-              user_id: user.id,
-              weekly_loss_kg: 0.25,
-              monthly_loss_kg: 1,
-              quarterly_loss_kg: 3,
-              semester_loss_kg: 6,
-              target_weight_kg: null,
-              created_at: new Date(0).toISOString(),
-            },
-          ],
-    goals:
-      (goals as Goals) ??
-      ({
-        user_id: user.id,
-        weekly_loss_kg: 0.25,
-        monthly_loss_kg: 1,
-        quarterly_loss_kg: 3,
-        semester_loss_kg: 6,
-        target_weight_kg: null,
-        updated_at: "",
-      } as Goals),
+    goalsHistory: typedGoalsHistory,
+    activeGoals: typedActiveGoals,
     achievements: (achievements as UserAchievement[]) ?? [],
   };
 }

@@ -16,9 +16,11 @@ const STATUS_STYLES: Record<PeriodKpi["status"], { dot: string; text: string; ri
 export default function KpiCard({
   kpi,
   prediction,
+  unit = "kg",
 }: {
   kpi: PeriodKpi;
   prediction?: GoalPrediction;
+  unit?: string;
 }) {
   const style = STATUS_STYLES[kpi.status];
   const hasData = kpi.currentWeightKg !== null && kpi.baselineWeightKg !== null;
@@ -38,7 +40,7 @@ export default function KpiCard({
                 ? `-${kpi.actualLossKg.toFixed(2)}`
                 : `+${Math.abs(kpi.actualLossKg ?? 0).toFixed(2)}`}
             </span>
-            <span className="text-sm text-ink-faint">/ -{kpi.targetLossKg.toFixed(2)} kg meta</span>
+            <span className="text-sm text-ink-faint">/ -{kpi.targetLossKg.toFixed(2)} {unit} meta</span>
           </div>
 
           <div className="h-1.5 rounded-full bg-base-surface2 overflow-hidden">
@@ -54,8 +56,8 @@ export default function KpiCard({
 
           {kpi.expectedWeightNowKg !== null && (
             <p className="text-xs text-ink-faint">
-              Hoje você está em <span className="text-ink-muted">{kpi.currentWeightKg?.toFixed(1)} kg</span>{" "}
-              · esperado pela meta: <span className="text-ink-muted">{kpi.expectedWeightNowKg.toFixed(1)} kg</span>
+              Hoje você está em <span className="text-ink-muted">{kpi.currentWeightKg?.toFixed(1)} {unit}</span>{" "}
+              · esperado pela meta: <span className="text-ink-muted">{kpi.expectedWeightNowKg.toFixed(1)} {unit}</span>
             </p>
           )}
 
@@ -70,13 +72,13 @@ export default function KpiCard({
                 </>
               )}
               {prediction.kind === "insufficient_data" && (
-                <>Sem dados suficientes para projetar (mínimo 2 pesagens nos últimos 21 dias).</>
+                <>Sem dados suficientes para projetar (mínimo 2 registros nos últimos 21 dias).</>
               )}
               {prediction.kind === "wrong_direction" && (
                 <>No ritmo atual, a meta não será alcançada — tendência dos últimos 21 dias não é de perda.</>
               )}
               {prediction.kind === "already_reached" && prediction.withTarget && (
-                <>Meta de peso já alcançada! 🎉</>
+                <>Meta já alcançada! 🎉</>
               )}
               {prediction.kind === "already_reached" && !prediction.withTarget && (
                 <>Meta deste período já batida. ✅</>

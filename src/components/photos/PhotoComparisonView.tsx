@@ -13,16 +13,27 @@ function PhotoSlot({ photo }: { photo: PhotoWithUrl | undefined }) {
     return <div className="rounded-card border border-base-border bg-base-surface2 aspect-[3/4]" />;
   }
   return (
-    <div className="relative">
+    <div className="relative rounded-card border border-base-border overflow-hidden">
       <img
         src={photo.url}
         alt={`Foto de ${photo.photo_date}`}
-        className="rounded-card border border-base-border w-full aspect-[3/4] object-cover"
+        className="w-full aspect-[3/4] object-cover"
       />
       {photo.weight_kg != null && (
-        <span className="absolute bottom-3 left-3 text-2xl sm:text-3xl font-display font-bold text-white/70 drop-shadow-md">
-          {formatWeight(photo.weight_kg)}
-        </span>
+        <>
+          {/* Escurecimento gradiente na base da foto — só quando há peso pra
+              mostrar. Sem ele, o texto branco translúcido ficava
+              imperceptível em fotos de fundo claro (achado real de teste,
+              02/09/2026); `overflow-hidden` no wrapper garante que o
+              gradiente respeite os cantos arredondados do `rounded-card`. */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/70 to-transparent"
+          />
+          <span className="absolute bottom-3 left-3 text-2xl sm:text-3xl font-display font-bold text-white drop-shadow-md">
+            {formatWeight(photo.weight_kg)}
+          </span>
+        </>
       )}
     </div>
   );

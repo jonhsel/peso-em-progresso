@@ -3,20 +3,33 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { Goals } from "@/types/database";
+import { METRIC_UNIT, METRIC_LABEL } from "@/lib/analytics";
+import type { Goal } from "@/types/database";
 
-export default function GoalsForm({ userId, goals }: { userId: string; goals: Goals }) {
+export default function GoalsForm({ userId, goal }: { userId: string; goal: Goal }) {
   const router = useRouter();
   const supabase = createClient();
+  const unit = METRIC_UNIT[goal.metric];
 
-  const [weekly, setWeekly] = useState(String(goals.weekly_loss_kg));
-  const [monthly, setMonthly] = useState(String(goals.monthly_loss_kg));
-  const [quarterly, setQuarterly] = useState(String(goals.quarterly_loss_kg));
-  const [semester, setSemester] = useState(String(goals.semester_loss_kg));
-  const [target, setTarget] = useState(goals.target_weight_kg ? String(goals.target_weight_kg) : "");
+  const [weekly, setWeekly] = useState(String(goal.weekly_rate));
+  const [monthly, setMonthly] = useState(String(goal.monthly_rate));
+  const [quarterly, setQuarterly] = useState(String(goal.quarterly_rate));
+  const [semester, setSemester] = useState(String(goal.semester_rate));
+  const [target, setTarget] = useState(goal.target_value ? String(goal.target_value) : "");
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Reseta os campos quando a meta selecionada muda (troca de aba/edição).
+  useEffect(() => {
+    setWeekly(String(goal.weekly_rate));
+    setMonthly(String(goal.monthly_rate));
+    setQuarterly(String(goal.quarterly_rate));
+    setSemester(String(goal.semester_rate));
+    setTarget(goal.target_value ? String(goal.target_value) : "");
+    setError(null);
+    setSaved(false);
+  }, [goal.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Converte string do input em número. String vazia → NaN (não zero). */
   const parseRequired = (v: string): number => {
@@ -62,22 +75,21 @@ export default function GoalsForm({ userId, goals }: { userId: string; goals: Go
     }
 
     if (t !== null && (isNaN(t) || t <= 0 || t >= 500)) {
-      setError("Peso alvo: informe um número entre 0 e 500 kg (ou deixe em branco).");
+      setError(`Valor alvo: informe um número entre 0 e 500 ${unit} (ou deixe em branco).`);
       return;
     }
 
     const payload = {
-      user_id: userId,
-      weekly_loss_kg: w,
-      monthly_loss_kg: m,
-      quarterly_loss_kg: q,
-      semester_loss_kg: s,
-      target_weight_kg: t,
+      weekly_rate: w,
+      monthly_rate: m,
+      quarterly_rate: q,
+      semester_rate: s,
+      target_value: t,
       updated_at: new Date().toISOString(),
     };
 
     setLoading(true);
-    const { error: supaError } = await supabase.from("goals").upsert(payload, { onConflict: "user_id" });
+    const { error: supaError } = await supabase.from("goals").update(payload).eq("id", goal.id);
     setLoading(false);
 
     if (supaError) {
@@ -91,17 +103,20 @@ export default function GoalsForm({ userId, goals }: { userId: string; goals: Go
   return (
     <form onSubmit={handleSubmit} className="bg-base-surface border border-base-border rounded-card p-5 space-y-4 max-w-md">
       <div>
-        <p className="font-display font-bold text-lg mb-1">Suas metas de perda de peso</p>
+        <p className="font-display font-bold text-lg mb-1">
+          Meta de {METRIC_LABEL[goal.metric]}
+          {goal.label ? ` — ${goal.label}` : ""}
+        </p>
         <p className="text-sm text-ink-faint">
-          Defina quanto deseja perder em cada período. Os KPIs do painel usam esses valores.
+          Defina quanto deseja mudar em cada período. Os KPIs desta meta usam esses valores.
         </p>
       </div>
 
-      <Field label="Meta semanal (kg)" value={weekly} onChange={setWeekly} placeholder="0.25" />
-      <Field label="Meta mensal (kg)" value={monthly} onChange={setMonthly} placeholder="1.0" />
-      <Field label="Meta trimestral (kg)" value={quarterly} onChange={setQuarterly} placeholder="3.0" />
-      <Field label="Meta semestral (kg)" value={semester} onChange={setSemester} placeholder="6.0" />
-      <Field label="Peso alvo final (kg) — opcional" value={target} onChange={setTarget} placeholder="ex: 80" />
+      <Field label={`Meta semanal (${unit})`} value={weekly} onChange={setWeekly} placeholder="0.25" />
+      <Field label={`Meta mensal (${unit})`} value={monthly} onChange={setMonthly} placeholder="1.0" />
+      <Field label={`Meta trimestral (${unit})`} value={quarterly} onChange={setQuarterly} placeholder="3.0" />
+      <Field label={`Meta semestral (${unit})`} value={semester} onChange={setSemester} placeholder="6.0" />
+      <Field label={`Valor alvo final (${unit}) — opcional`} value={target} onChange={setTarget} placeholder="ex: 80" />
 
       {error && <p className="text-sm text-signal-behind">{error}</p>}
       {saved && <p className="text-sm text-signal-ahead">Metas atualizadas.</p>}

@@ -4,10 +4,17 @@ import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { GoalsHistoryEntry } from "@/types/database";
 
-export default function GoalsHistoryList({ history }: { history: GoalsHistoryEntry[] }) {
-  // history vem ordenado decrescente (created_at DESC) de loadUserData().
-  // A entrada mais recente é a meta ATIVA (já mostrada no formulário acima),
-  // então a lista mostra só as anteriores — evita repetir a mesma info 2x.
+export default function GoalsHistoryList({
+  history,
+  unit,
+}: {
+  history: GoalsHistoryEntry[];
+  unit: string;
+}) {
+  // history vem ordenado decrescente (created_at DESC) de loadUserData(),
+  // já filtrado pelo caller por goal_id (uma meta por vez). A entrada mais
+  // recente é a meta ATIVA (já mostrada no formulário acima), então a
+  // lista mostra só as anteriores — evita repetir a mesma info 2x.
   const previous = history.length > 1 ? history.slice(1) : [];
 
   if (previous.length === 0) {
@@ -15,7 +22,7 @@ export default function GoalsHistoryList({ history }: { history: GoalsHistoryEnt
       <div className="bg-base-surface border border-base-border rounded-card p-5 max-w-md">
         <p className="font-display font-bold text-lg mb-1">Metas anteriores</p>
         <p className="text-sm text-ink-faint">
-          Ainda não há histórico — esta é sua primeira meta configurada.
+          Ainda não há histórico — esta é a primeira vez que essa meta foi configurada.
         </p>
       </div>
     );
@@ -37,9 +44,9 @@ export default function GoalsHistoryList({ history }: { history: GoalsHistoryEnt
               {format(parseISO(g.created_at), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
             </p>
             <p className="text-ink">
-              {g.weekly_loss_kg} kg/semana · {g.monthly_loss_kg} kg/mês ·{" "}
-              {g.quarterly_loss_kg} kg/trimestre · {g.semester_loss_kg} kg/semestre
-              {g.target_weight_kg ? ` · alvo ${g.target_weight_kg} kg` : ""}
+              {g.weekly_rate} {unit}/semana · {g.monthly_rate} {unit}/mês ·{" "}
+              {g.quarterly_rate} {unit}/trimestre · {g.semester_rate} {unit}/semestre
+              {g.target_value ? ` · alvo ${g.target_value} ${unit}` : ""}
             </p>
           </li>
         ))}

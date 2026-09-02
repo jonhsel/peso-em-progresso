@@ -1,6 +1,7 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-import type { WeightEntry } from "@/types/database";
+import type { WeightEntry, Goal } from "@/types/database";
 import type { PeriodKpi, TrendResult } from "@/lib/analytics";
+import { METRIC_LABEL } from "@/lib/analytics";
 
 const styles = StyleSheet.create({
   page: { padding: 32, fontSize: 10, fontFamily: "Helvetica", color: "#111827" },
@@ -82,12 +83,12 @@ function fmtDate(iso: string) {
 export function ExportDocument({
   displayName,
   entries,
-  kpis,
+  goalsWithKpis,
   trend,
 }: {
   displayName: string;
   entries: WeightEntry[];
-  kpis: PeriodKpi[];
+  goalsWithKpis: { goal: Goal; kpis: PeriodKpi[] }[];
   trend: TrendResult;
 }) {
   const sorted = [...entries].sort((a, b) => a.measured_at.localeCompare(b.measured_at));
@@ -130,27 +131,36 @@ export function ExportDocument({
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Metas por período</Text>
-        <View style={styles.table}>
-          <View style={styles.tableHeaderRow}>
-            <Text style={[styles.th, styles.colPeriod]}>Período</Text>
-            <Text style={[styles.th, styles.colStatus]}>Status</Text>
-            <Text style={[styles.th, styles.colDetail]}>Detalhe</Text>
-          </View>
-          {kpis.map((kpi) => {
-            const color = STATUS_COLOR[kpi.status];
-            return (
-              <View style={styles.tableRow} key={kpi.period}>
-                <Text style={[styles.td, styles.colPeriod]}>{kpi.label}</Text>
-                <View style={styles.colStatus}>
-                  <View style={[styles.statusDot, { backgroundColor: color }]} />
-                  <Text style={[styles.statusText, { color }]}>{STATUS_LABEL[kpi.status]}</Text>
-                </View>
-                <Text style={[styles.td, styles.colDetail, { color }]}>{kpi.statusLabel}</Text>
+        {/* Fase 6.2 — 1 seção "Metas por período" por meta ativa, não mais
+            uma tabela única (o app já não tem meta singleton). */}
+        {goalsWithKpis.map(({ goal, kpis }) => (
+          <View key={goal.id} wrap={false}>
+            <Text style={styles.sectionTitle}>
+              Metas por período — {METRIC_LABEL[goal.metric]}
+              {goal.label ? ` (${goal.label})` : ""}
+            </Text>
+            <View style={styles.table}>
+              <View style={styles.tableHeaderRow}>
+                <Text style={[styles.th, styles.colPeriod]}>Período</Text>
+                <Text style={[styles.th, styles.colStatus]}>Status</Text>
+                <Text style={[styles.th, styles.colDetail]}>Detalhe</Text>
               </View>
-            );
-          })}
-        </View>
+              {kpis.map((kpi) => {
+                const color = STATUS_COLOR[kpi.status];
+                return (
+                  <View style={styles.tableRow} key={kpi.period}>
+                    <Text style={[styles.td, styles.colPeriod]}>{kpi.label}</Text>
+                    <View style={styles.colStatus}>
+                      <View style={[styles.statusDot, { backgroundColor: color }]} />
+                      <Text style={[styles.statusText, { color }]}>{STATUS_LABEL[kpi.status]}</Text>
+                    </View>
+                    <Text style={[styles.td, styles.colDetail, { color }]}>{kpi.statusLabel}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        ))}
 
         <Text style={styles.sectionTitle}>Histórico de pesagens ({sorted.length})</Text>
         {sorted.length === 0 ? (

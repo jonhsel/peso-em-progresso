@@ -13,10 +13,10 @@ const TOTAL_STEPS = 4;
 // Coerente com os defaults do schema (0.25/1/3/6).
 function deriveGoals(weeklyLossKg: number) {
   return {
-    weekly_loss_kg: weeklyLossKg,
-    monthly_loss_kg: Number((weeklyLossKg * 4.345).toFixed(2)),
-    quarterly_loss_kg: Number((weeklyLossKg * 13.04).toFixed(2)),
-    semester_loss_kg: Number((weeklyLossKg * 26.07).toFixed(2)),
+    weekly_rate: weeklyLossKg,
+    monthly_rate: Number((weeklyLossKg * 4.345).toFixed(2)),
+    quarterly_rate: Number((weeklyLossKg * 13.04).toFixed(2)),
+    semester_rate: Number((weeklyLossKg * 26.07).toFixed(2)),
   };
 }
 
@@ -56,15 +56,33 @@ export function OnboardingFlow({
 
     setLoading(true);
 
-    const { error: goalsError } = await supabase.from("goals").upsert(
-      {
-        user_id: userId,
+    // A meta de peso já foi criada pelo trigger de signup (handle_new_user_goals)
+    // — aqui só atualizamos os valores dela por id (goals deixou de ser
+    // singleton na Fase 6.2, upsert com onConflict:"user_id" não funciona mais).
+    const { data: existingGoal, error: findError } = await supabase
+      .from("goals")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("metric", "weight")
+      .eq("is_active", true)
+      .order("created_at")
+      .limit(1)
+      .single();
+
+    if (findError || !existingGoal) {
+      setLoading(false);
+      setError("Não foi possível encontrar sua meta de peso. Tente novamente.");
+      return;
+    }
+
+    const { error: goalsError } = await supabase
+      .from("goals")
+      .update({
         ...deriveGoals(weekly),
-        target_weight_kg: target,
+        target_value: target,
         updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" }
-    );
+      })
+      .eq("id", existingGoal.id);
 
     if (goalsError) {
       setLoading(false);

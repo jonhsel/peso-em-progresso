@@ -86,15 +86,24 @@ create policy "weight_entries_delete_own"
   using (auth.uid() = user_id);
 
 -- ---------------------------------------------------------
--- 3. Metas (uma linha por usuário; editável a qualquer momento)
+-- 3. Metas (até 3 linhas ATIVAS por usuário, cada uma com sua métrica —
+--    peso, cintura, quadril, braço ou %gordura. Ver Fase 6.2,
+--    supabase/migrations/0009_multi_goals.sql, para o histórico de como
+--    isso deixou de ser singleton.)
 -- ---------------------------------------------------------
 create table if not exists public.goals (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  weekly_loss_kg numeric(5,2) not null default 0.25,
-  monthly_loss_kg numeric(5,2) not null default 1.0,
-  quarterly_loss_kg numeric(5,2) not null default 3.0,
-  semester_loss_kg numeric(5,2) not null default 6.0,
-  target_weight_kg numeric(5,2),
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  metric text not null default 'weight'
+    check (metric in ('weight', 'waist', 'hip', 'arm', 'body_fat')),
+  label text,
+  weekly_rate numeric(5,2) not null default 0.25,
+  monthly_rate numeric(5,2) not null default 1.0,
+  quarterly_rate numeric(5,2) not null default 3.0,
+  semester_rate numeric(5,2) not null default 6.0,
+  target_value numeric(5,2),
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
@@ -112,15 +121,42 @@ create policy "goals_update_own"
   on public.goals for update
   using (auth.uid() = user_id);
 
--- Cria metas padrão (250g/semana, 1kg/mês) junto com o perfil
+-- Trava de no máximo 3 metas ativas simultâneas por usuário.
+create or replace function public.enforce_max_active_goals()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  active_count integer;
+begin
+  if new.is_active then
+    select count(*) into active_count
+    from public.goals
+    where user_id = new.user_id
+      and is_active = true
+      and id <> new.id;
+    if active_count >= 3 then
+      raise exception 'Máximo de 3 metas ativas por usuário';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_goals_max_active on public.goals;
+create trigger on_goals_max_active
+  before insert or update on public.goals
+  for each row execute procedure public.enforce_max_active_goals();
+
+-- Cria a meta de peso padrão (250g/semana, 1kg/mês) junto com o perfil
 create or replace function public.handle_new_user_goals()
 returns trigger
 language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into public.goals (user_id) values (new.id)
-  on conflict (user_id) do nothing;
+  insert into public.goals (user_id, metric) values (new.id, 'weight');
   return new;
 end;
 $$;
@@ -177,25 +213,31 @@ comment on table public.body_measurements is
 
 -- ---------------------------------------------------------
 -- Histórico de metas (log append-only, complementar a `goals`)
--- `goals` continua sendo o snapshot da meta ATIVA (1 linha/usuário,
--- usado por formulários e valores-padrão). `goals_history` é o log
--- completo de toda meta que já existiu, usado pelo KPI pra saber
+-- `goals` guarda o snapshot de cada meta ATIVA (até 3 linhas/usuário desde
+-- a Fase 6.2). `goals_history` é o log completo de toda meta que já
+-- existiu, uma linha por (goal_id) e edição, usado pelo KPI pra saber
 -- qual meta valia em cada período passado e pela tela de histórico.
--- Ver supabase/migrations/0004_goals_history.sql (inclui backfill).
+-- Ver supabase/migrations/0004_goals_history.sql (criação + backfill
+-- original) e 0009_multi_goals.sql (generalização por goal_id/metric).
 -- ---------------------------------------------------------
 create table if not exists public.goals_history (
   id uuid primary key default gen_random_uuid(),
+  goal_id uuid not null references public.goals(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
-  weekly_loss_kg numeric(5,2) not null,
-  monthly_loss_kg numeric(5,2) not null,
-  quarterly_loss_kg numeric(5,2) not null,
-  semester_loss_kg numeric(5,2) not null,
-  target_weight_kg numeric(5,2),
+  metric text not null default 'weight',
+  weekly_rate numeric(5,2) not null,
+  monthly_rate numeric(5,2) not null,
+  quarterly_rate numeric(5,2) not null,
+  semester_rate numeric(5,2) not null,
+  target_value numeric(5,2),
   created_at timestamptz not null default now()
 );
 
 create index if not exists goals_history_user_created_idx
   on public.goals_history (user_id, created_at desc);
+
+create index if not exists goals_history_goal_id_idx
+  on public.goals_history (goal_id, created_at desc);
 
 alter table public.goals_history enable row level security;
 
@@ -212,8 +254,9 @@ create policy "goals_history_insert_own"
 -- Trigger: toda escrita em `goals` (INSERT ou UPDATE) espelha em
 -- `goals_history`. Isso cobre:
 --   • Signup: trigger handle_new_user_goals faz INSERT em goals → dispara
---   • Onboarding: OnboardingFlow.handleFinish faz upsert (= UPDATE) → dispara
---   • GoalsForm: edição faz upsert (= UPDATE) → dispara
+--   • Onboarding: OnboardingFlow.handleFinish faz update por id → dispara
+--   • GoalsForm: edição faz update por id → dispara
+--   • GoalsManager: criar/desativar meta faz insert/update → dispara
 -- Sem precisar de insert client-side em nenhum desses lugares.
 create or replace function public.handle_goals_history_sync()
 returns trigger
@@ -222,11 +265,11 @@ security definer set search_path = public
 as $$
 begin
   insert into public.goals_history
-    (user_id, weekly_loss_kg, monthly_loss_kg, quarterly_loss_kg,
-     semester_loss_kg, target_weight_kg)
+    (goal_id, user_id, metric, weekly_rate, monthly_rate, quarterly_rate,
+     semester_rate, target_value)
   values
-    (new.user_id, new.weekly_loss_kg, new.monthly_loss_kg,
-     new.quarterly_loss_kg, new.semester_loss_kg, new.target_weight_kg);
+    (new.id, new.user_id, new.metric, new.weekly_rate, new.monthly_rate,
+     new.quarterly_rate, new.semester_rate, new.target_value);
   return new;
 end;
 $$;
@@ -237,7 +280,7 @@ create trigger on_goals_changed_history
   for each row execute procedure public.handle_goals_history_sync();
 
 comment on table public.goals_history is
-  'Log append-only de toda meta que já existiu por usuário — usado para resolver qual meta valia em cada período passado (ver resolveGoalsForPeriod em src/lib/analytics.ts) e pela tela de histórico em /dashboard/goals.';
+  'Log append-only de toda meta que já existiu por usuário, por goal_id — usado para resolver qual meta valia em cada período passado (ver resolveGoalsForPeriod em src/lib/analytics.ts) e pela tela de histórico em /dashboard/goals.';
 
 -- ---------------------------------------------------------
 -- 6. Conquistas (achievements)
