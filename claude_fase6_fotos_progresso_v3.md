@@ -1,11 +1,9 @@
-# Fase 6.1 — Fotos de progresso (spec v2)
+# Fase 6.1 — Fotos de progresso (spec v3)
 
-**Status:** v2, auditada contra o código real via `project_knowledge_search`
-(`NavBar.tsx`, `loadUserData.ts`, `database.ts`, `supabase/server.ts`,
-`supabase/client.ts`, `get-theme.ts`, `WeightEntryForm.tsx`,
-`BodyMeasurementForm.tsx`, `CsvImporter.tsx`, `GoalsForm.tsx`,
-`goals/page.tsx`, `api/export/pdf/route.tsx`, `streak.ts`, `schema.sql`).
-Pronta para handoff ao Claude Code.
+**Status:** v3, incorpora sobre a v2 (auditada) a funcionalidade de mostrar
+o peso do dia sobre a foto na tela de comparação, pedida pelo usuário após
+a v2. Ver Apêndice B para o que mudou v2 → v3. Pronta para handoff ao
+Claude Code — **apagar a v2 do repositório após confirmar esta.**
 
 Primeiro item da Fase 6 (Ticket alto): Fotos de progresso (Supabase Storage
 + comparação lado a lado).
@@ -21,6 +19,10 @@ Primeiro item da Fase 6 (Ticket alto): Fotos de progresso (Supabase Storage
    recente".
 3. **Página nova dedicada** `/dashboard/photos`, com link próprio no
    `NavBar` — não é uma aba dentro de `/dashboard/measurements`.
+4. **Na tela de comparação, mostrar o peso do dia sobreposto à foto**
+   (na frente da imagem, opacidade reduzida) — só quando existir uma
+   pesagem (`weight_entries`) na mesma data da foto. Se não houver
+   pesagem naquele dia, não mostra nada (não busca a mais próxima).
 
 ## 2. Decisões técnicas (confirmadas pela auditoria)
 
@@ -543,13 +545,40 @@ para purge.
 ## 9. Arquivo novo — `src/components/photos/PhotoComparisonView.tsx`
 
 Client component (`useState` pra controlar as 2 datas selecionadas).
+`weight_kg` é opcional por foto — vem de `weight_entries` casado por data
+exata (`photo_date === measured_at`), resolvido na `page.tsx` (seção 10).
+Quando `null`, nenhum overlay é renderizado pra aquele lado.
 
 ```tsx
 "use client";
 
 import { useState } from "react";
 
-type PhotoWithUrl = { photo_date: string; url: string };
+type PhotoWithUrl = { photo_date: string; url: string; weight_kg: number | null };
+
+function formatWeight(kg: number): string {
+  return `${kg.toFixed(1).replace(".", ",")} kg`;
+}
+
+function PhotoSlot({ photo }: { photo: PhotoWithUrl | undefined }) {
+  if (!photo) {
+    return <div className="rounded-card border border-base-border bg-base-surface2 aspect-[3/4]" />;
+  }
+  return (
+    <div className="relative">
+      <img
+        src={photo.url}
+        alt={`Foto de ${photo.photo_date}`}
+        className="rounded-card border border-base-border w-full aspect-[3/4] object-cover"
+      />
+      {photo.weight_kg != null && (
+        <span className="absolute bottom-3 left-3 text-2xl sm:text-3xl font-display font-bold text-white/70 drop-shadow-md">
+          {formatWeight(photo.weight_kg)}
+        </span>
+      )}
+    </div>
+  );
+}
 
 export default function PhotoComparisonView({ photos }: { photos: PhotoWithUrl[] }) {
   // Default: mais antiga à esquerda, mais recente à direita
@@ -606,24 +635,8 @@ export default function PhotoComparisonView({ photos }: { photos: PhotoWithUrl[]
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        {left ? (
-          <img
-            src={left.url}
-            alt={`Foto de ${left.photo_date}`}
-            className="rounded-card border border-base-border w-full"
-          />
-        ) : (
-          <div className="rounded-card border border-base-border bg-base-surface2 aspect-[3/4]" />
-        )}
-        {right ? (
-          <img
-            src={right.url}
-            alt={`Foto de ${right.photo_date}`}
-            className="rounded-card border border-base-border w-full"
-          />
-        ) : (
-          <div className="rounded-card border border-base-border bg-base-surface2 aspect-[3/4]" />
-        )}
+        <PhotoSlot photo={left} />
+        <PhotoSlot photo={right} />
       </div>
     </div>
   );
@@ -642,6 +655,28 @@ export default function PhotoComparisonView({ photos }: { photos: PhotoWithUrl[]
 - Os dois `<select>` continuam independentes (sem bloquear mesma data nos
   dois lados — decisão deliberada, caso inofensivo).
 
+**Diferenças da v2 → v3 (overlay de peso — ver Apêndice B):**
+- `PhotoWithUrl` ganha `weight_kg: number | null`.
+- Extraído `PhotoSlot`, um sub-componente local que decide: sem foto → o
+  placeholder de sempre; com foto → `<img>` dentro de um `<div
+  className="relative">`, com o peso em overlay via `<span
+  className="absolute ...">` quando `weight_kg` não é `null`.
+- **Overlay:** `absolute bottom-3 left-3` (canto inferior esquerdo, não
+  cobre rosto), `text-2xl sm:text-3xl font-display font-bold` (grande,
+  legível, mesma família tipográfica dos números de KPI do app),
+  `text-white/70` (branco fixo — a foto tem fundo variável e imprevisível,
+  então não usa os tokens de tema `ink-*`, que assumem fundo do app, não
+  fundo de foto; `/70` é o "um pouco esmaecido" pedido — opacity modifier
+  funciona aqui porque `white` é cor padrão do Tailwind, não uma CSS var
+  como `accent`/`ink-*`, que têm a limitação documentada no `CLAUDE.md`
+  item 13), `drop-shadow-md` (sombra da própria letra, não caixa de fundo —
+  garante legibilidade em fotos claras sem exigir um scrim atrás do texto).
+- **`object-cover` + `aspect-[3/4]` movidos pra dentro do `<img>`** (antes
+  só estava no `<img>` do grid de histórico, `PhotoHistoryGrid`; aqui
+  precisa também, pra imagem não esticar dentro do wrapper `relative` e o
+  overlay ficar sempre no canto certo independente da proporção original
+  do arquivo).
+
 ## 10. Arquivo novo — `src/app/(app)/dashboard/photos/page.tsx`
 
 Server Component. Segue o padrão de `goals/page.tsx`: chama
@@ -659,7 +694,7 @@ import PhotoComparisonView from "@/components/photos/PhotoComparisonView";
 import type { ProgressPhoto } from "@/types/database";
 
 export default async function PhotosPage() {
-  const { user, profile } = await loadUserData();
+  const { user, profile, entries } = await loadUserData();
   const theme = await getTheme();
   const supabase = createClient();
 
@@ -671,7 +706,13 @@ export default async function PhotosPage() {
 
   const photoRows = (rows as ProgressPhoto[]) ?? [];
 
-  let photos: { photo_date: string; storage_path: string; url: string }[] = [];
+  // Peso do dia, casado por data exata (measured_at === photo_date).
+  // weight_entries já garante no máximo 1 registro por dia por usuário
+  // (unique(user_id, measured_at), schema.sql) — o Map nunca perde dado
+  // por colisão de chave.
+  const weightByDate = new Map(entries.map((e) => [e.measured_at, e.weight_kg]));
+
+  let photos: { photo_date: string; storage_path: string; url: string; weight_kg: number | null }[] = [];
   if (photoRows.length > 0) {
     const { data: signed } = await supabase.storage
       .from("progress-photos")
@@ -683,6 +724,7 @@ export default async function PhotosPage() {
       photo_date: p.photo_date,
       storage_path: p.storage_path,
       url: signed?.[i]?.signedUrl ?? "",
+      weight_kg: weightByDate.get(p.photo_date) ?? null,
     }));
   }
 
@@ -717,6 +759,17 @@ export default async function PhotosPage() {
   "Containers do dashboard usam `max-w-6xl`").
 - `font-display font-bold text-lg` — mesma tipografia de títulos de seção
   em `GoalsForm` ("Suas metas de perda de peso").
+- **`entries` desestruturado de `loadUserData()` (v3):** zero custo de
+  query nova — `loadUserData()` já busca `weight_entries` internamente pra
+  todas as páginas; a `photos/page.tsx` só não estava usando esse campo do
+  retorno. `WeightEntry.weight_kg` é `number` (não string), então
+  `weightByDate.get(...)` já devolve o tipo certo pro `PhotoComparisonView`
+  sem cast.
+- **`PhotoHistoryGrid` também recebe `weight_kg` agora** (mesmo array
+  `photos` é passado pros dois componentes) mas **ignora o campo** — o
+  pedido do usuário foi mostrar o peso só na comparação, não no grid de
+  histórico (ver decisão 4 e Apêndice B). `PhotoHistoryGrid.tsx` (seção 8)
+  não muda.
 
 ## 11. Patch — `src/components/NavBar.tsx`
 
@@ -795,6 +848,17 @@ cabe sem cortar labels ilegivelmente em telas ≥ 320px.
 - [ ] Conta nova (nunca fez upload): página carrega sem erro, mostra
       formulário de upload + "Nenhuma foto ainda" no histórico +
       mensagem de "envie 2 datas" na comparação.
+- [ ] Comparação: foto de um dia **com** pesagem registrada mostra o peso
+      em overlay, canto inferior esquerdo, formatado como "92,4 kg".
+- [ ] Comparação: foto de um dia **sem** pesagem registrada não mostra
+      overlay nenhum (sem placeholder, sem "—", nada).
+- [ ] Trocar a data no `<select>` atualiza o overlay de peso junto com a
+      imagem, instantaneamente.
+- [ ] Overlay legível em foto de fundo claro e em foto de fundo escuro
+      (testar com 2 fotos de exemplo diferentes) — o `drop-shadow-md`
+      deve bastar nos dois casos.
+- [ ] Grid de histórico (`PhotoHistoryGrid`) **não** mostra peso —
+      confirmar que o escopo do overlay ficou restrito à comparação.
 
 ## 14. Ordem de execução
 
@@ -807,12 +871,15 @@ cabe sem cortar labels ilegivelmente em telas ≥ 320px.
 6. Criar `src/components/photos/DeletePhotoButton.tsx` (seção 7).
 7. Criar `src/components/photos/PhotoHistoryGrid.tsx` (seção 8).
 8. Criar `src/components/photos/PhotoComparisonView.tsx` (seção 9).
-9. Criar `src/app/(app)/dashboard/photos/page.tsx` (seção 10).
+9. Criar `src/app/(app)/dashboard/photos/page.tsx` — já com `entries` e
+   `weightByDate` (seção 10, inclui a mudança da v3).
 10. Aplicar patch em `src/components/NavBar.tsx` (seção 11).
 11. `npx tsc --noEmit` e `npm run build`.
-12. Rodar checklist de teste manual (seção 13).
-13. Atualizar `CLAUDE.md` (nova seção "Fase 6.1 — Fotos de progresso") e
-    marcar o item em `claude_fases.md`.
+12. Rodar checklist de teste manual (seção 13, inclui os itens novos de
+    overlay de peso).
+13. Atualizar `CLAUDE.md` (nova seção "Fase 6.1 — Fotos de progresso",
+    mencionando o overlay de peso na comparação) e marcar o item em
+    `claude_fases.md`.
 
 ---
 
@@ -910,3 +977,69 @@ correto no browser client component, mas o padrão `Intl` é mais explícito).
 
 **v1 não mostrava** indicação de que a deleção está em andamento.
 **Correção:** v2 mostra "..." no texto do botão durante `isDeleting`.
+
+---
+
+## Apêndice B — Mudanças v2 → v3 (pedido do usuário, pós-v2)
+
+**Pedido:** mostrar o peso referente à data escolhida na tela de
+comparação, sobreposto à imagem, com opacidade reduzida.
+
+### B1. Fonte do dado: `weight_entries` via `loadUserData()`, sem query nova
+
+`photos/page.tsx` já chamava `loadUserData()` (só não desestruturava
+`entries`). `weight_entries` tem unicidade por `(user_id, measured_at)`
+(confirmado em `schema.sql`), então o casamento `photo_date ===
+measured_at` é 1:1 — um `Map` simples resolve sem ambiguidade e sem custo
+de rede adicional.
+
+### B2. Onde o peso aparece: só na comparação, não no histórico
+
+Decisão restritiva deliberada, seguindo a redação literal do pedido
+("quando fizer a comparação"). `PhotoHistoryGrid` recebe o mesmo array
+`photos` (que agora carrega `weight_kg` em todo item, por vir de uma fonte
+única), mas seu JSX não foi alterado — o campo passa despercebido. Isso
+evita duas fontes de verdade pro mesmo dado (uma versão do tipo `photos`
+"com peso" e outra "sem peso" só pra diferenciar os dois componentes, o
+que seria complexidade desnecessária pra um `number | null` extra).
+
+### B3. Estilo do overlay
+
+- **Posição:** canto inferior esquerdo (`absolute bottom-3 left-3`) — não
+  cobre o rosto/corpo, que costuma estar centralizado ou ocupar a área
+  superior/central da foto.
+- **Opacidade "um pouco esmaecida":** `text-white/70`. Branco fixo (não os
+  tokens `ink-*`/`accent`, que assumem estar sobre o fundo do app, não
+  sobre uma foto com conteúdo/cor imprevisível). `/70` funciona como
+  opacity modifier porque `white` é cor padrão do Tailwind (não uma CSS
+  var como `--accent`, que tem a limitação de opacity modifier documentada
+  no `CLAUDE.md` item 13 — não é o caso aqui, mas vale registrar por que
+  essa classe é segura enquanto `bg-accent/70` não seria).
+- **Legibilidade sobre fundo variável:** `drop-shadow-md` (sombra na
+  própria tipografia via `filter`, não uma caixa/scrim atrás do texto) —
+  suficiente pra manter contraste em fotos claras sem exigir um elemento
+  extra de fundo. Se em teste real (checklist, item novo) a legibilidade
+  não for suficiente em alguma foto muito clara, a alternativa é adicionar
+  um scrim (`bg-black/30` atrás do número, canto arredondado) — decisão de
+  ajuste fino deixada pro checklist, não implementada preventivamente pra
+  não adicionar complexidade visual sem confirmar que é necessária.
+- **Tamanho:** `text-2xl sm:text-3xl font-display font-bold` — grande o
+  bastante pra ler rápido numa comparação de fotos (o objetivo é dar
+  contexto instantâneo), mesma família tipográfica (`font-display`) dos
+  números de destaque do app (peso atual no dashboard, KPIs).
+- **Formato do número:** `92,4 kg` — vírgula decimal, mesmo padrão do CSV
+  export (`Number(weight_kg).toFixed(1).replace(".", ",")`, confirmado em
+  `api/export/csv/route.ts`) e dos placeholders de input (`ex: 92,4` em
+  `WeightEntryForm`).
+
+### B4. Arquivos afetados por esta mudança
+
+- `src/components/photos/PhotoComparisonView.tsx` — tipo `PhotoWithUrl`
+  ganha `weight_kg`; novo sub-componente local `PhotoSlot`.
+- `src/app/(app)/dashboard/photos/page.tsx` — desestruturar `entries`,
+  montar `weightByDate`, incluir `weight_kg` no array `photos`.
+- `src/components/photos/PhotoHistoryGrid.tsx` — **sem mudança** (recebe
+  o campo extra mas não usa).
+- `src/lib/image.ts`, `PhotoUploadForm.tsx`, `DeletePhotoButton.tsx`,
+  migração SQL, tipos em `database.ts`, patch do `NavBar.tsx` — **sem
+  mudança**, idênticos à v2.

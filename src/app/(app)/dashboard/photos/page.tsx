@@ -8,7 +8,7 @@ import PhotoComparisonView from "@/components/photos/PhotoComparisonView";
 import type { ProgressPhoto } from "@/types/database";
 
 export default async function PhotosPage() {
-  const { user, profile } = await loadUserData();
+  const { user, profile, entries } = await loadUserData();
   const theme = await getTheme();
   const supabase = createClient();
 
@@ -20,7 +20,13 @@ export default async function PhotosPage() {
 
   const photoRows = (rows as ProgressPhoto[]) ?? [];
 
-  let photos: { photo_date: string; storage_path: string; url: string }[] = [];
+  // Peso do dia, casado por data exata (measured_at === photo_date).
+  // weight_entries já garante no máximo 1 registro por dia por usuário
+  // (unique(user_id, measured_at), schema.sql) — o Map nunca perde dado
+  // por colisão de chave.
+  const weightByDate = new Map(entries.map((e) => [e.measured_at, e.weight_kg]));
+
+  let photos: { photo_date: string; storage_path: string; url: string; weight_kg: number | null }[] = [];
   if (photoRows.length > 0) {
     const { data: signed } = await supabase.storage
       .from("progress-photos")
@@ -32,6 +38,7 @@ export default async function PhotosPage() {
       photo_date: p.photo_date,
       storage_path: p.storage_path,
       url: signed?.[i]?.signedUrl ?? "",
+      weight_kg: weightByDate.get(p.photo_date) ?? null,
     }));
   }
 

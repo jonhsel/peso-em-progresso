@@ -2,7 +2,31 @@
 
 import { useState } from "react";
 
-type PhotoWithUrl = { photo_date: string; url: string };
+type PhotoWithUrl = { photo_date: string; url: string; weight_kg: number | null };
+
+function formatWeight(kg: number): string {
+  return `${kg.toFixed(1).replace(".", ",")} kg`;
+}
+
+function PhotoSlot({ photo }: { photo: PhotoWithUrl | undefined }) {
+  if (!photo) {
+    return <div className="rounded-card border border-base-border bg-base-surface2 aspect-[3/4]" />;
+  }
+  return (
+    <div className="relative">
+      <img
+        src={photo.url}
+        alt={`Foto de ${photo.photo_date}`}
+        className="rounded-card border border-base-border w-full aspect-[3/4] object-cover"
+      />
+      {photo.weight_kg != null && (
+        <span className="absolute bottom-3 left-3 text-2xl sm:text-3xl font-display font-bold text-white/70 drop-shadow-md">
+          {formatWeight(photo.weight_kg)}
+        </span>
+      )}
+    </div>
+  );
+}
 
 export default function PhotoComparisonView({ photos }: { photos: PhotoWithUrl[] }) {
   // Default: mais antiga à esquerda, mais recente à direita
@@ -59,24 +83,8 @@ export default function PhotoComparisonView({ photos }: { photos: PhotoWithUrl[]
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        {left ? (
-          <img
-            src={left.url}
-            alt={`Foto de ${left.photo_date}`}
-            className="rounded-card border border-base-border w-full"
-          />
-        ) : (
-          <div className="rounded-card border border-base-border bg-base-surface2 aspect-[3/4]" />
-        )}
-        {right ? (
-          <img
-            src={right.url}
-            alt={`Foto de ${right.photo_date}`}
-            className="rounded-card border border-base-border w-full"
-          />
-        ) : (
-          <div className="rounded-card border border-base-border bg-base-surface2 aspect-[3/4]" />
-        )}
+        <PhotoSlot photo={left} />
+        <PhotoSlot photo={right} />
       </div>
     </div>
   );

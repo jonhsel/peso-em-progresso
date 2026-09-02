@@ -1587,18 +1587,26 @@ Inteligência sobre os dados → "Widget-resumo de Medidas Corporais no
 dashboard") e atualizar os checkboxes acima. **Fase 5 (Inteligência sobre
 os dados) fechada por completo.**
 
-## Fase 6.1 — Fotos de progresso (implementada 01/09/2026)
+## Fase 6.1 — Fotos de progresso (implementada 01/09/2026, overlay de peso 02/09/2026)
 
-Spec completo em `claude_fase6_fotos_progresso_v2.md` (na raiz do repo, não
+Spec completo em `claude_fase6_fotos_progresso_v3.md` (na raiz do repo, não
 versionado — mesmo padrão dos specs anteriores; v2 já auditada contra
 `NavBar.tsx`/`loadUserData.ts`/`database.ts`/`supabase/server.ts`/
 `supabase/client.ts`/`get-theme.ts`/`WeightEntryForm.tsx`/
 `BodyMeasurementForm.tsx`/`CsvImporter.tsx`/`GoalsForm.tsx`/`goals/page.tsx`/
-`api/export/pdf/route.tsx`/`streak.ts`/`schema.sql` reais). Implementado
-nesta sessão: `npx tsc --noEmit` e `npm run build` limpos. **Ainda não
-testado contra Supabase real nem visto num navegador** — ver checklist
-abaixo. Patch aplicado ao pé da letra do spec, sem desvios. Primeiro item da
-Fase 6 (Ticket alto).
+`api/export/pdf/route.tsx`/`streak.ts`/`schema.sql` reais; v3 acrescenta,
+sobre a v2 já implementada, o overlay de peso do dia na tela de comparação —
+`claude_fase6_fotos_progresso_v2.md` apagado do repo após confirmar a v3,
+conforme instrução do próprio spec). Implementado em duas sessões: base
+(bucket/tabela/upload/histórico/comparação) em 01/09/2026, overlay de peso em
+02/09/2026. `npx tsc --noEmit` e `npm run build` limpos nas duas. **Testado
+contra Supabase real em 02/09/2026** (migração 0008 rodada no Dashboard,
+confirmada por print real de `/dashboard/photos` logado: link "Fotos" ativo
+no `NavBar`, upload de foto funcionando, `PhotoComparisonView` listando e
+trocando entre 2 datas distintas) — **overlay de peso, exclusão de foto e
+sobrescrita no mesmo dia ainda não testados**, ver checklist abaixo. Patch
+aplicado ao pé da letra do spec, sem desvios. Primeiro item da Fase 6
+(Ticket alto).
 
 - **Bucket privado** `progress-photos` no Supabase Storage (não público) —
   mesma filosofia de RLS-first do resto do projeto (decisão 3). Leitura via
@@ -1630,6 +1638,27 @@ Fase 6 (Ticket alto).
   "primeira vs mais recente", decisão fechada com o usuário. Os dois selects
   não se bloqueiam mutuamente (podem apontar pra mesma data), caso
   inofensivo aceito deliberadamente.
+- **Peso do dia sobreposto à foto na tela de comparação** (pedido do usuário
+  após a v1/v2, incorporado na v3 do spec) — cada lado da comparação mostra
+  o peso (`weight_entries.weight_kg`) casado por data exata
+  (`photo_date === measured_at`, `unique(user_id, measured_at)` garante 1:1,
+  sem ambiguidade) em overlay `absolute bottom-3 left-3 text-2xl sm:text-3xl
+  font-display font-bold text-white/70 drop-shadow-md` sobre a foto; sem
+  pesagem naquele dia exato, nenhum overlay aparece (não busca a mais
+  próxima). `text-white/70` é branco fixo, não os tokens `ink-*`/`accent` do
+  tema — uma foto tem fundo imprevisível, não o fundo do app; `/70` funciona
+  aqui porque `white` é cor literal do Tailwind, não uma CSS var como
+  `accent` (limitação de opacity modifier documentada no item 13). Formato
+  `92,4 kg` (vírgula decimal, mesmo padrão do CSV export). Fonte do dado:
+  `entries` já vinha de `loadUserData()` — `photos/page.tsx` passou a
+  desestruturá-lo e montar um `Map` (`weightByDate`) sem query nova.
+  Restrito à comparação, deliberadamente: `PhotoHistoryGrid` recebe o mesmo
+  array `photos` (que agora carrega `weight_kg` em todo item) mas ignora o
+  campo — o pedido foi mostrar peso "na comparação", não no grid de
+  histórico, e diferenciar os tipos só pra isso seria complexidade
+  desnecessária. `PhotoComparisonView.tsx` ganhou um sub-componente local
+  `PhotoSlot` que decide entre o placeholder (sem foto) e a imagem com/sem
+  overlay.
 - **Página nova dedicada `/dashboard/photos`** (não uma aba dentro de
   `/dashboard/measurements`), com link próprio "Fotos" no `NavBar` entre
   "Medidas" e "Metas" (registros físicos periódicos, mesma vizinhança
@@ -1675,36 +1704,78 @@ Fase 6 (Ticket alto).
   `UserAchievement`) + entrada `progress_photos` em `Database.Tables`
   (depois de `user_achievements`).
 
-- [ ] Rodar `supabase/migrations/0008_progress_photos.sql` no Supabase
-      Dashboard — conferir bucket `progress-photos` privado, tabela
-      `progress_photos` criada, 8 políticas de RLS ativas (4 tabela +
-      4 storage).
-- [ ] Link "Fotos" aparece no `NavBar` (desktop e mobile), entre "Medidas"
-      e "Metas" — 8 elementos visuais em mobile, sem overflow ilegível.
+- [x] Rodar `supabase/migrations/0008_progress_photos.sql` no Supabase
+      Dashboard — **rodada em 02/09/2026** (confirmado pelo usuário; página
+      carrega e faz upload real, o que exige bucket+tabela existentes).
+      Não confirmado individualmente: as 8 políticas de RLS ativas (4
+      tabela + 4 storage) — inferido do fato de a página funcionar logada
+      como dono dos dados, não testa isolamento entre usuários (ver item
+      de RLS abaixo, ainda pendente).
+- [x] Link "Fotos" aparece no `NavBar` desktop, entre "Medidas" e "Metas",
+      estado ativo destacado — **confirmado por print real** de
+      `/dashboard/photos`. Mobile (8 elementos visuais, overflow) ainda
+      não visto.
 - [ ] Upload de foto grande (celular, >5MB): completa sem erro, arquivo no
-      Storage é bem menor (~JPEG redimensionado a 1600px).
+      Storage é bem menor (~JPEG redimensionado a 1600px). Upload básico
+      confirmado funcionando (print real), tamanho do arquivo original
+      não verificado.
 - [ ] Upload de segunda foto na mesma data: sobrescreve (mesmo path), não
-      duplica na tabela nem no bucket.
-- [ ] Upload em datas diferentes: registros separados no histórico,
-      ordenados do mais recente pro mais antigo.
+      duplica na tabela nem no bucket. **Ainda não testado** (confirmado
+      pelo usuário).
+- [x] Upload em datas diferentes: registros separados no histórico —
+      **confirmado por print real**, `PhotoComparisonView` lista
+      `2026-08-30` e `2026-09-01` como datas distintas com foto própria.
+      Ordenação "mais recente pro mais antigo" no grid de histórico
+      (`PhotoHistoryGrid`) não verificada nesse print (seção fora da
+      captura de tela).
 - [ ] Tentar data futura no input: bloqueado pelo `max`.
-- [ ] Comparação: 2 `<select>` listam todas as datas; trocar qualquer um
-      atualiza a imagem sem nova query.
+- [x] Comparação: 2 `<select>` listam as datas com foto e trocar a seleção
+      atualiza a imagem — **confirmado por print real** (selects "Antes"/
+      "Depois" populados com as 2 datas). Ausência de nova query ao trocar
+      não verificada visualmente (comportamento client-side esperado pelo
+      código, não conferido via Network).
 - [ ] 0 ou 1 foto: seção "Comparar" mostra mensagem, sem quebrar.
 - [ ] Excluir foto: `window.confirm`, some do histórico e da comparação,
-      arquivo removido do bucket.
+      arquivo removido do bucket. **Ainda não testado** (confirmado pelo
+      usuário).
 - [ ] RLS: usuário A não vê/edita fotos do usuário B (tabela e bucket).
 - [ ] Signed URLs expiram em 1h — reabrir a página gera novas URLs.
 - [ ] Tema claro/escuro: bordas, `ink-faint`, botão de excluir com
-      contraste adequado.
+      contraste adequado. Print real visto é do tema escuro; claro não
+      testado.
 - [ ] Mobile: grid histórico (2 colunas) e selects de comparação sem
       overflow horizontal.
 - [ ] Conta nova (nunca fez upload): página carrega sem erro, mostra
       formulário de upload + "Nenhuma foto ainda" no histórico + mensagem
-      de "envie 2 datas" na comparação.
+      de "envie 2 datas" na comparação. Não aplicável à conta usada no
+      teste (já tinha fotos), não verificado com conta zerada.
+- [ ] Comparação: foto de um dia **com** pesagem registrada mostra o peso
+      em overlay, canto inferior esquerdo, formatado como "92,4 kg".
+      **Ainda não testado** (confirmado pelo usuário) — no print real, as
+      2 fotos comparadas não mostram overlay, mas não se sabe se é porque
+      não há pesagem nas datas `2026-08-30`/`2026-09-01` (comportamento
+      correto) ou se o overlay não está funcionando; precisa de teste
+      dedicado com uma pesagem registrada numa dessas datas exatas.
+- [ ] Comparação: foto de um dia **sem** pesagem registrada não mostra
+      overlay nenhum (sem placeholder, sem "—", nada).
+- [ ] Trocar a data no `<select>` atualiza o overlay de peso junto com a
+      imagem, instantaneamente.
+- [ ] Overlay legível em foto de fundo claro e em foto de fundo escuro
+      (testar com 2 fotos de exemplo diferentes) — o `drop-shadow-md`
+      deve bastar nos dois casos; se não bastar em produção, a correção
+      é somar um scrim `bg-black/30` atrás do número, não trocar a cor.
+- [ ] Grid de histórico (`PhotoHistoryGrid`) **não** mostra peso —
+      confirmar que o escopo do overlay ficou restrito à comparação.
 
-Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 6 —
-Ticket alto → "Fotos de progresso") e atualizar os checkboxes acima.
+**Pendência ativa desta sub-fase, aberta em 02/09/2026:** overlay de peso,
+exclusão de foto e sobrescrita no mesmo dia — os 3 itens que o usuário
+sinalizou explicitamente como ainda não testados após a primeira rodada de
+testes reais. Retomar por aqui na próxima sessão antes de considerar a
+Fase 6.1 validada em produção.
+
+Depois de validar o restante em produção: marcar o item no `claude_fases.md`
+(Fase 6 — Ticket alto → "Fotos de progresso") e atualizar os checkboxes
+acima.
 
 ## Pendências / próximos passos sugeridos (não iniciados)
 
