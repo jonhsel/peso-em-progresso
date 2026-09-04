@@ -14,6 +14,7 @@ import GoalTabs, { type GoalPredictions } from "@/components/GoalTabs";
 import KpiWeeklyTeaser from "@/components/KpiWeeklyTeaser";
 import StreakCard from "@/components/StreakCard";
 import AchievementsCard from "@/components/AchievementsCard";
+import ChallengesCard from "@/components/ChallengesCard";
 import TrendBadge from "@/components/TrendBadge";
 import WeightChart, { type WeightGoalKpi } from "@/components/WeightChart";
 import BodyMeasurementsSummaryCard from "@/components/BodyMeasurementsSummaryCard";
@@ -22,7 +23,7 @@ import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default async function DashboardPage() {
-  const { user, profile, entries, measurements, activeGoals, goalsHistory, achievements } = await loadUserData();
+  const { user, profile, entries, measurements, activeGoals, goalsHistory, achievements, challenges } = await loadUserData();
   const theme = await getTheme();
 
   // KPIs por meta ativa (Fase 6.2): cada meta é avaliada de forma
@@ -126,6 +127,11 @@ export default async function DashboardPage() {
           primaryWeightGoal={primaryWeightGoal}
           achievements={achievements}
           userId={user.id}
+        />
+        <ChallengesCard
+          challenges={challenges}
+          entries={entries}
+          measurements={measurements}
         />
 
         {primaryWeekKpi && <KpiWeeklyTeaser kpi={primaryWeekKpi} />}

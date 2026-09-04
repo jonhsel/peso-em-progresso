@@ -15,6 +15,7 @@ const links = [
   { href: "/dashboard/measurements", label: "Medidas" },
   { href: "/dashboard/photos", label: "Fotos" },
   { href: "/dashboard/goals", label: "Metas" },
+  { href: "/dashboard/challenges", label: "Desafios" },
   { href: "/dashboard/reports", label: "Relatórios" },
   { href: "/dashboard/settings", label: "Configurações" },
 ];

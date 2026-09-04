@@ -21,7 +21,7 @@ na tela `/dashboard/goals`, não fixas no código.
 
 ## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) + Fase 4.2 (conquistas) + Fase 4.3 (próximo check-in) + Fase 4.4 (guia de ajuda) + Fase 5.1 (previsão da meta) + Fase 5.2 (média móvel de 7 dias) + Fase 5.3 (seletor de período do gráfico) + Fase 5.4 (relatórios) + Fase 5.5
 (widget-resumo de medidas corporais) + Fase 6.1 (fotos de progresso) + Fase 6.2
-(múltiplas metas simultâneas) completos, não validados em produção
+(múltiplas metas simultâneas) + Fase 6.3 (desafios) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -1952,17 +1952,140 @@ Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 6 —
 Ticket alto → "Múltiplas metas simultâneas") e atualizar os checkboxes
 acima.
 
+## Fase 6.3 — Desafios (implementada 03/09/2026)
+
+Spec completo em `claude_fase6_desafios_v2.md` (na raiz do repo, não
+versionado — mesmo padrão dos specs anteriores; v2 já é resultado de
+auditoria contra o repo real, achados no Apêndice A do próprio arquivo).
+Implementado nesta sessão: `npx tsc --noEmit` e `npm run build` limpos.
+**Ainda não testado contra Supabase real nem visto num navegador** — ver
+checklist abaixo. Patch aplicado ao pé da letra do spec, com 1 ajuste de
+tipagem descoberto só ao rodar `tsc` (não coberto pela auditoria do spec,
+ver abaixo). Terceiro item da Fase 6 (Ticket alto), depois de fotos de
+progresso (6.1) e múltiplas metas simultâneas (6.2).
+
+- **Camada nova, separada de `goals`/`user_achievements`/streak** — tabela
+  `challenges` (`supabase/migrations/0010_challenges.sql`, também
+  adicionada a `supabase/schema.sql` seção 10): `type` (`progress | habit`),
+  `metric` (só quando `type = 'progress'`, mesmo `GoalMetric` da Fase 6.2),
+  `target_value`, `baseline_value`, `start_date`/`end_date`, `status`
+  (`active | completed | failed`). RLS por `auth.uid() = user_id` em
+  select/insert/update — **sem policy de delete**, desafio resolvido
+  permanece no histórico pra sempre (mesma filosofia de
+  `goals_history`/`user_achievements`). Trigger
+  `enforce_max_active_challenges` (mesmo padrão do
+  `enforce_max_active_goals` da Fase 6.2) trava em 3 desafios ativos
+  simultâneos por usuário. **Ainda precisa ser rodada manualmente no
+  Supabase Dashboard > SQL Editor** — sem isso, `/dashboard/challenges`
+  quebra em produção (tabela inexistente).
+- **Dois tipos:** progresso (reduzir uma métrica em X unidades até um
+  prazo — reaproveita `extractMetricPoints`/`METRIC_UNIT`/`METRIC_LABEL` de
+  `analytics.ts`, mesma origem de dado da Fase 6.2: peso vem de
+  `weight_entries`, as outras 4 métricas de `body_measurements`) e hábito
+  (registrar pesagem em N dias consecutivos, sem tolerância — diferente do
+  streak global de `streak.ts`, que perdoa 1 dia; aqui furou um dia dentro
+  da janela = `failed` imediato, decisão de produto fechada com o usuário,
+  ver Apêndice A5 do spec).
+- `src/lib/challenges.ts` (novo) — funções puras, mesmo padrão de
+  `achievements.ts`/`streak.ts`: `CHALLENGE_TEMPLATES` (5 templates fixos)
+  + `evaluateChallenge(challenge, entries, measurements, reference)`, que
+  **não persiste nada** — só calcula `resolvedStatus`/`progressPct`/
+  `daysRemaining` a partir do estado atual. Status já resolvido
+  (`completed`/`failed`) fica congelado, nunca "ressuscita". Mesmo
+  `Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" })` de
+  `streak.ts` pra "hoje", e aritmética de data em `T12:00:00` (meio-dia,
+  evita virada de DST) pra `addDays`/`daysBetween` — nunca `.toISOString()`.
+- **Status é persistido, não só calculado on-the-fly** — porque "falhou"
+  precisa sobreviver no histórico mesmo com dados editados depois.
+  `ChallengesCard.tsx` (novo, client component, renderizado no dashboard
+  entre `AchievementsCard` e `KpiWeeklyTeaser`) recalcula via
+  `evaluateChallenge` a cada carga e persiste transições
+  `active → completed/failed` num `useEffect` fire-and-forget — mesmo
+  padrão exato de `AchievementsCard` (`createClient()` criado **dentro**
+  do efeito, não no corpo do componente; `didPersist` ref guard contra
+  StrictMode/re-render; `router` fora das deps).
+- Página nova `/dashboard/challenges` (`ChallengesManager.tsx`, client
+  component, mesmo padrão de `GoalsManager.tsx`): lista de desafios ativos
+  com barra de progresso, criação por template ou customizada (toggle
+  tipo/métrica/valor/duração), histórico completo abaixo (concluídos e
+  falhos, nunca escondidos). Criação de desafio de progresso é **bloqueada
+  no client** se não houver nenhum registro daquela métrica ainda (mensagem
+  "registre ao menos uma medição de [...] antes de criar esse desafio") —
+  sem isso, `baseline_value` não teria de onde vir. Botão "Adicionar" bloqueia
+  no client ao atingir 3 ativos, mas a trava de verdade é o trigger Postgres.
+  Link "Desafios" adicionado à `NavBar` entre "Metas" e "Relatórios" (8
+  itens no array + "Ajuda" fora do `.map()` = 9 elementos visuais em
+  mobile — `overflow-x-auto` já existente cobre, mesma solução usada nas
+  vezes anteriores que o nav cresceu).
+- `loadUserData()` ganhou uma 7ª query (`challenges`, todos — ativos +
+  histórico, `order by created_at desc`), em paralelo com as 6 já
+  existentes. Diferente de `progress_photos` (Fase 6.1, que fica isolado na
+  própria página): desafios entram em `loadUserData()` porque o
+  `ChallengesCard` do dashboard precisa do resumo a cada visita, mesmo
+  motivo de `achievements`.
+- **Ajuste sobre o spec original** (não coberto pela auditoria v2, só
+  aparece ao rodar `tsc --noEmit`): `ChallengesManager.insertChallenge`
+  recebia `fields: Record<string, unknown>` no spec — o spread
+  `{ user_id: userId, ...fields }` perde a informação de quais campos
+  `Record<string, unknown>` garante presentes, e o tipo `Insert` de
+  `challenges` (`database.ts`) exige `type`/`label`/`target_value`/
+  `end_date` obrigatórios. TS rejeitava o `.insert()` resultante. Trocado
+  por um tipo literal explícito com exatamente os campos que os 3 call
+  sites (template com métrica, template hábito, customizado) sempre
+  passam — sem mudança de comportamento, só tipagem mais precisa.
+- **Fora de escopo** (idem spec): desafios sociais/entre usuários,
+  direção "ganhar"/"manter", notificação de prazo próximo, desafios no PDF
+  exportado ou no CSV (`api/export/pdf`/`api/export/report-pdf` não
+  mudaram — fazem query própria, não usam `loadUserData()`), editar/
+  abandonar um desafio já criado, gate de plano.
+
+- [ ] Rodar `supabase/migrations/0010_challenges.sql` no Supabase
+      Dashboard — conferir tabela `challenges`, RLS ativo (3 policies),
+      trigger `on_challenges_max_active`, índices.
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
+      dev — **ainda não visto rodando num navegador real**).
+- [ ] Criar desafio de progresso por template ("Perca 2 kg em 30 dias"):
+      baseline capturado corretamente a partir do registro mais recente de
+      peso.
+- [ ] Criar desafio de progresso sem nenhum registro da métrica: bloqueado
+      no client com mensagem "registre ao menos uma medição de [...]".
+- [ ] Atingir a meta de um desafio de progresso antes do prazo: vira
+      `completed` na próxima visita ao dashboard, sai da lista de ativos,
+      aparece no histórico com "Concluído" em `text-signal-ahead`.
+- [ ] Deixar o prazo passar sem atingir: vira `failed`, aparece no
+      histórico com "Falhou" em `text-signal-behind`.
+- [ ] Desafio de hábito de 7 dias: registrar dias 1-7 consecutivos →
+      `completed`. Registrar dias 1-3, pular dia 4, registrar dia 5 →
+      `failed` imediato (testar `brokeEarly` — sem tolerância).
+- [ ] Criar o 4º desafio ativo: trigger do banco rejeita, client mostra
+      mensagem de erro.
+- [ ] RLS: usuário A não vê/edita desafios do usuário B.
+- [ ] Link "Desafios" no `NavBar` — desktop e mobile (9 elementos visuais,
+      scroll horizontal sem cortar labels em tela ≥ 320px).
+- [ ] Dashboard: `ChallengesCard` aparece entre `AchievementsCard` e
+      `KpiWeeklyTeaser`; sem desafios ativos, mostra link pro
+      `/dashboard/challenges`.
+- [ ] Página `/dashboard/challenges`: templates clicáveis, modo
+      customizado com campos de tipo/métrica/valor/duração, lista de
+      ativos com barra de progresso, histórico abaixo.
+- [ ] Alternar tema claro/escuro: barra de progresso, status "Concluído"/
+      "Falhou", mensagem de erro com contraste adequado nos dois temas.
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 6 —
+Ticket alto → "Desafios") e atualizar os checkboxes acima.
+
 ## Pendências / próximos passos sugeridos (não iniciados)
 
 - [ ] Testar o app fim a fim contra um projeto Supabase real (criar projeto, rodar
       `schema.sql` + `migrations/0002_onboarding.sql` + `migrations/0003_body_measurements.sql`
       + `migrations/0004_goals_history.sql` + `migrations/0005_period_mode.sql`
       + `migrations/0006_user_achievements.sql` + `migrations/0007_checkin_hour.sql`
-      + `migrations/0008_progress_photos.sql` + `migrations/0009_multi_goals.sql`,
+      + `migrations/0008_progress_photos.sql` + `migrations/0009_multi_goals.sql`
+      + `migrations/0010_challenges.sql`,
       configurar `.env.local`, testar signup/login/registro de peso,
       exportação CSV/PDF, importação CSV, medidas corporais, metas + histórico,
       tela de Configurações/período de meta, conquistas, horário de check-in,
-      fotos de progresso, e múltiplas metas simultâneas.
+      fotos de progresso, múltiplas metas simultâneas, e desafios.
 - [ ] Deploy real na Vercel + configurar Site URL / Redirect URLs no Supabase Auth.
 - [ ] Testes unitários para `src/lib/analytics.ts` (funções puras, fáceis de testar).
 - [ ] Massa magra/composição corporal mais completa (bioimpedância avançada) — hoje

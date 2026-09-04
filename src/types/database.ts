@@ -79,6 +79,28 @@ export type ProgressPhoto = {
   created_at: string;
 };
 
+export type ChallengeType = "progress" | "habit";
+export type ChallengeStatus = "active" | "completed" | "failed";
+
+export type Challenge = {
+  id: string;
+  user_id: string;
+  type: ChallengeType;
+  metric: GoalMetric | null; // null quando type === "habit"
+  template_key: string | null;
+  label: string;
+  // progress: quantidade a reduzir, na unidade da métrica (kg/cm/p.p.)
+  // habit: número de dias consecutivos
+  target_value: number;
+  // progress: valor da métrica capturado na criação. habit: sempre null.
+  baseline_value: number | null;
+  start_date: string; // YYYY-MM-DD
+  end_date: string; // YYYY-MM-DD
+  status: ChallengeStatus;
+  completed_at: string | null;
+  created_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -129,6 +151,18 @@ export type Database = {
         Row: ProgressPhoto;
         Insert: Partial<ProgressPhoto> & { user_id: string; photo_date: string; storage_path: string };
         Update: Partial<ProgressPhoto>;
+        Relationships: [];
+      };
+      challenges: {
+        Row: Challenge;
+        Insert: Partial<Challenge> & {
+          user_id: string;
+          type: ChallengeType;
+          label: string;
+          target_value: number;
+          end_date: string;
+        };
+        Update: Partial<Challenge>;
         Relationships: [];
       };
     };
