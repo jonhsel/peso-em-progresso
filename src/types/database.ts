@@ -101,6 +101,21 @@ export type Challenge = {
   created_at: string;
 };
 
+export type CoachLinkStatus = "pending" | "active" | "revoked";
+
+export type CoachLink = {
+  id: string;
+  owner_user_id: string;
+  coach_user_id: string | null;
+  invite_code: string;
+  status: CoachLinkStatus;
+  owner_display_name: string;
+  coach_display_name: string | null;
+  created_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -163,6 +178,12 @@ export type Database = {
           end_date: string;
         };
         Update: Partial<Challenge>;
+        Relationships: [];
+      };
+      coach_links: {
+        Row: CoachLink;
+        Insert: Partial<CoachLink> & { owner_user_id: string; invite_code: string; owner_display_name: string };
+        Update: Partial<CoachLink>;
         Relationships: [];
       };
     };

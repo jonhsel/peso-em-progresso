@@ -21,7 +21,8 @@ na tela `/dashboard/goals`, não fixas no código.
 
 ## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) + Fase 4.2 (conquistas) + Fase 4.3 (próximo check-in) + Fase 4.4 (guia de ajuda) + Fase 5.1 (previsão da meta) + Fase 5.2 (média móvel de 7 dias) + Fase 5.3 (seletor de período do gráfico) + Fase 5.4 (relatórios) + Fase 5.5
 (widget-resumo de medidas corporais) + Fase 6.1 (fotos de progresso) + Fase 6.2
-(múltiplas metas simultâneas) + Fase 6.3 (desafios) completos, não validados em produção
+(múltiplas metas simultâneas) + Fase 6.3 (desafios) + Fase 6.4 (papel de
+coach/visualizador) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -2074,6 +2075,174 @@ progresso (6.1) e múltiplas metas simultâneas (6.2).
 Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 6 —
 Ticket alto → "Desafios") e atualizar os checkboxes acima.
 
+## Fase 6.4 — Papel de coach/visualizador (implementada 04/09/2026)
+
+Spec completo em `claude_fase6_coach_v2.md` (na raiz do repo, não
+versionado — mesmo padrão dos specs anteriores; v2 já é resultado de
+auditoria contra o repo real, achados A–D do próprio arquivo todos
+resolvidos antes do handoff). Implementado nesta sessão: `npx tsc --noEmit`
+e `npm run build` limpos. **Ainda não testado contra Supabase real nem
+visto num navegador** — ver checklist abaixo. Patch aplicado seguindo o
+spec de perto, com 1 desvio de numeração de migração e 1 adaptação de
+implementação da tela do coach (ambos abaixo). Quarto item da Fase 6
+(Ticket alto), depois de fotos de progresso (6.1), múltiplas metas
+simultâneas (6.2) e desafios (6.3) — **fecha a Fase 6 por completo**.
+
+- **Vínculo por link/código copiável** — dono gera convite, coach aceita;
+  **coach enxerga tudo, somente leitura** (peso, medidas, fotos, metas);
+  **1 coach ativo por dono, 1 coach pode acompanhar N donos**. Decisões
+  travadas desde a v1 do spec, inalteradas.
+- **Desvio sobre o spec: migração renumerada de `0010` para
+  `supabase/migrations/0011_coach_links.sql`** — o spec original (escrito
+  antes de confirmar contra o repo) assumia `0010` livre, mas essa
+  numeração já tinha sido usada por `0010_challenges.sql` (Fase 6.3,
+  implementada antes desta sessão). Conteúdo idêntico ao spec, só o nome
+  do arquivo mudou. **Ainda precisa ser rodada manualmente no Supabase
+  Dashboard > SQL Editor**, em blocos separados (create table+indexes → RLS
+  de `coach_links` → as 6 políticas condicionais → política de storage,
+  conferindo "Success" a cada um) — sem isso, `/dashboard/coach` e as
+  telas dependentes quebram em produção. Bloco completo também acrescentado
+  ao final de `supabase/schema.sql`, seção 11 "Coach/visualizador".
+- Tabela nova `coach_links`: `owner_user_id`/`coach_user_id`
+  (`coach_user_id` fica `null` até o aceite), `invite_code` (8 chars,
+  gerado no client via `crypto.randomUUID()`), `status`
+  (`pending | active | revoked`), `owner_display_name`/`coach_display_name`
+  **desnormalizados** (evita abrir política de leitura cruzada em
+  `profiles`, que hoje é estritamente `auth.uid() = id` — a mais
+  restritiva do projeto; só pra mostrar nome numa tela de convite/lista,
+  não vale o risco). `owner_display_name` é preenchido no insert
+  (`CoachShareSection`, que já tem o próprio `profile.display_name`);
+  `coach_display_name` é preenchido no update de aceite
+  (`AcceptInviteButton`, idem). Índice parcial único
+  (`coach_links_one_open_per_owner`, `where status in ('pending',
+  'active')`) garante 1 vínculo pendente **ou** ativo por dono por vez —
+  a trava de verdade, não só client-side.
+- **RLS:** política de update única (`coach_links_update_party`, `using`
+  abrangente + `with check (true)`) em vez de duas políticas separadas
+  para revogação/aceite — decisão documentada no spec: políticas de UPDATE
+  no Postgres combinam `USING`/`WITH CHECK` de forma que duas políticas
+  restritivas viram mais permissivas juntas (`OR`) do que o pretendido;
+  uma única política ampla + validação de negócio no client (mesmo padrão
+  já usado em `coach_links_insert_owner`) é mais segura e previsível aqui.
+  6 políticas novas `_select_by_coach` nas tabelas existentes
+  (`profiles`, `weight_entries`, `body_measurements`, `goals`,
+  `goals_history`, `progress_photos`) + 1 política de storage
+  (`progress_photos_storage_select_by_coach`, só select, sem
+  insert/update/delete pro coach). `user_achievements` e `challenges`
+  **não** ganham política de coach — conquistas e desafios são pessoais/
+  gamificação, decisão que reduz a superfície de RLS sem perder valor pro
+  personal trainer/coach.
+- `src/lib/loadCoachClientData.ts` (novo) — espelha `loadUserData()` mas
+  para o contexto do coach lendo dados de um `ownerId`; recebe também
+  `coachUserId` pra checar o vínculo ativo antes de consultar (UX, não
+  segurança — RLS já protege; sem essa checagem, um `ownerId` sem vínculo
+  simplesmente retornaria arrays vazios em vez de uma mensagem clara).
+  `maybeSingle()` no lugar de `single()` pro vínculo (não lança exceção
+  com 0 linhas). Não carrega `user_achievements`/`challenges` (mesma
+  decisão de RLS acima). Mesmo fallback sintético de `goalsHistory` de
+  `loadUserData()`, caso a migração de `goal_id` ainda não tenha rodado.
+- **Componentes existentes ganharam prop `readOnly?: boolean` (default
+  `false`, zero mudança pra quem já usa)**: `BodyMeasurementsList.tsx`
+  (esconde o botão "Excluir") e `photos/PhotoHistoryGrid.tsx` (esconde o
+  `DeletePhotoButton`) — solução escolhida sobre criar componentes de
+  apresentação duplicados, porque nenhum dos dois embute um form de edição
+  (só delete), então a prop é a menor mudança possível e serve pra
+  qualquer cenário futuro de somente-leitura.
+- 3 componentes novos em `src/components/coach/`:
+  `CoachShareSection.tsx` (client — gera/copia/cancela convite, revoga
+  coach ativo, tudo via update direto ao Supabase, mesmo padrão de
+  `GoalsManager`), `CoachClientsList.tsx` (Server Component, só links pros
+  perfis acompanhados), `AcceptInviteButton.tsx` (client — aceita o
+  convite via `supabase.auth.getUser()` + update em `coach_links`).
+- 3 rotas novas sob `/dashboard/coach`: `page.tsx` (hub — `max-w-2xl`,
+  mesma largura de `settings/page.tsx`; mostra o convite/coach do próprio
+  usuário como dono + a lista de quem ele acompanha como coach),
+  `accept/page.tsx` (Server Component, lê `searchParams.code`; 5 estados —
+  sem código, não encontrado, já usado/cancelado, "não pode aceitar o
+  próprio convite", ou válido mostrando `AcceptInviteButton`), e
+  `[ownerId]/page.tsx` (visão do coach, somente leitura). Sem mudança em
+  `middleware.ts` — tudo sob `/dashboard` já cai em `isProtectedRoute`.
+- **Adaptação sobre o rascunho do spec (seção 4.6): a tela
+  `[ownerId]/page.tsx` foi implementada reaproveitando o formato real e
+  atual de `dashboard/page.tsx` (pós Fase 6.2/6.3), não o esqueleto mais
+  antigo esboçado no próprio spec.** O rascunho do spec (escrito antes da
+  Fase 6.2 estar madura) ainda assumia `KpiCard` renderizado direto num
+  grid fixo de 4 e `WeightChart` recebendo `targetWeightKg`/`weekKpi`
+  únicos — mas o código real desde a Fase 6.2 usa `GoalTabs` (que já
+  encapsula os `KpiCard` por meta + abas) e `WeightChart` recebendo
+  `weightGoals: WeightGoalKpi[]` (1 linha "esperado" por meta de peso
+  ativa). A implementação final espelha exatamente a lógica de
+  `dashboard/page.tsx` (mesmos `kpisByGoal`/`predictionsByGoal` via
+  `extractMetricPoints`/`computeAllKpis`/`computeGoalPrediction`), só
+  trocando a fonte dos dados (`loadCoachClientData(ownerId, coachUserId)`
+  em vez de `loadUserData()`) e omitindo tudo que o coach não deve ver ou
+  fazer: sem `StreakCard`/`AchievementsCard`/`ChallengesCard` (pessoais,
+  fora da visão do coach — mesma decisão de RLS), sem `PhotoUploadForm`
+  nem `GoalsForm`/`GoalsManager` (o coach não edita nada). `NavBar` mostra
+  o `display_name` do **coach** (usuário logado, via `loadUserData()`),
+  não o do cliente sendo visualizado — o título da página (`<h1>`) mostra
+  o nome do cliente. Seção "Metas ativas" no fim da página é uma lista
+  simples (métrica + ritmo semanal), sem reaproveitar `GoalsManager`
+  (que tem UI de edição/desativação).
+- `src/components/photos/PhotoComparisonView.tsx` e `WeightChart.tsx`/
+  `KpiCard.tsx`/`GoalTabs.tsx`/`TrendBadge.tsx` **não precisaram de
+  nenhuma mudança** — todos já são somente-leitura por natureza (recebem
+  dados via prop, nenhum side effect/escrita), confirmando a nota do spec.
+- `NavBar.tsx` — "Coach" adicionado ao array `links`, entre "Relatórios" e
+  "Configurações". 9 elementos visuais em mobile (8 links + "Ajuda" fora
+  do `.map()`) — mesmo `overflow-x-auto` genérico de sempre, sem CSS novo.
+- **Fora de escopo** (idem spec): múltiplos coaches simultâneos por dono,
+  notificação por e-mail (aceite/revogação), coach comentar/anotar dados
+  do cliente, exportação PDF/CSV pela visão do coach, expiração automática
+  de convite por tempo, gate de plano (Fase 7), atualização em tempo real
+  de `owner_display_name`/`coach_display_name` quando alguém muda o nome
+  em Configurações (aceitável ficar desatualizado até o próximo convite/
+  aceite).
+
+- [ ] Rodar `supabase/migrations/0011_coach_links.sql` no Supabase
+      Dashboard (em blocos, conferindo "Success" a cada um) — tabela
+      `coach_links` com 3 colunas de status, 2 colunas de display_name,
+      índice parcial ativo; 6 políticas `_select_by_coach` ativas nas
+      tabelas existentes + 1 de storage + as políticas da própria
+      `coach_links`.
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
+      dev — **ainda não visto rodando num navegador real**).
+- [ ] **Gerar convite:** link copiável com código de 8 chars, formato
+      `.../dashboard/coach/accept?code=XXXXXXXX`.
+- [ ] **2º convite com 1 já pendente:** bloqueado pelo índice parcial.
+- [ ] **Cancelar convite pendente:** libera geração de novo.
+- [ ] **Abrir link de convite deslogado:** middleware redireciona pra
+      `/login`. Após login, reabrir o link mostra o preview.
+- [ ] **Aceitar o próprio convite:** bloqueado, mensagem clara.
+- [ ] **Aceitar com conta B:** vínculo vira `active`;
+      `coach_display_name` preenchido; dono vê nome do coach.
+- [ ] **Coach (B) vê o cliente listado:** "Perfis que você acompanha"
+      mostra o `owner_display_name`.
+- [ ] **Coach abre `/dashboard/coach/[ownerId]`:** vê gráfico + KPIs por
+      meta (via `GoalTabs`), medidas (sem botão excluir), fotos
+      (comparação + grid sem excluir), metas ativas (sem form de edição).
+- [ ] **Conta C (sem vínculo) tenta URL direta:** redirecionada pra
+      `/dashboard/coach`, RLS também bloqueia queries.
+- [ ] **Dono revoga coach ativo:** B perde acesso imediatamente.
+- [ ] **Link usado 2x (2ª pessoa):** bloqueado, "já foi usado".
+- [ ] **1 coach com 2 clientes:** lista mostra os 2, dados não se
+      misturam.
+- [ ] **readOnly=true:** `BodyMeasurementsList` e `PhotoHistoryGrid` sem
+      botão "Excluir" na visão do coach.
+- [ ] **readOnly=false (default):** nenhuma regressão nas telas normais
+      de medidas (`/dashboard/measurements`) e fotos (`/dashboard/photos`).
+- [ ] **Mobile:** 9 elementos visuais no NavBar sem overflow ilegível.
+- [ ] **Tema claro/escuro** nas 3 telas novas (hub, aceite, visão do
+      coach).
+- [ ] Copiar link (`navigator.clipboard.writeText`) funciona; contexto sem
+      permissão de clipboard degrada sem crash (link continua visível pra
+      copiar manualmente).
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 6 —
+Ticket alto → "Papel de coach/visualizador") e atualizar os checkboxes
+acima. **Fase 6 (Ticket alto) fechada por completo** (fotos de progresso,
+múltiplas metas simultâneas, desafios, coach/visualizador).
+
 ## Pendências / próximos passos sugeridos (não iniciados)
 
 - [ ] Testar o app fim a fim contra um projeto Supabase real (criar projeto, rodar
@@ -2081,11 +2250,12 @@ Ticket alto → "Desafios") e atualizar os checkboxes acima.
       + `migrations/0004_goals_history.sql` + `migrations/0005_period_mode.sql`
       + `migrations/0006_user_achievements.sql` + `migrations/0007_checkin_hour.sql`
       + `migrations/0008_progress_photos.sql` + `migrations/0009_multi_goals.sql`
-      + `migrations/0010_challenges.sql`,
+      + `migrations/0010_challenges.sql` + `migrations/0011_coach_links.sql`,
       configurar `.env.local`, testar signup/login/registro de peso,
       exportação CSV/PDF, importação CSV, medidas corporais, metas + histórico,
       tela de Configurações/período de meta, conquistas, horário de check-in,
-      fotos de progresso, múltiplas metas simultâneas, e desafios.
+      fotos de progresso, múltiplas metas simultâneas, desafios, e o papel
+      de coach/visualizador.
 - [ ] Deploy real na Vercel + configurar Site URL / Redirect URLs no Supabase Auth.
 - [ ] Testes unitários para `src/lib/analytics.ts` (funções puras, fáceis de testar).
 - [ ] Massa magra/composição corporal mais completa (bioimpedância avançada) — hoje

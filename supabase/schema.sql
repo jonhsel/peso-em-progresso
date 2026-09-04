@@ -424,6 +424,134 @@ comment on table public.challenges is
   'Desafios com prazo fixo (progresso ou hábito). status transiciona active -> completed/failed via recálculo no client (ChallengesCard), nunca via cron/trigger de tempo — Postgres não sabe "hoje" sem uma query ativa.';
 
 -- ---------------------------------------------------------
+-- 11. Coach/visualizador
+-- Ver supabase/migrations/0011_coach_links.sql
+-- ---------------------------------------------------------
+create table if not exists public.coach_links (
+  id uuid primary key default gen_random_uuid(),
+  owner_user_id uuid not null references auth.users(id) on delete cascade,
+  coach_user_id uuid references auth.users(id) on delete cascade,
+  invite_code text not null unique,
+  status text not null default 'pending'
+    check (status in ('pending', 'active', 'revoked')),
+  owner_display_name text not null,
+  coach_display_name text,
+  created_at timestamptz not null default now(),
+  accepted_at timestamptz,
+  revoked_at timestamptz
+);
+
+create index if not exists coach_links_owner_idx
+  on public.coach_links (owner_user_id);
+
+create index if not exists coach_links_coach_idx
+  on public.coach_links (coach_user_id);
+
+create unique index if not exists coach_links_one_open_per_owner
+  on public.coach_links (owner_user_id)
+  where status in ('pending', 'active');
+
+alter table public.coach_links enable row level security;
+
+create policy "coach_links_select_party"
+  on public.coach_links for select
+  using (auth.uid() = owner_user_id or auth.uid() = coach_user_id);
+
+create policy "coach_links_select_pending_by_code"
+  on public.coach_links for select
+  using (status = 'pending');
+
+create policy "coach_links_insert_owner"
+  on public.coach_links for insert
+  with check (auth.uid() = owner_user_id and coach_user_id is null);
+
+create policy "coach_links_update_party"
+  on public.coach_links for update
+  using (auth.uid() = owner_user_id or (status = 'pending' and coach_user_id is null))
+  with check (true);
+
+create policy "profiles_select_by_coach"
+  on public.profiles for select
+  using (
+    exists (
+      select 1 from public.coach_links cl
+      where cl.owner_user_id = profiles.id
+        and cl.coach_user_id = auth.uid()
+        and cl.status = 'active'
+    )
+  );
+
+create policy "weight_entries_select_by_coach"
+  on public.weight_entries for select
+  using (
+    exists (
+      select 1 from public.coach_links cl
+      where cl.owner_user_id = weight_entries.user_id
+        and cl.coach_user_id = auth.uid()
+        and cl.status = 'active'
+    )
+  );
+
+create policy "body_measurements_select_by_coach"
+  on public.body_measurements for select
+  using (
+    exists (
+      select 1 from public.coach_links cl
+      where cl.owner_user_id = body_measurements.user_id
+        and cl.coach_user_id = auth.uid()
+        and cl.status = 'active'
+    )
+  );
+
+create policy "goals_select_by_coach"
+  on public.goals for select
+  using (
+    exists (
+      select 1 from public.coach_links cl
+      where cl.owner_user_id = goals.user_id
+        and cl.coach_user_id = auth.uid()
+        and cl.status = 'active'
+    )
+  );
+
+create policy "goals_history_select_by_coach"
+  on public.goals_history for select
+  using (
+    exists (
+      select 1 from public.coach_links cl
+      where cl.owner_user_id = goals_history.user_id
+        and cl.coach_user_id = auth.uid()
+        and cl.status = 'active'
+    )
+  );
+
+create policy "progress_photos_select_by_coach"
+  on public.progress_photos for select
+  using (
+    exists (
+      select 1 from public.coach_links cl
+      where cl.owner_user_id = progress_photos.user_id
+        and cl.coach_user_id = auth.uid()
+        and cl.status = 'active'
+    )
+  );
+
+create policy "progress_photos_storage_select_by_coach"
+  on storage.objects for select
+  using (
+    bucket_id = 'progress-photos'
+    and exists (
+      select 1 from public.coach_links cl
+      where cl.owner_user_id::text = (storage.foldername(name))[1]
+        and cl.coach_user_id = auth.uid()
+        and cl.status = 'active'
+    )
+  );
+
+comment on table public.coach_links is
+  'Vínculo coach/cliente por convite. owner = dono dos dados; coach = quem acompanha (preenchido ao aceitar). 1 vínculo pendente/ativo por owner (índice parcial); 1 coach pode ter N owners. display_name desnormalizado para evitar leitura cruzada em profiles.';
+
+-- ---------------------------------------------------------
 -- Notas de arquitetura:
 -- * RLS garante que cada usuário (amigo/familiar) só vê os próprios dados,
 --   mesmo estando todos no mesmo projeto Supabase.

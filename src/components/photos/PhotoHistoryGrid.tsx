@@ -9,9 +9,11 @@ type PhotoWithUrl = {
 export default function PhotoHistoryGrid({
   userId,
   photos,
+  readOnly = false,
 }: {
   userId: string;
   photos: PhotoWithUrl[];
+  readOnly?: boolean;
 }) {
   if (photos.length === 0) {
     return (
@@ -32,11 +34,13 @@ export default function PhotoHistoryGrid({
           />
           <div className="flex items-center justify-between">
             <span className="text-xs text-ink-muted">{p.photo_date}</span>
-            <DeletePhotoButton
-              userId={userId}
-              photoDate={p.photo_date}
-              storagePath={p.storage_path}
-            />
+            {!readOnly && (
+              <DeletePhotoButton
+                userId={userId}
+                photoDate={p.photo_date}
+                storagePath={p.storage_path}
+              />
+            )}
           </div>
         </div>
       ))}

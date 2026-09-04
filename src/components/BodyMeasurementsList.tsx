@@ -16,7 +16,13 @@ const FIELDS: { key: FieldKey; label: string; unit: string }[] = [
   { key: "body_fat_pct", label: "% gordura", unit: "%" },
 ];
 
-export default function BodyMeasurementsList({ measurements }: { measurements: BodyMeasurement[] }) {
+export default function BodyMeasurementsList({
+  measurements,
+  readOnly = false,
+}: {
+  measurements: BodyMeasurement[];
+  readOnly?: boolean;
+}) {
   const router = useRouter();
   const supabase = createClient();
 
@@ -95,14 +101,16 @@ export default function BodyMeasurementsList({ measurements }: { measurements: B
                   })}
                 </div>
               </div>
-              <button
-                onClick={() => handleDelete(m)}
-                disabled={isDeleting}
-                className="text-xs text-ink-faint hover:text-signal-behind transition disabled:opacity-50 disabled:cursor-wait shrink-0"
-                aria-label="Excluir medidas"
-              >
-                {isDeleting ? "Excluindo…" : "Excluir"}
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={() => handleDelete(m)}
+                  disabled={isDeleting}
+                  className="text-xs text-ink-faint hover:text-signal-behind transition disabled:opacity-50 disabled:cursor-wait shrink-0"
+                  aria-label="Excluir medidas"
+                >
+                  {isDeleting ? "Excluindo…" : "Excluir"}
+                </button>
+              )}
             </div>
           );
         })}
