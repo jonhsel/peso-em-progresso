@@ -63,13 +63,30 @@ function isValidSignature(rawBody: string, signature: string | null): boolean {
   return crypto.timingSafeEqual(expectedBuf, receivedBuf);
 }
 
+/**
+ * Lookup de auth.users por email — CORRIGIDO em 05/09/2026 após teste real
+ * (ver CLAUDE.md Fase 7): `supabase.schema("auth").from("users")` NÃO
+ * funciona via @supabase/supabase-js, mesmo com service role key — o
+ * PostgREST só expõe o schema "public" pela API REST por padrão (restrição
+ * do gateway HTTP, não de RLS). Confirmado com um webhook real simulado
+ * pra um email que já tinha conta: caiu (incorretamente) no caminho de
+ * "usuário não encontrado" / pending_payments. Corrigido chamando a função
+ * security definer `get_user_id_by_email` (migração 0013), que roda dentro
+ * do Postgres e não passa pela mesma restrição.
+ */
+async function findUserIdByEmail(
+  supabase: ReturnType<typeof createAdminClient>,
+  email: string
+): Promise<string | null> {
+  const { data } = await supabase.rpc("get_user_id_by_email", { lookup_email: email });
+  return (data as string | null) ?? null;
+}
+
 // ⚠️ Pendências de confirmação contra a Kiwify real (ver claude_fase7_monetizacao_v3.md
 // seção 7 + CLAUDE.md Fase 7):
-// 1. Valores exatos de GRANT_EVENTS/REVOKE_EVENTS acima — só o NOME do campo
-//    (webhook_event_type) foi confirmado, não os valores de aprovação/
-//    assinatura. Testar "Compra aprovada"/"Assinatura cancelada" no painel.
-// 2. `supabase.schema("auth")` — funciona com service role key; se não,
-//    criar função Postgres security definer chamada via `.rpc()`.
+// 1. Valores exatos de GRANT_EVENTS/REVOKE_EVENTS acima — "order_approved" e
+//    "subscription_canceled" já confirmados; "subscription_late"/
+//    "subscription_renewed"/"order_refunded"/"chargeback" ainda não.
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const signature = req.nextUrl.searchParams.get("signature");
@@ -98,19 +115,13 @@ export async function POST(req: NextRequest) {
 
   if (GRANT_EVENTS.has(eventType)) {
     const expiresAt = addDays(new Date(eventCreatedAt), SUBSCRIPTION_DAYS).toISOString();
+    const userId = await findUserIdByEmail(supabase, email);
 
-    const { data: authUser } = await supabase
-      .schema("auth")
-      .from("users")
-      .select("id")
-      .eq("email", email)
-      .maybeSingle();
-
-    if (authUser) {
+    if (userId) {
       await supabase
         .from("profiles")
         .update({ plan: "pro", plan_expires_at: expiresAt, kiwify_order_id: orderId ?? null })
-        .eq("id", authUser.id);
+        .eq("id", userId);
     } else {
       await supabase.from("pending_payments").insert({
         email,
@@ -119,18 +130,13 @@ export async function POST(req: NextRequest) {
       });
     }
   } else if (REVOKE_EVENTS.has(eventType)) {
-    const { data: authUser } = await supabase
-      .schema("auth")
-      .from("users")
-      .select("id")
-      .eq("email", email)
-      .maybeSingle();
+    const userId = await findUserIdByEmail(supabase, email);
 
-    if (authUser) {
+    if (userId) {
       await supabase
         .from("profiles")
         .update({ plan: "free", plan_expires_at: null })
-        .eq("id", authUser.id);
+        .eq("id", userId);
     }
     await supabase
       .from("pending_payments")

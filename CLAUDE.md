@@ -2323,9 +2323,35 @@ numeradas do projeto (0 a 7).
   4. `email`/`orderId` já batiam com os fallbacks que o código original já
      tinha (`Customer.email` maiúsculo, `order_id` na raiz) — sem mudança
      de lógica aí, só reordenados como caminho primário.
-  5. `supabase.schema("auth")` **não foi testado ainda** (webhook de teste
-     não chega a rodar essa parte do código, só a validação de assinatura)
-     — continua pendente.
+  5. **`supabase.schema("auth")` — testado e CONFIRMADO QUE NÃO FUNCIONA,
+     bug real pego em produção e corrigido no mesmo dia.** Fluxo do teste:
+     simulei uma chamada de webhook real (assinada com HMAC-SHA1 de
+     verdade, via `curl`) usando o email de uma conta que **já existia**
+     — o resultado foi cair (incorretamente) no caminho de "usuário não
+     encontrado", criando uma linha em `pending_payments` em vez de
+     atualizar `profiles.plan` direto. Causa raiz: o PostgREST (API REST
+     do Supabase) só expõe o schema `public` por padrão — `auth` fica de
+     fora independente de RLS/service role key, então
+     `.schema("auth").from("users")` sempre retorna vazio nesse setup,
+     silenciosamente (sem erro, só `data: null`), o que fazia TODO
+     `compra_aprovada`/`order_approved` real cair em `pending_payments`
+     mesmo pra clientes que já tinham conta — bug que na prática
+     inviabilizaria o produto inteiro (ninguém vira `pro` automaticamente).
+     **Corrigido com migração nova**
+     `supabase/migrations/0013_get_user_id_by_email.sql` (também em
+     `schema.sql`): função `public.get_user_id_by_email(lookup_email text)
+     returns uuid`, `security definer`, roda dentro do Postgres (não passa
+     pela API REST) e por isso lê `auth.users` sem problema; `revoke` de
+     `public`/`anon`/`authenticated` + `grant` só pra `service_role`
+     (vazaria existência de conta por email se fosse chamável por qualquer
+     client). `route.ts` ganhou `findUserIdByEmail()`, que chama
+     `supabase.rpc("get_user_id_by_email", { lookup_email: email })` em
+     vez de `.schema("auth").from("users")`, nos dois pontos (grant e
+     revoke). **Ainda precisa rodar a migração 0013 no Supabase Dashboard**
+     antes do webhook funcionar corretamente pra contas existentes — ver
+     checklist abaixo. Enquanto essa migração não roda, o comportamento
+     observado no teste (tudo cai em `pending_payments`, mesmo pra quem já
+     tem conta) continua acontecendo.
   **Implicação prática pro usuário:** o token de cada webhook é **gerado
   pela própria Kiwify**, não é algo que se inventa (diferente da orientação
   inicial desta sessão, que mandou gerar com `openssl rand` — corrigido).
@@ -2414,26 +2440,52 @@ numeradas do projeto (0 a 7).
   `period === "week"` quando `plan === "free"`), não coberto por esta
   sessão.
 
-- [ ] Rodar `supabase/migrations/0012_plan_gate.sql` no Supabase Dashboard
-      (4 blocos) — conferir que contas existentes ganharam `plan='free'`
-      e que `enforce_max_active_goals` passou a ler `profiles.plan`.
-- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado nesta sessão —
-      **ainda não visto rodando num navegador real**).
-- [ ] Conta nova sem pagamento: `plan='free'`, gate ativo nas 7 páginas +
-      3 API routes de export.
-- [ ] Configurar as 3 env vars novas (`SUPABASE_SERVICE_ROLE_KEY`,
+- [x] Rodar `supabase/migrations/0012_plan_gate.sql` no Supabase Dashboard
+      (4 blocos) — **confirmado em produção 05/09/2026** (commit `f29ea2d`
+      deployado, gate funcionando, `plan='free'` default ativo).
+- [ ] **Rodar `supabase/migrations/0013_get_user_id_by_email.sql` no
+      Supabase Dashboard** — nova, criada em 05/09/2026 depois de um bug
+      real pego em teste (ver item 5 da Fase 7 acima: `schema("auth")` não
+      funciona, webhook cai sempre em `pending_payments` mesmo pra conta
+      existente até essa migração rodar). **Bloqueador pro webhook
+      funcionar de verdade** — sem ela, todo `compra_aprovada`/
+      `order_approved` real vira pagamento pendente, nunca `plan='pro'`
+      direto, mesmo pra quem já tem conta.
+- [x] `npx tsc --noEmit` e `npm run build` limpos — **e também visto
+      rodando num navegador real** (05/09/2026, várias telas conferidas em
+      produção: gate de Relatórios, `/dashboard/upgrade`, checkout Kiwify).
+- [x] Conta nova sem pagamento: `plan='free'`, gate ativo — **confirmado
+      por print real** em `/dashboard/reports` ("Relatórios é Pro").
+- [x] Configurar as 3 env vars novas (`SUPABASE_SERVICE_ROLE_KEY`,
       `KIWIFY_WEBHOOK_TOKEN`, `NEXT_PUBLIC_KIWIFY_CHECKOUT_URL`) na Vercel
-      (Production e Preview) e no `.env.local` local.
-- [ ] Confirmar os 3 pontos pendentes do webhook Kiwify (nome dos campos
-      do payload, header vs body do token, `schema("auth")` com service
-      role) via "Test Webhook" real antes de ligar em produção.
-- [ ] Webhook `compra_aprovada` com email de conta existente:
-      `profiles.plan → 'pro'`, `plan_expires_at` ~30 dias, gate libera.
-- [ ] Webhook `compra_aprovada` com email sem conta: cria
-      `pending_payments`; criar conta com o mesmo email → `handle_new_user()`
-      concilia, conta nasce `pro`.
-- [ ] Webhook `subscription_canceled`: `plan → 'free'` imediato,
-      `plan_expires_at → null`.
+      (Production e Preview) e no `.env.local` local — **feito e
+      redeployado em 05/09/2026**.
+- [x] Confirmar os pontos pendentes do webhook Kiwify contra testes reais
+      (05/09/2026, ver item 5 da Fase 7 acima para o detalhe completo):
+      nome do campo de evento (`webhook_event_type`, confirmado) e 2
+      valores (`order_approved`, `subscription_canceled`, confirmados);
+      onde o token vai (query string `?signature=`, confirmado) e o
+      algoritmo (HMAC-SHA1 do corpo bruto, confirmado bit a bit);
+      `schema("auth")` **confirmado que NÃO funciona** — corrigido com a
+      migração 0013 (ver acima, ainda precisa rodar). Não confirmados:
+      `subscription_late`/`subscription_renewed`/`order_refunded`/
+      `chargeback` (chutes por analogia, nunca testados individualmente).
+- [ ] Webhook `order_approved`/`compra_aprovada` com email de conta
+      existente: `profiles.plan → 'pro'`, `plan_expires_at` ~30 dias, gate
+      libera. **Testado em 05/09/2026 e FALHOU** (caiu em
+      `pending_payments` por causa do bug do item 5) — **re-testar depois
+      de rodar a migração 0013** (repetir o teste com `curl` assinado ou
+      esperar produção de verdade).
+- [x] Webhook `order_approved` com email sem conta: cria
+      `pending_payments` — **confirmado por teste real** (2 linhas
+      inseridas com `expires_at` calculado corretamente, ~30 dias). Falta
+      testar a segunda metade: criar conta com o mesmo email →
+      `handle_new_user()` concilia, conta nasce `pro`.
+- [x] Webhook `subscription_canceled`: **evento confirmado** via teste
+      real (`webhook_event_type` bate exatamente). Efeito no banco
+      (`plan → 'free'`, `plan_expires_at → null`) ainda não testado fim a
+      fim contra uma conta que já era `pro` (o teste usado tinha email
+      fake, sem conta correspondente).
 - [ ] Token inválido no webhook: 401, sem mudança no banco.
 - [ ] `GoalsManager` free: não cria 2ª meta nem meta ≠ peso (testar
       também via SQL direto pra confirmar que o trigger, não só o client,

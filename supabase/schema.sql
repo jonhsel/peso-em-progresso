@@ -614,6 +614,34 @@ comment on table public.pending_payments is
    tinha conta no app no momento do webhook. handle_new_user() concilia
    automaticamente no signup. Sem RLS de client — só service role e triggers.';
 
+-- supabase.schema("auth") não funciona via @supabase/supabase-js com service
+-- role key — o PostgREST só expõe o schema "public" pela API REST por
+-- padrão (restrição do gateway HTTP, não de RLS; a service role key não
+-- contorna). Confirmado com um teste real em 05/09/2026 (ver CLAUDE.md Fase
+-- 7). Função security definer abaixo, em "public" (schema exposto), lê
+-- auth.users por dentro do Postgres — chamada via supabase.rpc(), nunca
+-- .schema("auth").from("users").
+create or replace function public.get_user_id_by_email(lookup_email text)
+returns uuid
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select id from auth.users where email = lookup_email limit 1;
+$$;
+
+revoke all on function public.get_user_id_by_email(text) from public;
+revoke all on function public.get_user_id_by_email(text) from anon;
+revoke all on function public.get_user_id_by_email(text) from authenticated;
+grant execute on function public.get_user_id_by_email(text) to service_role;
+
+comment on function public.get_user_id_by_email(text) is
+  'Lookup de auth.users por email via security definer — necessário porque
+   a API REST do Supabase (mesmo com service role key) não expõe o schema
+   auth por padrão. Usado só pelo webhook da Kiwify, chamado via .rpc(),
+   nunca pelo client anon/authenticated (revogado explicitamente acima).';
+
 -- ---------------------------------------------------------
 -- Notas de arquitetura:
 -- * RLS garante que cada usuário (amigo/familiar) só vê os próprios dados,
