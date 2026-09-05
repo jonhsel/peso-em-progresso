@@ -2278,20 +2278,62 @@ numeradas do projeto (0 a 7).
   (`SUPABASE_SERVICE_ROLE_KEY`, env var nova), usado **só** pelo webhook,
   nunca em código client-side ou em rotas que atendem o próprio usuário
   logado (essas continuam em `supabase/server.ts`, que respeita RLS).
-- `src/app/api/webhooks/kiwify/route.ts` (novo) — token compartilhado
-  (`KIWIFY_WEBHOOK_TOKEN`, env var nova) validado no corpo da requisição;
-  `compra_aprovada`/`subscription_renewed` concedem `pro` por 30 dias
-  (ou criam `pending_payments` se o email ainda não tiver conta);
+- `src/app/api/webhooks/kiwify/route.ts` (novo, **corrigido em 05/09/2026
+  contra um teste real** — ver abaixo) — `compra_aprovada`/`order_approved`/
+  `subscription_renewed` concedem `pro` por 30 dias (ou criam
+  `pending_payments` se o email ainda não tiver conta);
   `subscription_canceled`/`subscription_late`/`compra_reembolsada`/
-  `chargeback` revogam pra `free` imediatamente (decisão: downgrade sem
-  esperar `plan_expires_at` vencer). **⚠️ 3 pontos pendentes de confirmação
-  contra a Kiwify real antes de ligar o webhook em produção** (documentados
-  em comentário no próprio arquivo): nome exato dos campos do payload
-  (`event`/`type`, `data.customer.email`) — validar com um "Test Webhook"
-  do painel da Kiwify contra webhook.site; como o token é entregue (body
-  vs header); se `supabase.schema("auth").from("users")` funciona com
-  service role key (se não, precisa de uma função Postgres `security
-  definer` chamada via `.rpc()`).
+  `order_refunded`/`chargeback` revogam pra `free` imediatamente (decisão:
+  downgrade sem esperar `plan_expires_at` vencer).
+  **Validação de assinatura do webhook — confirmada empiricamente, não é
+  suposição:** as 3 pendências originais do spec (nome dos campos, onde o
+  token é entregue, `schema("auth")`) foram checadas nesta sessão com um
+  webhook de teste real (Kiwify → webhook.site). Achados:
+  1. **O token NÃO vai no corpo nem em header** — vai como **query string**
+     (`?signature=<hex>`). O código original (`body.token !== ...`) estava
+     errado e teria rejeitado 100% dos webhooks reais.
+  2. **`signature` é `HMAC-SHA1(corpo_bruto_da_requisição, chave=token do
+     webhook)` em hex** — confirmado batendo bit a bit (não é chute): com o
+     token real mostrado pela Kiwify pro webhook de teste e o corpo exato
+     recebido, o HMAC calculado localmente foi idêntico ao `signature`
+     recebido. Implementado em `isValidSignature()` com
+     `crypto.createHmac("sha1", token)` + `crypto.timingSafeEqual` (proteção
+     contra timing attack). **Precisa do corpo bruto** (`req.text()`, não
+     `req.json()`) — reserializar o JSON pode mudar espaçamento/ordem de
+     chaves e quebrar o HMAC, por isso a rota lê texto primeiro e só faz
+     `JSON.parse` depois de validar a assinatura.
+  3. **O campo do evento é `webhook_event_type`** (não `event`/`type`) — o
+     primeiro payload de teste trouxe `"billet_created"` (boleto gerado),
+     confirmando o NOME do campo. **Testes adicionais confirmaram 2 dos
+     valores usados no código, com certeza**: "Compra aprovada" real
+     trouxe `webhook_event_type: "order_approved"` (não `"compra_aprovada"`
+     — os nomes em português do spec original v1-v3 eram chute errado; a
+     Kiwify usa valores em inglês mesmo com o painel em português) e
+     "Assinatura cancelada" real trouxe `"subscription_canceled"` (curioso:
+     o `order_status` desse teste veio `"refunded"`, não `"canceled"` —
+     irrelevante, o código lê `webhook_event_type`, não `order_status`).
+     `GRANT_EVENTS`/`REVOKE_EVENTS` (`src/app/api/webhooks/kiwify/route.ts`)
+     mantêm os 2 valores confirmados + os nomes em português como rede de
+     segurança inofensiva (não custam nada num `Set`) + os 3 restantes
+     (`subscription_late`, `subscription_renewed`, `order_refunded`,
+     `chargeback`) ainda não testados individualmente — cobrem os 2
+     cenários mais comuns (assinar, cancelar) com certeza; os restantes
+     (atraso, reembolso, chargeback) são chute por analogia com o padrão
+     `order_X`/`subscription_X` confirmado, plausíveis mas não garantidos.
+  4. `email`/`orderId` já batiam com os fallbacks que o código original já
+     tinha (`Customer.email` maiúsculo, `order_id` na raiz) — sem mudança
+     de lógica aí, só reordenados como caminho primário.
+  5. `supabase.schema("auth")` **não foi testado ainda** (webhook de teste
+     não chega a rodar essa parte do código, só a validação de assinatura)
+     — continua pendente.
+  **Implicação prática pro usuário:** o token de cada webhook é **gerado
+  pela própria Kiwify**, não é algo que se inventa (diferente da orientação
+  inicial desta sessão, que mandou gerar com `openssl rand` — corrigido).
+  Cada webhook cadastrado tem o seu próprio token — o token usado no
+  webhook de teste (apontando pro webhook.site) não é necessariamente o
+  mesmo que vai ser usado no webhook real (apontando pra produção); ao
+  cadastrar o webhook de produção, `KIWIFY_WEBHOOK_TOKEN` (`.env.local` e
+  Vercel) precisa ser atualizado com o token **daquele** webhook específico.
 - `src/lib/pricing.ts` reescrito pra 2 tiers (`PlanId = "gratis" | "pro"`),
   removendo a menção a "Stripe"/"Fase 3" (era vitrine da Fase 0, nunca
   ligada a cobrança real). `src/app/page.tsx` (landing): CTA do plano Pro
