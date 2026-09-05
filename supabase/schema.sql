@@ -15,7 +15,10 @@ create table if not exists public.profiles (
   onboarded_at timestamptz,
   period_mode text not null default 'fixed' check (period_mode in ('fixed', 'rolling')),
   week_starts_on text not null default 'monday' check (week_starts_on in ('monday', 'sunday')),
-  checkin_hour smallint check (checkin_hour is null or (checkin_hour >= 0 and checkin_hour <= 23))
+  checkin_hour smallint check (checkin_hour is null or (checkin_hour >= 0 and checkin_hour <= 23)),
+  plan text not null default 'free' check (plan in ('free', 'pro')),
+  plan_expires_at timestamptz,
+  kiwify_order_id text
 );
 
 alter table public.profiles enable row level security;
@@ -32,15 +35,38 @@ create policy "profiles_insert_own"
   on public.profiles for insert
   with check (auth.uid() = id);
 
--- Cria o perfil automaticamente quando um usuário se cadastra
+-- Cria o perfil automaticamente quando um usuário se cadastra. A partir da
+-- Fase 7, também concilia um pagamento pendente (Kiwify) porventura já
+-- aprovado pra esse email antes da conta existir — ver seção 12.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer set search_path = public
 as $$
+declare
+  pending record;
 begin
   insert into public.profiles (id, display_name)
   values (new.id, coalesce(new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1)));
+
+  select * into pending
+  from public.pending_payments
+  where email = new.email and status = 'pending'
+  order by created_at desc
+  limit 1;
+
+  if found then
+    update public.profiles
+    set plan = 'pro',
+        plan_expires_at = pending.expires_at,
+        kiwify_order_id = pending.kiwify_order_id
+    where id = new.id;
+
+    update public.pending_payments
+    set status = 'applied', applied_at = now()
+    where id = pending.id;
+  end if;
+
   return new;
 end;
 $$;
@@ -122,6 +148,8 @@ create policy "goals_update_own"
   using (auth.uid() = user_id);
 
 -- Trava de no máximo 3 metas ativas simultâneas por usuário.
+-- Fase 7: o limite de metas ativas passou a depender do plano (1 para
+-- free, 3 para pro) — ver seção 12.
 create or replace function public.enforce_max_active_goals()
 returns trigger
 language plpgsql
@@ -129,15 +157,21 @@ security definer set search_path = public
 as $$
 declare
   active_count integer;
+  user_plan text;
+  max_allowed integer;
 begin
   if new.is_active then
+    select plan into user_plan from public.profiles where id = new.user_id;
+    max_allowed := case when user_plan = 'pro' then 3 else 1 end;
+
     select count(*) into active_count
     from public.goals
     where user_id = new.user_id
       and is_active = true
       and id <> new.id;
-    if active_count >= 3 then
-      raise exception 'Máximo de 3 metas ativas por usuário';
+
+    if active_count >= max_allowed then
+      raise exception 'Limite de % meta(s) ativa(s) atingido para o plano %', max_allowed, coalesce(user_plan, 'free');
     end if;
   end if;
   return new;
@@ -550,6 +584,35 @@ create policy "progress_photos_storage_select_by_coach"
 
 comment on table public.coach_links is
   'Vínculo coach/cliente por convite. owner = dono dos dados; coach = quem acompanha (preenchido ao aceitar). 1 vínculo pendente/ativo por owner (índice parcial); 1 coach pode ter N owners. display_name desnormalizado para evitar leitura cruzada em profiles.';
+
+-- ---------------------------------------------------------
+-- 12. Plano (free/pro) + pagamentos pendentes
+-- Ver supabase/migrations/0012_plan_gate.sql. profiles.plan/plan_expires_at/
+-- kiwify_order_id já fazem parte da definição de profiles acima (seção 1);
+-- esta seção cobre só a tabela de conciliação de pagamentos pendentes.
+-- ---------------------------------------------------------
+create table if not exists public.pending_payments (
+  id uuid primary key default gen_random_uuid(),
+  email text not null,
+  kiwify_order_id text,
+  expires_at timestamptz not null,
+  status text not null default 'pending' check (status in ('pending', 'applied')),
+  created_at timestamptz not null default now(),
+  applied_at timestamptz
+);
+
+create index if not exists pending_payments_email_status_idx
+  on public.pending_payments (email, status);
+
+-- RLS ativado, SEM policies: só acessível via service role (webhook) e via
+-- funções security definer (handle_new_user, seção 1). Client nunca lê/
+-- escreve aqui diretamente.
+alter table public.pending_payments enable row level security;
+
+comment on table public.pending_payments is
+  'Fila de conciliação: pagamento aprovado na Kiwify pra um email que ainda não
+   tinha conta no app no momento do webhook. handle_new_user() concilia
+   automaticamente no signup. Sem RLS de client — só service role e triggers.';
 
 -- ---------------------------------------------------------
 -- Notas de arquitetura:

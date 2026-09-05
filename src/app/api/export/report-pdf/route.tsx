@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     { data: goalsHistory },
     { data: measurements },
   ] = await Promise.all([
-    supabase.from("profiles").select("display_name, period_mode, week_starts_on").eq("id", user.id).single(),
+    supabase.from("profiles").select("display_name, period_mode, week_starts_on, plan").eq("id", user.id).single(),
     supabase
       .from("weight_entries")
       .select("*")
@@ -88,6 +88,13 @@ export async function GET(request: NextRequest) {
 
   if (entriesError) {
     return NextResponse.json({ error: "Erro ao buscar dados." }, { status: 500 });
+  }
+
+  // Gate de plano (Fase 7) — exportação é feature Pro. Checagem independente
+  // da UI, essa é a proteção real. Incorporado no select de profile já
+  // existente acima (sem query extra).
+  if (profile?.plan !== "pro") {
+    return NextResponse.json({ error: "Exportação disponível no plano Pro" }, { status: 403 });
   }
 
   const typedEntries = (entries ?? []) as WeightEntry[];

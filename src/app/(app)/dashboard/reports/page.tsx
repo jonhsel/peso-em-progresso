@@ -9,6 +9,7 @@ import {
   type PeriodKpi,
 } from "@/lib/analytics";
 import NavBar from "@/components/NavBar";
+import PlanGate from "@/components/PlanGate";
 import ReportsClient from "./ReportsClient";
 import type { WeightGoalKpi } from "@/components/WeightChart";
 import type { GoalPredictions } from "@/components/GoalTabs";
@@ -51,16 +52,21 @@ export default async function ReportsPage() {
 
   return (
     <div>
-      <NavBar displayName={profile.display_name} theme={theme} />
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
-        <p className="text-xs uppercase tracking-wide text-ink-muted">Relatórios</p>
-        <ReportsClient
-          goals={activeGoals}
-          kpisByGoal={kpisByGoal}
-          predictionsByGoal={predictionsByGoal}
-          entries={entries}
-          weightGoals={weightGoalKpis}
-        />
+      <NavBar displayName={profile.display_name} theme={theme} plan={profile.plan} />
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        <PlanGate plan={profile.plan} featureName="Relatórios">
+          <div className="space-y-6">
+            <p className="text-xs uppercase tracking-wide text-ink-muted">Relatórios</p>
+            <ReportsClient
+              goals={activeGoals}
+              kpisByGoal={kpisByGoal}
+              predictionsByGoal={predictionsByGoal}
+              entries={entries}
+              weightGoals={weightGoalKpis}
+              plan={profile.plan}
+            />
+          </div>
+        </PlanGate>
       </main>
     </div>
   );

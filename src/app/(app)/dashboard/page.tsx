@@ -84,7 +84,7 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <NavBar displayName={profile.display_name} theme={theme} />
+      <NavBar displayName={profile.display_name} theme={theme} plan={profile.plan} />
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-end justify-between flex-wrap gap-4">
           <div>
@@ -138,7 +138,7 @@ export default async function DashboardPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2">
-            <WeightChart entries={entries} weightGoals={weightGoalKpis} />
+            <WeightChart entries={entries} weightGoals={weightGoalKpis} plan={profile.plan} />
           </div>
           <TrendBadge trend={trend} />
         </div>

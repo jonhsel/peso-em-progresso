@@ -9,9 +9,14 @@ export default async function GoalsPage() {
 
   return (
     <div>
-      <NavBar displayName={profile.display_name} theme={theme} />
+      <NavBar displayName={profile.display_name} theme={theme} plan={profile.plan} />
       <main className="max-w-6xl mx-auto px-4 py-8">
-        <GoalsManager userId={user.id} activeGoals={activeGoals} goalsHistory={goalsHistory} />
+        <GoalsManager
+          userId={user.id}
+          activeGoals={activeGoals}
+          goalsHistory={goalsHistory}
+          plan={profile.plan}
+        />
       </main>
     </div>
   );

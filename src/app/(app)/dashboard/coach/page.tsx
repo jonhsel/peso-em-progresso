@@ -2,6 +2,7 @@ import { loadUserData } from "@/lib/loadUserData";
 import { getTheme } from "@/lib/get-theme";
 import { createClient } from "@/lib/supabase/server";
 import NavBar from "@/components/NavBar";
+import PlanGate from "@/components/PlanGate";
 import CoachShareSection from "@/components/coach/CoachShareSection";
 import CoachClientsList from "@/components/coach/CoachClientsList";
 import type { CoachLink } from "@/types/database";
@@ -30,14 +31,18 @@ export default async function CoachPage() {
 
   return (
     <div>
-      <NavBar displayName={profile.display_name} theme={theme} />
-      <main className="max-w-2xl mx-auto px-4 py-8 space-y-8">
-        <CoachShareSection
-          userId={user.id}
-          displayName={profile.display_name}
-          currentLink={(myLink as CoachLink) ?? null}
-        />
-        <CoachClientsList clients={(clientLinks as CoachLink[]) ?? []} />
+      <NavBar displayName={profile.display_name} theme={theme} plan={profile.plan} />
+      <main className="max-w-2xl mx-auto px-4 py-8">
+        <PlanGate plan={profile.plan} featureName="Coach">
+          <div className="space-y-8">
+            <CoachShareSection
+              userId={user.id}
+              displayName={profile.display_name}
+              currentLink={(myLink as CoachLink) ?? null}
+            />
+            <CoachClientsList clients={(clientLinks as CoachLink[]) ?? []} />
+          </div>
+        </PlanGate>
       </main>
     </div>
   );

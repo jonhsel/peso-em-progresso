@@ -31,6 +31,17 @@ export async function GET() {
     return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   }
 
+  // Gate de plano (Fase 7) — exportação é feature Pro. Checagem independente
+  // da UI (PlanGate/botões escondidos no client), essa é a proteção real.
+  const { data: planCheck } = await supabase
+    .from("profiles")
+    .select("plan")
+    .eq("id", user.id)
+    .single();
+  if (planCheck?.plan !== "pro") {
+    return NextResponse.json({ error: "Exportação disponível no plano Pro" }, { status: 403 });
+  }
+
   const { data: entries, error } = await supabase
     .from("weight_entries")
     .select("measured_at, weight_kg, note, source")

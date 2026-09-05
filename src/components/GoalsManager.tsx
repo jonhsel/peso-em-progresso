@@ -6,27 +6,35 @@ import { createClient } from "@/lib/supabase/client";
 import GoalsForm from "@/components/GoalsForm";
 import GoalsHistoryList from "@/components/GoalsHistoryList";
 import { METRIC_LABEL, METRIC_UNIT } from "@/lib/analytics";
+import { goalLimitFor, allowedGoalMetricsFor } from "@/lib/plan";
 import type { Goal, GoalMetric, GoalsHistoryEntry } from "@/types/database";
-
-const METRIC_OPTIONS: GoalMetric[] = ["weight", "waist", "hip", "arm", "body_fat"];
 
 /**
  * Gerencia as até 3 metas ativas do usuário (Fase 6.2): lista resumida com
  * seleção/edição/desativação, e criação de meta nova por métrica. A meta
  * selecionada é editada abaixo via GoalsForm (1 meta por vez) + seu
  * histórico filtrado (GoalsHistoryList).
+ *
+ * Fase 7: limite de metas e métricas permitidas dependem do plano
+ * (src/lib/plan.ts) — free trava em 1 meta, só peso; pro sobe pra 3,
+ * qualquer métrica. A trava de verdade é o trigger Postgres
+ * (enforce_max_active_goals); isto aqui só evita a viagem ao banco.
  */
 export default function GoalsManager({
   userId,
   activeGoals,
   goalsHistory,
+  plan,
 }: {
   userId: string;
   activeGoals: Goal[];
   goalsHistory: GoalsHistoryEntry[];
+  plan: "free" | "pro";
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const METRIC_OPTIONS = allowedGoalMetricsFor({ plan });
+  const goalLimit = goalLimitFor({ plan });
   const [selectedId, setSelectedId] = useState<string | null>(activeGoals[0]?.id ?? null);
   const [adding, setAdding] = useState(false);
   const [newMetric, setNewMetric] = useState<GoalMetric>("weight");
@@ -35,7 +43,7 @@ export default function GoalsManager({
   const [error, setError] = useState<string | null>(null);
 
   const selectedGoal = activeGoals.find((g) => g.id === selectedId) ?? null;
-  const canAddMore = activeGoals.length < 3;
+  const canAddMore = activeGoals.length < goalLimit;
 
   async function handleDeactivate(goal: Goal) {
     const label = `${METRIC_LABEL[goal.metric]}${goal.label ? ` — ${goal.label}` : ""}`;
@@ -73,7 +81,7 @@ export default function GoalsManager({
 
     if (supaError) {
       setError(
-        "Não foi possível criar essa meta (talvez o limite de 3 metas ativas já tenha sido atingido)."
+        `Não foi possível criar essa meta (talvez o limite de ${goalLimit} meta(s) ativa(s) já tenha sido atingido).`
       );
       return;
     }
@@ -162,10 +170,14 @@ export default function GoalsManager({
               type="button"
               onClick={() => setAdding(true)}
               disabled={!canAddMore}
-              title={!canAddMore ? "Limite de 3 metas ativas atingido" : undefined}
+              title={
+                !canAddMore
+                  ? `Limite de ${goalLimit} meta(s) ativa(s) atingido${plan === "free" ? " — faça upgrade pra mais" : ""}`
+                  : undefined
+              }
               className="w-full rounded-lg border border-dashed border-base-border px-3 py-2 text-sm text-ink-muted hover:text-ink hover:border-ink-faint transition disabled:opacity-40 disabled:hover:border-base-border disabled:hover:text-ink-muted"
             >
-              + Adicionar meta{!canAddMore ? " (limite de 3 atingido)" : ""}
+              + Adicionar meta{!canAddMore ? ` (limite de ${goalLimit} atingido)` : ""}
             </button>
           )}
         </div>

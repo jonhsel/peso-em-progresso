@@ -22,7 +22,8 @@ na tela `/dashboard/goals`, não fixas no código.
 ## Status atual: MVP + Fase 0 (landing/onboarding) + Fase 1.1 (export CSV/PDF) + Fase 1.2 (dark/light) + Fase 2.1 (import CSV) + Fase 2.2 (medidas corporais) + Fase 2.3 (histórico de metas) + Fase 3 (período de meta fixo/móvel + Configurações) + Fase 4.1 (streak de registros) + Fase 4.2 (conquistas) + Fase 4.3 (próximo check-in) + Fase 4.4 (guia de ajuda) + Fase 5.1 (previsão da meta) + Fase 5.2 (média móvel de 7 dias) + Fase 5.3 (seletor de período do gráfico) + Fase 5.4 (relatórios) + Fase 5.5
 (widget-resumo de medidas corporais) + Fase 6.1 (fotos de progresso) + Fase 6.2
 (múltiplas metas simultâneas) + Fase 6.3 (desafios) + Fase 6.4 (papel de
-coach/visualizador) completos, não validados em produção
+coach/visualizador) + Fase 7 (monetização em camadas — gate free/pro +
+Kiwify) completos, não validados em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -2243,6 +2244,190 @@ Ticket alto → "Papel de coach/visualizador") e atualizar os checkboxes
 acima. **Fase 6 (Ticket alto) fechada por completo** (fotos de progresso,
 múltiplas metas simultâneas, desafios, coach/visualizador).
 
+## Fase 7 — Monetização em camadas (implementada 05/09/2026)
+
+Spec completo em `claude_fase7_monetizacao_v3.md` (na raiz do repo, não
+versionado — mesmo padrão dos specs anteriores; v3 = v2 + 2ª auditoria,
+achados do Apêndice B já incorporados). Implementado nesta sessão:
+`npx tsc --noEmit` e `npm run build` limpos. **Ainda não testado contra
+Supabase real nem contra a Kiwify real** — ver checklist abaixo. Patch
+aplicado ao pé da letra do spec (19 arquivos + 1 dependência nova), com 1
+gap identificado nesta sessão e deixado documentado (não corrigido, fora
+do escopo dos diffs do spec — ver abaixo). Fecha o roadmap de fases
+numeradas do projeto (0 a 7).
+
+- **2 tiers: Grátis / Pro** (R$ 0 / R$ 11,90 por mês), assinatura
+  recorrente via Kiwify, vínculo por email com `pending_payments` como
+  fallback. Migração `supabase/migrations/0012_plan_gate.sql` (também
+  refletida em `supabase/schema.sql`, seções 1 e 12): `profiles.plan`
+  (`'free' | 'pro'`, default `'free'`) + `plan_expires_at` +
+  `kiwify_order_id`; tabela `pending_payments` (RLS ativado sem policies —
+  só service role e a função `handle_new_user`, que agora concilia
+  pagamento pendente automaticamente no signup); `enforce_max_active_goals`
+  reescrita pra ler `profiles.plan` e travar em 1 meta ativa (free) ou 3
+  (pro), em vez do `3` fixo da Fase 6.2. **Ainda precisa ser rodada
+  manualmente no Supabase Dashboard > SQL Editor**, em 4 blocos (conferir
+  "Success" a cada um) — sem isso, `profiles.plan` não existe e todo o
+  gate quebra em produção.
+- **Conquistas ficam completas no free** (decisão de produto: engajamento
+  > incentivo de upgrade aqui) — `AchievementsCard`/`achievements.ts` não
+  mudaram.
+- `src/lib/plan.ts` (novo) — helpers puros (`isPro`, `goalLimitFor`,
+  `allowedGoalMetricsFor`), mesmo padrão de `analytics.ts`/`streak.ts`.
+  `src/lib/supabase/admin.ts` (novo) — client com service role key
+  (`SUPABASE_SERVICE_ROLE_KEY`, env var nova), usado **só** pelo webhook,
+  nunca em código client-side ou em rotas que atendem o próprio usuário
+  logado (essas continuam em `supabase/server.ts`, que respeita RLS).
+- `src/app/api/webhooks/kiwify/route.ts` (novo) — token compartilhado
+  (`KIWIFY_WEBHOOK_TOKEN`, env var nova) validado no corpo da requisição;
+  `compra_aprovada`/`subscription_renewed` concedem `pro` por 30 dias
+  (ou criam `pending_payments` se o email ainda não tiver conta);
+  `subscription_canceled`/`subscription_late`/`compra_reembolsada`/
+  `chargeback` revogam pra `free` imediatamente (decisão: downgrade sem
+  esperar `plan_expires_at` vencer). **⚠️ 3 pontos pendentes de confirmação
+  contra a Kiwify real antes de ligar o webhook em produção** (documentados
+  em comentário no próprio arquivo): nome exato dos campos do payload
+  (`event`/`type`, `data.customer.email`) — validar com um "Test Webhook"
+  do painel da Kiwify contra webhook.site; como o token é entregue (body
+  vs header); se `supabase.schema("auth").from("users")` funciona com
+  service role key (se não, precisa de uma função Postgres `security
+  definer` chamada via `.rpc()`).
+- `src/lib/pricing.ts` reescrito pra 2 tiers (`PlanId = "gratis" | "pro"`),
+  removendo a menção a "Stripe"/"Fase 3" (era vitrine da Fase 0, nunca
+  ligada a cobrança real). `src/app/page.tsx` (landing): CTA do plano Pro
+  passou a apontar pro checkout Kiwify (`NEXT_PUBLIC_KIWIFY_CHECKOUT_URL`,
+  env var nova) em vez de `/login`; removido o aviso "Cobrança ainda não
+  está ativa nesta versão".
+- `src/components/PlanGate.tsx` (novo, client component) — envolve o
+  conteúdo de uma página inteira (não campos individuais) e mostra um
+  card de bloqueio com CTA pra `/dashboard/upgrade` quando `plan !==
+  "pro"`; usa o ícone `Lock` de **`lucide-react`, dependência nova**
+  (`0.454.0`, pinada — não existia no projeto até esta sessão, `npm
+  install` rodado nesta sessão). Aplicado ao redor do conteúdo (nunca do
+  `NavBar`) em 7 páginas: `dashboard/measurements`, `dashboard/photos`,
+  `dashboard/challenges`, `dashboard/reports`, `dashboard/coach`,
+  `dashboard/coach/[ownerId]`, `dashboard/import`. Na visão do coach
+  (`[ownerId]`), o gate é sobre o plano do **coach** (quem está vendo a
+  página), não do dono dos dados — o dono pode ser free, o coach sempre
+  vê tudo do cliente sem gate interno nenhum (nota explícita deixada no
+  código).
+- **API Routes de export protegidas de verdade no servidor** (403, não só
+  UI escondida) — `api/export/csv/route.ts` ganhou uma query própria de
+  `profiles.plan` (rota não tinha nenhuma query de profile antes);
+  `api/export/pdf/route.tsx` e `api/export/report-pdf/route.tsx`
+  incorporaram `plan` no `select` de profile que já faziam (sem query
+  extra), checando logo após buscar `entries`. **`ExportButtons.tsx` não
+  mudou** — a decisão de implementação (deixada a critério desta sessão
+  pelo spec) foi: `entries/page.tsx` esconde o componente inteiro no free
+  e mostra um link "Exportar (Pro)" pra `/dashboard/upgrade` no lugar, em
+  vez de envolver os botões pequenos num `PlanGate` (que ficaria
+  desproporcional ao lado de 2 links de texto).
+- `src/components/WeightChart.tsx` ganhou prop opcional `plan?: "free" |
+  "pro"` (default `undefined` → sem gate, comportamento Pro — mantém
+  `coach/[ownerId]/page.tsx` funcionando sem nenhuma mudança, o único
+  caller que não passa a prop). No free: seletor de período (pills)
+  escondido e o gráfico mostra o **histórico completo** (não trava num
+  período fixo — decisão explícita do spec, mais generosa que forçar
+  "1 mês"); média móvel de 7 dias não é desenhada (cálculo continua
+  rodando por baixo, só a `Line`/legenda são suprimidas — sem risco de
+  quebrar `data.map`). `dashboard/page.tsx` e `reports/page.tsx` (via
+  `ReportsClient.tsx`, que ganhou a mesma prop) passam `plan={profile.plan}`.
+- `src/components/SettingsForm.tsx` ganhou prop obrigatória `plan`. Seção
+  "Período das metas" fica com `opacity-50 pointer-events-none` no free
+  (campos continuam no DOM e nos states `mode`/`weekStart` — `persist()`
+  não quebra, só a interação é bloqueada) + link "(Pro)" pra
+  `/dashboard/upgrade` (com `pointer-events-auto` próprio, porque o pai
+  tem `pointer-events-none`).
+- `src/components/GoalsManager.tsx` — limite de metas e métricas
+  permitidas passaram a vir de `goalLimitFor`/`allowedGoalMetricsFor`
+  (`src/lib/plan.ts`) em vez do `3`/5-métricas fixos da Fase 6.2. A trava
+  de verdade continua sendo o trigger Postgres
+  (`enforce_max_active_goals`); isto no client só evita a viagem ao banco.
+- `src/app/(app)/dashboard/upgrade/page.tsx` (novo) — mostra "Você é Pro 🎉"
+  + data de renovação pra quem já é pro, ou os 2 planos lado a lado (com
+  CTA de checkout) pra quem é free. **⚠️ Pendente de confirmação**: se o
+  checkout da Kiwify aceita `?email=` como query param pra pré-preencher
+  — se não aceitar, remover o param (mensagem "use o mesmo email" já cobre
+  o caso).
+- `src/components/NavBar.tsx` ganhou prop opcional `plan` + botão "Upgrade"
+  (só aparece com `plan === "free"`) ao lado do `ThemeToggle`. **Todos os
+  12 callers** (`dashboard`, `entries`, `measurements`, `photos`, `goals`,
+  `challenges`, `reports`, `coach`, `coach/[ownerId]` — este passa
+  `coachProfile.plan`, não o do dono —, `settings`, `upgrade`, `import`)
+  atualizados pra passar `plan={profile.plan}`.
+- **Gap identificado nesta sessão, fora dos diffs explícitos do spec (não
+  corrigido — documentado aqui pra decisão futura do usuário):** a seção 1
+  do spec lista "KPI semanal" como o único KPI do free (mês/trimestre/
+  semestre seriam Pro), mas nenhum diff do spec toca `GoalTabs.tsx` — o
+  dashboard continua mostrando os 4 `KpiCard` (semana/mês/trimestre/
+  semestre) pra qualquer usuário com pelo menos 1 meta ativa, free ou pro.
+  Como toda meta (inclusive a única meta free, peso/semanal) sempre tem os
+  4 campos de ritmo (`weekly_rate`/`monthly_rate`/`quarterly_rate`/
+  `semester_rate`, defaults 0.25/1/3/6 desde sempre), `computeAllKpis`
+  calcula os 4 períodos igual pra todo mundo — só o Relatórios
+  (`/dashboard/reports`, com seus próprios tabs de período) ficou
+  Pro-gated de fato, coberto pelo `PlanGate` da página inteira. Se a
+  intenção for mesmo restringir o dashboard a só o KPI semanal no free,
+  precisa de um diff novo em `GoalTabs.tsx` (ex: filtrar `kpis` pra
+  `period === "week"` quando `plan === "free"`), não coberto por esta
+  sessão.
+
+- [ ] Rodar `supabase/migrations/0012_plan_gate.sql` no Supabase Dashboard
+      (4 blocos) — conferir que contas existentes ganharam `plan='free'`
+      e que `enforce_max_active_goals` passou a ler `profiles.plan`.
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado nesta sessão —
+      **ainda não visto rodando num navegador real**).
+- [ ] Conta nova sem pagamento: `plan='free'`, gate ativo nas 7 páginas +
+      3 API routes de export.
+- [ ] Configurar as 3 env vars novas (`SUPABASE_SERVICE_ROLE_KEY`,
+      `KIWIFY_WEBHOOK_TOKEN`, `NEXT_PUBLIC_KIWIFY_CHECKOUT_URL`) na Vercel
+      (Production e Preview) e no `.env.local` local.
+- [ ] Confirmar os 3 pontos pendentes do webhook Kiwify (nome dos campos
+      do payload, header vs body do token, `schema("auth")` com service
+      role) via "Test Webhook" real antes de ligar em produção.
+- [ ] Webhook `compra_aprovada` com email de conta existente:
+      `profiles.plan → 'pro'`, `plan_expires_at` ~30 dias, gate libera.
+- [ ] Webhook `compra_aprovada` com email sem conta: cria
+      `pending_payments`; criar conta com o mesmo email → `handle_new_user()`
+      concilia, conta nasce `pro`.
+- [ ] Webhook `subscription_canceled`: `plan → 'free'` imediato,
+      `plan_expires_at → null`.
+- [ ] Token inválido no webhook: 401, sem mudança no banco.
+- [ ] `GoalsManager` free: não cria 2ª meta nem meta ≠ peso (testar
+      também via SQL direto pra confirmar que o trigger, não só o client,
+      rejeita). Pro cria até 3 metas sem bloqueio.
+- [ ] `/dashboard/upgrade`: free mostra os 2 planos + checkout; pro mostra
+      "Você é Pro" + data de renovação.
+- [ ] Export CSV/PDF/relatório free: 403 nas 3 API routes; link "Exportar
+      (Pro)" aparece em `/dashboard/entries` em vez dos botões.
+- [ ] `NavBar`: botão "Upgrade" só aparece pra `plan==='free'`, nas 12
+      páginas.
+- [ ] `WeightChart` free: sem pills, sem média móvel, histórico completo
+      visível (sem filtro de período).
+- [ ] `SettingsForm` free: seção "Período das metas" visualmente
+      desabilitada (opacidade + sem interação), demais campos (nome,
+      altura, horário de check-in) editáveis normalmente; salvar não
+      quebra `period_mode`/`week_starts_on` existentes.
+- [ ] `dashboard/coach/[ownerId]` com coach free mas cliente pro (ou
+      vice-versa): gate da página é sobre o plano do **coach**; uma vez
+      dentro, o gráfico do cliente aparece sempre completo (pills + média
+      móvel), independente do plano de qualquer um dos dois.
+- [ ] Alternar tema claro/escuro: `PlanGate`, botão "Upgrade" do NavBar e
+      seção desabilitada do `SettingsForm` com contraste adequado nos dois
+      temas.
+- [ ] Revisar o gap do `GoalTabs`/KPI semanal-only documentado acima e
+      decidir se vale um patch adicional.
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 7
+— Monetização) e atualizar os checkboxes acima. **Com esta fase, todo o
+roadmap de fases numeradas do projeto (0 a 7) está implementado** — daqui
+em diante, o trabalho pendente é validação em produção (ver `##
+Pendências` abaixo) e itens fora de escopo explicitamente adiados (grace
+period no downgrade, múltiplos produtos Kiwify, painel de conciliação
+manual de `pending_payments`, notificação de renovação por e-mail,
+"compartilhar progresso" — item 3 da fase, spec separada ainda não
+escrita).
+
 ## Pendências / próximos passos sugeridos (não iniciados)
 
 - [ ] Testar o app fim a fim contra um projeto Supabase real (criar projeto, rodar
@@ -2250,23 +2435,30 @@ múltiplas metas simultâneas, desafios, coach/visualizador).
       + `migrations/0004_goals_history.sql` + `migrations/0005_period_mode.sql`
       + `migrations/0006_user_achievements.sql` + `migrations/0007_checkin_hour.sql`
       + `migrations/0008_progress_photos.sql` + `migrations/0009_multi_goals.sql`
-      + `migrations/0010_challenges.sql` + `migrations/0011_coach_links.sql`,
-      configurar `.env.local`, testar signup/login/registro de peso,
-      exportação CSV/PDF, importação CSV, medidas corporais, metas + histórico,
-      tela de Configurações/período de meta, conquistas, horário de check-in,
-      fotos de progresso, múltiplas metas simultâneas, desafios, e o papel
-      de coach/visualizador.
+      + `migrations/0010_challenges.sql` + `migrations/0011_coach_links.sql`
+      + `migrations/0012_plan_gate.sql`,
+      configurar `.env.local` (incluindo as 3 env vars novas da Fase 7:
+      `SUPABASE_SERVICE_ROLE_KEY`, `KIWIFY_WEBHOOK_TOKEN`,
+      `NEXT_PUBLIC_KIWIFY_CHECKOUT_URL`), testar signup/login/registro de
+      peso, exportação CSV/PDF, importação CSV, medidas corporais, metas +
+      histórico, tela de Configurações/período de meta, conquistas,
+      horário de check-in, fotos de progresso, múltiplas metas
+      simultâneas, desafios, o papel de coach/visualizador, e o gate
+      free/pro + webhook da Kiwify.
 - [ ] Deploy real na Vercel + configurar Site URL / Redirect URLs no Supabase Auth.
 - [ ] Testes unitários para `src/lib/analytics.ts` (funções puras, fáceis de testar).
 - [ ] Massa magra/composição corporal mais completa (bioimpedância avançada) — hoje
       `body_measurements.body_fat_pct` cobre só % de gordura manual; sem cálculo ou
       import automático de balança.
 - [ ] Notificação (e-mail) quando um KPI fecha "atrás da meta".
-- [ ] Fase 3 planos (não iniciada — nome de fase em conflito com a "Fase 3"
-      de período/Configurações acima, ver nota lá): ligar os planos pagos
-      (`src/lib/pricing.ts`) a cobrança real (Stripe) — hoje todo CTA de
-      plano pago só leva pro `/login`, sem gate. Specced em
-      `claude_fase3_planos.md`.
+- [x] ~~Fase 3 planos (ligar `src/lib/pricing.ts` a cobrança real)~~ —
+      superada pela Fase 7 (monetização em camadas, ver seção acima):
+      cobrança real via Kiwify já implementada, gate free/pro já ativo.
+      `claude_fase3_planos.md` (specava Stripe) ficou obsoleto, não usado.
+- [ ] Item 3 da Fase 7 ("compartilhar progresso") — listado como feature
+      Pro em `claude_fase7_monetizacao_v3.md` seção 1, mas explicitamente
+      fora de escopo dessa spec ("spec futura"; ver seção 17). Ainda não
+      specced nem implementado.
 
 ## Entregável
 

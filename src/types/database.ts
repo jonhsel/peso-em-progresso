@@ -10,6 +10,9 @@ export type Profile = {
   period_mode: PeriodMode;
   week_starts_on: WeekStartsOn;
   checkin_hour: number | null;
+  plan: "free" | "pro";
+  plan_expires_at: string | null;
+  kiwify_order_id: string | null;
 };
 
 export type WeightEntry = {

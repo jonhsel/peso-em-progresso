@@ -9,7 +9,7 @@ export default async function SettingsPage() {
 
   return (
     <div>
-      <NavBar displayName={profile.display_name} theme={theme} />
+      <NavBar displayName={profile.display_name} theme={theme} plan={profile.plan} />
       <main className="max-w-2xl mx-auto px-4 py-8">
         <SettingsForm
           userId={user.id}
@@ -18,6 +18,7 @@ export default async function SettingsPage() {
           periodMode={profile.period_mode}
           weekStartsOn={profile.week_starts_on}
           checkinHour={profile.checkin_hour}
+          plan={profile.plan}
         />
       </main>
     </div>

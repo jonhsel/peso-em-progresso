@@ -23,12 +23,14 @@ export default function ReportsClient({
   predictionsByGoal,
   entries,
   weightGoals,
+  plan,
 }: {
   goals: Goal[];
   kpisByGoal: Record<string, PeriodKpi[]>;
   predictionsByGoal: Record<string, GoalPredictions>;
   entries: WeightEntry[];
   weightGoals: WeightGoalKpi[];
+  plan?: "free" | "pro";
 }) {
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(goals[0]?.id ?? null);
   const [selectedPeriod, setSelectedPeriod] = useState<Period>("week");
@@ -39,7 +41,7 @@ export default function ReportsClient({
         <div className="bg-base-surface border border-base-border rounded-card p-5">
           <p className="text-sm text-ink-faint">Nenhuma meta ativa. Configure uma em Metas.</p>
         </div>
-        <WeightChart entries={entries} weightGoals={weightGoals} />
+        <WeightChart entries={entries} weightGoals={weightGoals} plan={plan} />
       </div>
     );
   }

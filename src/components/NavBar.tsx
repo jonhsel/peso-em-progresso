@@ -21,7 +21,15 @@ const links = [
   { href: "/dashboard/settings", label: "Configurações" },
 ];
 
-export default function NavBar({ displayName, theme }: { displayName: string; theme: Theme }) {
+export default function NavBar({
+  displayName,
+  theme,
+  plan,
+}: {
+  displayName: string;
+  theme: Theme;
+  plan?: "free" | "pro";
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -67,6 +75,14 @@ export default function NavBar({ displayName, theme }: { displayName: string; th
             </nav>
           </div>
           <div className="flex items-center gap-3">
+            {plan === "free" && (
+              <Link
+                href="/dashboard/upgrade"
+                className="text-xs font-medium rounded-lg px-3 py-1.5 bg-signal-onpace text-base-bg hover:brightness-110 transition"
+              >
+                Upgrade
+              </Link>
+            )}
             <span className="text-sm text-ink-muted hidden sm:inline">{displayName}</span>
             <ThemeToggle current={theme} />
             <button

@@ -15,6 +15,7 @@ import {
 } from "@/lib/analytics";
 import type { GoalPredictions } from "@/components/GoalTabs";
 import NavBar from "@/components/NavBar";
+import PlanGate from "@/components/PlanGate";
 import GoalTabs from "@/components/GoalTabs";
 import TrendBadge from "@/components/TrendBadge";
 import WeightChart, { type WeightGoalKpi } from "@/components/WeightChart";
@@ -105,57 +106,66 @@ export default async function CoachClientPage({
 
   return (
     <div>
-      <NavBar displayName={coachProfile.display_name} theme={theme} />
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard/coach" className="text-sm text-ink-muted hover:text-ink transition">
-            ← Voltar
-          </Link>
-          <h1 className="font-display font-bold text-xl">{profile.display_name}</h1>
-        </div>
+      <NavBar displayName={coachProfile.display_name} theme={theme} plan={coachProfile.plan} />
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        {/* Gate é sobre o plano do COACH (quem está vendo esta página), não
+            do dono dos dados — o dono pode ser free, o coach sempre vê tudo
+            do cliente sem gate interno (WeightChart recebe plan=undefined
+            abaixo, nunca coachProfile.plan). Se a feature de Coach inteira
+            virar Pro, é aqui que a proteção mora. */}
+        <PlanGate plan={coachProfile.plan} featureName="Coach">
+          <div className="space-y-6">
+            <div className="flex items-center gap-3">
+              <Link href="/dashboard/coach" className="text-sm text-ink-muted hover:text-ink transition">
+                ← Voltar
+              </Link>
+              <h1 className="font-display font-bold text-xl">{profile.display_name}</h1>
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-2">
-            <WeightChart entries={entries} weightGoals={weightGoalKpis} />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-2">
+                <WeightChart entries={entries} weightGoals={weightGoalKpis} />
+              </div>
+              <TrendBadge trend={trend} />
+            </div>
+
+            <GoalTabs goals={activeGoals} kpisByGoal={kpisByGoal} predictionsByGoal={predictionsByGoal} />
+
+            <section>
+              <h2 className="font-display font-bold text-lg mb-3">Medidas corporais</h2>
+              <BodyMeasurementsList measurements={measurements} readOnly />
+            </section>
+
+            <section>
+              <h2 className="font-display font-bold text-lg mb-3">Fotos de progresso</h2>
+              <div className="space-y-4">
+                <PhotoComparisonView photos={photos} />
+                <PhotoHistoryGrid userId={params.ownerId} photos={photos} readOnly />
+              </div>
+            </section>
+
+            <section>
+              <h2 className="font-display font-bold text-lg mb-3">Metas ativas</h2>
+              {activeGoals.length === 0 ? (
+                <p className="text-sm text-ink-faint">Nenhuma meta ativa.</p>
+              ) : (
+                <ul className="bg-base-surface border border-base-border rounded-card divide-y divide-base-border">
+                  {activeGoals.map((goal) => (
+                    <li key={goal.id} className="px-4 py-3">
+                      <span className="text-sm text-ink">
+                        {METRIC_LABEL[goal.metric]}
+                        {goal.label ? ` — ${goal.label}` : ""}
+                      </span>
+                      <span className="block text-xs text-ink-faint font-mono mt-0.5">
+                        {goal.weekly_rate} {METRIC_UNIT[goal.metric]}/semana
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           </div>
-          <TrendBadge trend={trend} />
-        </div>
-
-        <GoalTabs goals={activeGoals} kpisByGoal={kpisByGoal} predictionsByGoal={predictionsByGoal} />
-
-        <section>
-          <h2 className="font-display font-bold text-lg mb-3">Medidas corporais</h2>
-          <BodyMeasurementsList measurements={measurements} readOnly />
-        </section>
-
-        <section>
-          <h2 className="font-display font-bold text-lg mb-3">Fotos de progresso</h2>
-          <div className="space-y-4">
-            <PhotoComparisonView photos={photos} />
-            <PhotoHistoryGrid userId={params.ownerId} photos={photos} readOnly />
-          </div>
-        </section>
-
-        <section>
-          <h2 className="font-display font-bold text-lg mb-3">Metas ativas</h2>
-          {activeGoals.length === 0 ? (
-            <p className="text-sm text-ink-faint">Nenhuma meta ativa.</p>
-          ) : (
-            <ul className="bg-base-surface border border-base-border rounded-card divide-y divide-base-border">
-              {activeGoals.map((goal) => (
-                <li key={goal.id} className="px-4 py-3">
-                  <span className="text-sm text-ink">
-                    {METRIC_LABEL[goal.metric]}
-                    {goal.label ? ` — ${goal.label}` : ""}
-                  </span>
-                  <span className="block text-xs text-ink-faint font-mono mt-0.5">
-                    {goal.weekly_rate} {METRIC_UNIT[goal.metric]}/semana
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        </PlanGate>
       </main>
     </div>
   );

@@ -233,7 +233,7 @@ function Pricing() {
               </ul>
 
               <a
-                href={appPath("/login")}
+                href={plan.id === "pro" ? process.env.NEXT_PUBLIC_KIWIFY_CHECKOUT_URL : appPath("/login")}
                 className={`mt-6 rounded-lg px-4 py-2.5 text-sm font-medium text-center transition ${
                   plan.highlighted
                     ? "bg-signal-onpace text-base-bg hover:brightness-110"
@@ -245,11 +245,6 @@ function Pricing() {
             </div>
           ))}
         </div>
-
-        <p className="mt-6 text-xs text-ink-faint">
-          Cobrança ainda não está ativa nesta versão — os planos pagos abrem
-          fila de espera ao criar conta.
-        </p>
       </div>
     </section>
   );

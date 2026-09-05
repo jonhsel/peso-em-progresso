@@ -143,9 +143,15 @@ export type WeightGoalKpi = { goal: Goal; weekKpi: PeriodKpi | null };
 export default function WeightChart({
   entries,
   weightGoals,
+  plan,
 }: {
   entries: WeightEntry[];
   weightGoals: WeightGoalKpi[];
+  // Fase 7: opcional, default undefined → sem gate (comportamento Pro).
+  // Mantém compatibilidade com callers que não passam — inclusive
+  // coach/[ownerId]/page.tsx, onde o coach sempre vê tudo do cliente
+  // independente do próprio plano.
+  plan?: "free" | "pro";
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [colors, setColors] = useState(FALLBACK_CHART_COLORS);
@@ -215,9 +221,18 @@ export default function WeightChart({
   const movingAverage = computeMovingAverage(entries);
   const movingAverageByDate = new Map(movingAverage.map((m) => [m.date, m.average]));
 
+  // Fase 7: média móvel é feature Pro — o cálculo acima continua rodando
+  // (não quebra data.map, que já popula point.mediaMovel), só o desenho
+  // (Line + legenda) é suprimido no free.
+  const showMovingAverage = plan !== "free" && hasMovingAverage;
+
   const now = new Date();
+  // Fase 7: seletor de período (pills) é feature Pro — no free, sem pills,
+  // o gráfico mostra a visão completa do histórico (mais generoso que
+  // travar num período fixo).
+  const effectivePeriod = plan === "free" ? null : selectedPeriod;
   const visibleEntries = sorted.filter((e) =>
-    isWithinChartPeriod(e.measured_at, selectedPeriod, primaryWeekKpi, now)
+    effectivePeriod ? isWithinChartPeriod(e.measured_at, effectivePeriod, primaryWeekKpi, now) : true
   );
 
   const data = visibleEntries.map((e) => {
@@ -283,7 +298,7 @@ export default function WeightChart({
       >
         <div className="flex items-center justify-between mb-2 px-1">
           <p className="text-xs uppercase tracking-wide text-ink-muted">Evolução do peso</p>
-          <PeriodPills selected={selectedPeriod} onChange={handlePeriodChange} />
+          {plan !== "free" && <PeriodPills selected={selectedPeriod} onChange={handlePeriodChange} />}
         </div>
         <div className="flex-1 flex items-center justify-center h-[calc(100%-2.5rem)]">
           <p className="text-sm text-ink-faint">
@@ -309,9 +324,9 @@ export default function WeightChart({
     <div ref={containerRef} className="bg-base-surface border border-base-border rounded-card p-4 h-96">
       <div className="flex items-center justify-between mb-2 px-1">
         <p className="text-xs uppercase tracking-wide text-ink-muted">Evolução do peso</p>
-        <PeriodPills selected={selectedPeriod} onChange={handlePeriodChange} />
+        {plan !== "free" && <PeriodPills selected={selectedPeriod} onChange={handlePeriodChange} />}
       </div>
-      {(anyWeeklyTrend || hasMovingAverage) && (
+      {(anyWeeklyTrend || showMovingAverage) && (
         <div className="flex items-center gap-4 px-1 mb-1 font-mono text-[11px] text-ink-faint flex-wrap">
           <span className="flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: colors.accent }} />
@@ -334,7 +349,7 @@ export default function WeightChart({
               </span>
             ) : null
           )}
-          {hasMovingAverage && (
+          {showMovingAverage && (
             <span className="flex items-center gap-1.5">
               <span className="h-0.5 w-3" style={{ backgroundColor: colors.movingAvg, opacity: 0.8 }} />
               média móvel (7)
@@ -433,7 +448,7 @@ export default function WeightChart({
               />
             ) : null
           )}
-          {hasMovingAverage && (
+          {showMovingAverage && (
             <Line
               type="monotone"
               dataKey="mediaMovel"

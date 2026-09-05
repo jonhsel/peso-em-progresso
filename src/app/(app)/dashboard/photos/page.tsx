@@ -2,6 +2,7 @@ import { loadUserData } from "@/lib/loadUserData";
 import { getTheme } from "@/lib/get-theme";
 import { createClient } from "@/lib/supabase/server";
 import NavBar from "@/components/NavBar";
+import PlanGate from "@/components/PlanGate";
 import PhotoUploadForm from "@/components/photos/PhotoUploadForm";
 import PhotoHistoryGrid from "@/components/photos/PhotoHistoryGrid";
 import PhotoComparisonView from "@/components/photos/PhotoComparisonView";
@@ -44,17 +45,21 @@ export default async function PhotosPage() {
 
   return (
     <div>
-      <NavBar displayName={profile.display_name} theme={theme} />
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-        <PhotoUploadForm userId={user.id} />
-        <section>
-          <h2 className="font-display font-bold text-lg mb-3">Comparar</h2>
-          <PhotoComparisonView photos={photos} />
-        </section>
-        <section>
-          <h2 className="font-display font-bold text-lg mb-3">Histórico</h2>
-          <PhotoHistoryGrid userId={user.id} photos={photos} />
-        </section>
+      <NavBar displayName={profile.display_name} theme={theme} plan={profile.plan} />
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        <PlanGate plan={profile.plan} featureName="Fotos de progresso">
+          <div className="space-y-8">
+            <PhotoUploadForm userId={user.id} />
+            <section>
+              <h2 className="font-display font-bold text-lg mb-3">Comparar</h2>
+              <PhotoComparisonView photos={photos} />
+            </section>
+            <section>
+              <h2 className="font-display font-bold text-lg mb-3">Histórico</h2>
+              <PhotoHistoryGrid userId={user.id} photos={photos} />
+            </section>
+          </div>
+        </PlanGate>
       </main>
     </div>
   );

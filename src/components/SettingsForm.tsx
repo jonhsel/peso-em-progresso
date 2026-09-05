@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { PeriodMode, WeekStartsOn } from "@/types/database";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -55,6 +56,7 @@ export default function SettingsForm({
   periodMode,
   weekStartsOn,
   checkinHour,
+  plan,
 }: {
   userId: string;
   displayName: string;
@@ -62,6 +64,7 @@ export default function SettingsForm({
   periodMode: PeriodMode;
   weekStartsOn: WeekStartsOn;
   checkinHour: number | null;
+  plan: "free" | "pro";
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -202,59 +205,71 @@ export default function SettingsForm({
         </div>
 
         <div className="bg-base-surface border border-base-border rounded-card p-5 space-y-4">
-          <div>
-            <p className="font-display font-bold text-lg mb-1">Período das metas</p>
-            <p className="text-sm text-ink-faint">
-              Define quando cada período (semana/mês/trimestre/semestre) começa
-              pra calcular seus KPIs.
-            </p>
-          </div>
+          <div className={plan === "free" ? "opacity-50 pointer-events-none" : ""}>
+            <div>
+              <p className="font-display font-bold text-lg mb-1">
+                Período das metas
+                {plan === "free" && (
+                  <Link
+                    href="/dashboard/upgrade"
+                    className="ml-2 text-xs text-accent hover:underline pointer-events-auto"
+                  >
+                    (Pro)
+                  </Link>
+                )}
+              </p>
+              <p className="text-sm text-ink-faint">
+                Define quando cada período (semana/mês/trimestre/semestre) começa
+                pra calcular seus KPIs.
+              </p>
+            </div>
 
-          <div className="space-y-3">
-            {PERIOD_MODE_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setMode(opt.value)}
-                className={`w-full text-left rounded-card border p-4 transition ${
-                  mode === opt.value
-                    ? "border-accent bg-base-surface2"
-                    : "border-base-border bg-base-surface hover:border-ink-faint"
-                }`}
-              >
-                <span className="text-sm font-medium text-ink">{opt.title}</span>
-                <span className="block mt-1 text-[13px] text-ink-muted">{opt.desc}</span>
-              </button>
-            ))}
-          </div>
-
-          <label className="block">
-            <span className="text-xs text-ink-muted mb-1.5 block">Sua semana começa em:</span>
-            <div className="flex gap-3">
-              {WEEK_STARTS_ON_OPTIONS.map((opt) => (
+            <div className="space-y-3 mt-4">
+              {PERIOD_MODE_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
-                  onClick={() => setWeekStart(opt.value)}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-sm transition ${
-                    weekStart === opt.value
-                      ? "border-accent bg-base-surface2 text-ink"
-                      : "border-base-border text-ink-muted hover:border-ink-faint"
+                  onClick={() => setMode(opt.value)}
+                  className={`w-full text-left rounded-card border p-4 transition ${
+                    mode === opt.value
+                      ? "border-accent bg-base-surface2"
+                      : "border-base-border bg-base-surface hover:border-ink-faint"
                   }`}
                 >
-                  {opt.label}
+                  <span className="text-sm font-medium text-ink">{opt.title}</span>
+                  <span className="block mt-1 text-[13px] text-ink-muted">{opt.desc}</span>
                 </button>
               ))}
             </div>
-          </label>
 
-          {mode === "fixed" && (
-            <p className="text-xs text-ink-faint">
-              Quando em modo &quot;Semana/mês corrido&quot;, o início de semana
-              configurado aqui também será usado pelo seletor de período do
-              gráfico (funcionalidade futura).
-            </p>
-          )}
+            <label className="block mt-4">
+              <span className="text-xs text-ink-muted mb-1.5 block">Sua semana começa em:</span>
+              <div className="flex gap-3">
+                {WEEK_STARTS_ON_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setWeekStart(opt.value)}
+                    className={`flex-1 rounded-lg border px-3 py-2 text-sm transition ${
+                      weekStart === opt.value
+                        ? "border-accent bg-base-surface2 text-ink"
+                        : "border-base-border text-ink-muted hover:border-ink-faint"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </label>
+
+            {mode === "fixed" && (
+              <p className="text-xs text-ink-faint mt-4">
+                Quando em modo &quot;Semana/mês corrido&quot;, o início de semana
+                configurado aqui também será usado pelo seletor de período do
+                gráfico.
+              </p>
+            )}
+          </div>
         </div>
 
         {error && <p className="text-sm text-signal-behind">{error}</p>}
