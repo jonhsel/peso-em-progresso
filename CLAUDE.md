@@ -2244,17 +2244,48 @@ Ticket alto → "Papel de coach/visualizador") e atualizar os checkboxes
 acima. **Fase 6 (Ticket alto) fechada por completo** (fotos de progresso,
 múltiplas metas simultâneas, desafios, coach/visualizador).
 
-## Fase 7 — Monetização em camadas (implementada 05/09/2026)
+## Fase 7 — Monetização em camadas (implementada 05/09/2026, validada em produção 05/09/2026)
 
 Spec completo em `claude_fase7_monetizacao_v3.md` (na raiz do repo, não
 versionado — mesmo padrão dos specs anteriores; v3 = v2 + 2ª auditoria,
-achados do Apêndice B já incorporados). Implementado nesta sessão:
-`npx tsc --noEmit` e `npm run build` limpos. **Ainda não testado contra
-Supabase real nem contra a Kiwify real** — ver checklist abaixo. Patch
-aplicado ao pé da letra do spec (19 arquivos + 1 dependência nova), com 1
-gap identificado nesta sessão e deixado documentado (não corrigido, fora
-do escopo dos diffs do spec — ver abaixo). Fecha o roadmap de fases
+achados do Apêndice B já incorporados). Implementado e depois **testado
+contra o Supabase e a Kiwify reais de produção na mesma sessão** (não só
+`tsc`/`build` — a diferença rara nesse projeto, ver "Resumo da validação
+em produção" mais abaixo). Patch aplicado ao pé da letra do spec (19
+arquivos + 1 dependência nova), mais 1 gap identificado e documentado (não
+corrigido, fora do escopo dos diffs do spec — ver abaixo) e **1 bug real
+pego em teste e corrigido no mesmo dia** (`schema("auth")` não funciona,
+ver item 5 da lista de achados do webhook). Fecha o roadmap de fases
 numeradas do projeto (0 a 7).
+
+**Resumo da validação em produção (05/09/2026)** — diferente de toda fase
+anterior deste changelog, esta foi de fato testada de ponta a ponta contra
+o Supabase e a Kiwify reais, não só `tsc`/`build`:
+- Migrações 0012 e 0013 rodadas com sucesso no Supabase de produção.
+- As 3 env vars novas configuradas na Vercel + redeploy.
+- Checkout Kiwify real testado (link, valor, produto, `?email=`
+  pré-preenchido).
+- Webhook testado com **payloads reais da Kiwify** (via botão "Testar
+  Webhook" contra webhook.site) e com **chamadas forjadas manualmente**
+  (via `curl` com assinatura HMAC calculada à mão) direto contra
+  `https://app.pesoemprogresso.com.br/api/webhooks/kiwify`: assinatura
+  válida aceita, assinatura inválida rejeitada com 401, concessão de Pro
+  pra conta existente, concessão pra email sem conta (`pending_payments`),
+  e revogação de Pro — todos confirmados por leitura direta do banco
+  depois de cada chamada.
+- Gate visual conferido de verdade no navegador (não só inferido do
+  código): página trancada no free, liberada no pro, botão "Upgrade"
+  sumindo, `/dashboard/upgrade` mostrando "Você é Pro".
+- Um bug real de produção foi pego e corrigido nessa mesma sessão de
+  testes (não em sessão futura) — ver item 5 abaixo.
+- **Ainda não testado**: reconciliação de `pending_payments` no signup
+  (criar conta nova com email que já tinha pagamento pendente — não deu
+  pra testar com o email fake `johndoe@example.com` dos payloads de
+  exemplo da Kiwify), `GoalsManager` no free (limite de 1 meta/só peso),
+  `ExportButtons`→"Exportar (Pro)", `WeightChart` sem pills no free,
+  `SettingsForm` com seção de período trancada, visão do coach, e contraste
+  em tema claro — ver checklist no fim da seção pro detalhe exato de cada
+  item.
 
 - **2 tiers: Grátis / Pro** (R$ 0 / R$ 11,90 por mês), assinatura
   recorrente via Kiwify, vínculo por email com `pending_payments` como
@@ -2265,10 +2296,9 @@ numeradas do projeto (0 a 7).
   só service role e a função `handle_new_user`, que agora concilia
   pagamento pendente automaticamente no signup); `enforce_max_active_goals`
   reescrita pra ler `profiles.plan` e travar em 1 meta ativa (free) ou 3
-  (pro), em vez do `3` fixo da Fase 6.2. **Ainda precisa ser rodada
-  manualmente no Supabase Dashboard > SQL Editor**, em 4 blocos (conferir
-  "Success" a cada um) — sem isso, `profiles.plan` não existe e todo o
-  gate quebra em produção.
+  (pro), em vez do `3` fixo da Fase 6.2. **Rodada com sucesso no Supabase
+  de produção em 05/09/2026** (confirmado: contas existentes ganharam
+  `plan='free'`, gate funcionando).
 - **Conquistas ficam completas no free** (decisão de produto: engajamento
   > incentivo de upgrade aqui) — `AchievementsCard`/`achievements.ts` não
   mudaram.
@@ -2470,23 +2500,27 @@ numeradas do projeto (0 a 7).
       migração 0013 (ver acima, ainda precisa rodar). Não confirmados:
       `subscription_late`/`subscription_renewed`/`order_refunded`/
       `chargeback` (chutes por analogia, nunca testados individualmente).
-- [ ] Webhook `order_approved`/`compra_aprovada` com email de conta
-      existente: `profiles.plan → 'pro'`, `plan_expires_at` ~30 dias, gate
-      libera. **Testado em 05/09/2026 e FALHOU** (caiu em
-      `pending_payments` por causa do bug do item 5) — **re-testar depois
-      de rodar a migração 0013** (repetir o teste com `curl` assinado ou
-      esperar produção de verdade).
+- [x] Webhook `order_approved` com email de conta existente:
+      `profiles.plan → 'pro'`, `plan_expires_at`/`kiwify_order_id`
+      preenchidos. **1ª tentativa (antes da migração 0013) FALHOU** —
+      caiu em `pending_payments` por causa do bug do item 5.
+      **Re-testado depois da migração 0013 + deploy do fix em
+      05/09/2026: passou**, confirmado por SQL direto (`plan='pro'` na
+      conta de teste `g3privacidade@gmail.com`). Falta ainda: verificar
+      que o gate libera de verdade nas telas (Relatórios, etc.) com essa
+      conta agora `pro`.
 - [x] Webhook `order_approved` com email sem conta: cria
       `pending_payments` — **confirmado por teste real** (2 linhas
       inseridas com `expires_at` calculado corretamente, ~30 dias). Falta
       testar a segunda metade: criar conta com o mesmo email →
       `handle_new_user()` concilia, conta nasce `pro`.
-- [x] Webhook `subscription_canceled`: **evento confirmado** via teste
-      real (`webhook_event_type` bate exatamente). Efeito no banco
-      (`plan → 'free'`, `plan_expires_at → null`) ainda não testado fim a
-      fim contra uma conta que já era `pro` (o teste usado tinha email
-      fake, sem conta correspondente).
-- [ ] Token inválido no webhook: 401, sem mudança no banco.
+- [x] Webhook `subscription_canceled`: **confirmado ponta a ponta**
+      (05/09/2026) — evento (`webhook_event_type`), assinatura HMAC e
+      efeito no banco (`plan → 'free'`, `plan_expires_at → null`) numa
+      conta que estava `pro` de verdade (a mesma usada no teste de
+      concessão acima), via `curl` assinado simulando o webhook.
+- [x] Token inválido no webhook: **confirmado** — assinatura errada retorna
+      401 `{"error":"invalid signature"}`, sem tocar no banco.
 - [ ] `GoalsManager` free: não cria 2ª meta nem meta ≠ peso (testar
       também via SQL direto pra confirmar que o trigger, não só o client,
       rejeita). Pro cria até 3 metas sem bloqueio.
