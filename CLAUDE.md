@@ -2578,14 +2578,17 @@ numeradas 0–7.
   (`displayName`/`theme`/`plan`) + `activeGoals?: Goal[]` (default `[]`,
   só pra mostrar "Meta: X,X kg" da meta de peso ativa no bloco de perfil).
   13 itens de menu (`lucide-react`, já dependência do projeto desde a
-  Fase 7): 5 marcados `premium: true` (badge "Premium" com ícone de
-  cadeado — Medidas, Fotos, Relatórios, Previsão da Meta, Exportar Dados)
-  e 3 marcados `comingSoon: true` (renderizam como `<span>` desabilitado
-  em vez de `<Link>`, pra não dar 404: Previsão da Meta, Conquistas,
-  Exportar Dados — rotas que ainda não existem). "Lembretes" aponta pra
+  Fase 7): originalmente 5 marcados `premium: true` (badge "Premium" com
+  ícone de cadeado — Medidas, Fotos, Relatórios, Previsão da Meta,
+  Exportar Dados; **depois expandido pra 9 e o texto do badge trocado pra
+  "Pro" pelo primeiro hotfix do mesmo dia, ver abaixo**) e 3 marcados
+  `comingSoon: true` (renderizam como `<span>` desabilitado em vez de
+  `<Link>`, pra não dar 404: Previsão da Meta, Conquistas, Exportar Dados
+  — rotas que ainda não existem). "Lembretes" aponta pra
   `/dashboard/settings#checkin`. Rodapé com card "Seja Premium"/"Plano
-  Atual: Pro" + botão "Sair". Mobile: barra compacta (logo + `ThemeToggle`
-  + ☰) + drawer que fecha ao clicar fora ou num link.
+  Atual: Pro" + botão "Sair" (**"Seja Premium" também virou "Seja Pro" no
+  mesmo hotfix**). Mobile: barra compacta (logo + `ThemeToggle` + ☰) +
+  drawer que fecha ao clicar fora ou num link.
   **`ThemeToggle` mora na sidebar/barra mobile só temporariamente** — nota
   deixada no próprio componente: quando a Fase 8.2 (Topbar) existir, mover
   pra lá.
@@ -2624,22 +2627,57 @@ numeradas 0–7.
   `ThemeToggle` pra fora da sidebar (só quando a Fase 8.2/Topbar existir),
   qualquer mudança em `PlanGate`/gate de plano (idêntico à Fase 7).
 
+**Hotfix 1 — badge "Pro" (mesmo dia, 06/09/2026).** Spec
+`claude_fase8_sidebar_hotfix_pro_badge.md` (raiz do repo, não versionado,
+mesmo padrão dos demais specs) — correção pós-deploy do 8.1, só o array
+`links` e o texto do badge em `Sidebar.tsx`, sem mudar estrutura. `npx tsc
+--noEmit`/`npm run build` limpos.
+- Texto do badge trocado de "Premium" pra "Pro" (ícone `Lock` mantido).
+- `premium: true` adicionado a Conquistas, Desafios, Coach e Lembretes —
+  total de itens com badge passou de 5 pra **9**: Medidas, Fotos,
+  Relatórios, Previsão da Meta, Conquistas, Desafios, Coach, Lembretes,
+  Exportar Dados. Os 5 sem badge continuam Dashboard, Registro de Peso,
+  Metas, Configurações e Ajuda e Suporte.
+- Card de rodapé: "Seja Premium" (free) → "Seja Pro".
+- **Puramente visual** — nenhum `PlanGate` de página foi tocado; Conquistas
+  e Desafios ganharam o badge no menu mas continuam sem gate de página
+  próprio (mesmo "show but lock" documentado no gap da Fase 7: o badge
+  sinaliza, quem bloqueia de verdade é o `PlanGate`).
+
+**Hotfix 2 — largura da sidebar no mobile (mesmo dia, 06/09/2026).** Spec
+`claude_fase8_sidebar_hotfix_mobile_width.md` (raiz do repo, não
+versionado) — o drawer mobile usava `w-64` (256px), a mesma classe do
+desktop, ocupando só ~68% de uma tela de 375px: nem menu decente, nem
+conteúdo visível atrás. `npx tsc --noEmit`/`npm run build` limpos.
+- Classe da `div` raiz do `body` (`Sidebar.tsx`) trocada de `w-64` fixo
+  pra `w-[85vw] max-w-[280px] sm:w-64 sm:max-w-none` — usada a abordagem
+  recomendada pelo spec (não a alternativa mais simples de `w-72`).
+- Mobile (< `sm`/640px): ocupa 85% da tela, nunca passando de 280px —
+  deixa uma faixa do overlay escuro visível como pista de "toque pra
+  fechar" (padrão Material/iOS). Desktop (`sm:`+): sem mudança, 256px
+  fixo.
+
 - [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
-      dev — **ainda não visto rodando num navegador real**).
+      dev — **ainda não visto rodando num navegador real**, nem os 2
+      hotfixes acima).
 - [ ] Sidebar aparece fixa em desktop nas 13 páginas (12 do spec + a 13ª
       migrada nesta sessão), sem quebrar `max-w-2xl`/`max-w-6xl` de cada
       uma.
 - [ ] Mobile: barra compacta (logo + toggle + ☰) no topo; drawer abre ao
       clicar no ☰, fecha ao clicar fora ou num link.
-- [ ] Badge "Premium" aparece nos 5 itens certos: Medidas Corporais, Fotos
-      de Progresso, Relatórios, Previsão da Meta, Exportar Dados.
+- [ ] Mobile (375px): sidebar drawer ocupa ~85% da tela (hotfix 2), overlay
+      escuro visível e clicável na faixa restante; mobile (414px+): sidebar
+      não ultrapassa 280px.
+- [ ] Badge "Pro" (hotfix 1, não mais "Premium") aparece nos 9 itens
+      certos: Medidas, Fotos, Relatórios, Previsão da Meta, Conquistas,
+      Desafios, Coach, Lembretes, Exportar Dados.
 - [ ] 3 itens "Em breve" (`comingSoon`) renderizam como `<span>` cinza, não
       navegam: Previsão da Meta, Conquistas, Exportar Dados.
 - [ ] "Meta: X,X kg" aparece quando há meta de peso ativa com
       `target_value` definido; some quando não há meta ou
       `target_value === null`.
-- [ ] Card de rodapé: "Seja Premium" pro free, "Plano Atual: Pro" pro pro,
-      nos dois temas (claro/escuro).
+- [ ] Card de rodapé: "Seja Pro" (hotfix 1, não mais "Seja Premium") pro
+      free, "Plano Atual: Pro" pro pro, nos dois temas (claro/escuro).
 - [ ] `ThemeToggle` funciona na sidebar (desktop) e na barra mobile.
 - [ ] Item ativo do menu destaca corretamente em cada rota (inclusive
       `/dashboard/settings` sem confundir com "Lembretes", que aponta pra
@@ -2651,7 +2689,7 @@ numeradas 0–7.
       `activeGoals`), sem erros.
 - [ ] `/dashboard/coach/accept` (13ª página, migrada fora do spec original)
       renderiza sidebar normalmente, aceite de convite continua funcionando.
-- [ ] Contraste do badge "Premium" aceitável em tema light (visual check).
+- [ ] Contraste do badge "Pro" aceitável em tema light (visual check).
 - [ ] Nenhum link de gate/`PlanGate` mudou — gate de página continua
       idêntico ao da Fase 7.
 
