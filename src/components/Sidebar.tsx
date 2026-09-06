@@ -129,7 +129,7 @@ export default function Sidebar({
   }
 
   const body = (
-    <div className="flex h-full w-64 shrink-0 flex-col border-r border-base-border bg-base-surface">
+    <div className="flex h-full w-[85vw] max-w-[280px] sm:w-64 sm:max-w-none shrink-0 flex-col border-r border-base-border bg-base-surface">
       {/* Logo */}
       <div className="flex items-center justify-between border-b border-base-border px-4 py-4">
         <Link href="/dashboard" className="flex items-center gap-2" aria-label="Peso em Progresso">
