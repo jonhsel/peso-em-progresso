@@ -49,10 +49,10 @@ const links: NavItem[] = [
   { href: "/dashboard/goals", label: "Metas", icon: Target },
   { href: "/dashboard/reports", label: "Relatórios", icon: FileBarChart, premium: true },
   { href: "/dashboard/prediction", label: "Previsão da Meta", icon: TrendingUp, premium: true, comingSoon: true },
-  { href: "/dashboard/achievements", label: "Conquistas", icon: Award, comingSoon: true },
-  { href: "/dashboard/challenges", label: "Desafios", icon: Swords },
-  { href: "/dashboard/coach", label: "Coach", icon: Users },
-  { href: "/dashboard/settings#checkin", label: "Lembretes", icon: Bell },
+  { href: "/dashboard/achievements", label: "Conquistas", icon: Award, premium: true, comingSoon: true },
+  { href: "/dashboard/challenges", label: "Desafios", icon: Swords, premium: true },
+  { href: "/dashboard/coach", label: "Coach", icon: Users, premium: true },
+  { href: "/dashboard/settings#checkin", label: "Lembretes", icon: Bell, premium: true },
   { href: "/dashboard/export", label: "Exportar Dados", icon: Download, premium: true, comingSoon: true },
   { href: "/dashboard/settings", label: "Configurações", icon: Settings },
 ];
@@ -94,7 +94,7 @@ export default function Sidebar({
         {l.premium && (
           <span className="flex items-center gap-1 rounded bg-accent-tint px-1.5 py-0.5 text-[10px] font-medium text-accent">
             <Lock className="h-2.5 w-2.5" />
-            Premium
+            Pro
           </span>
         )}
       </>
@@ -196,7 +196,7 @@ export default function Sidebar({
           </div>
         ) : (
           <div className="rounded-card border border-base-border bg-base-surface2 p-4 text-center">
-            <p className="font-display text-sm font-bold">Seja Premium</p>
+            <p className="font-display text-sm font-bold">Seja Pro</p>
             <p className="mt-1 text-xs text-ink-muted">
               Desbloqueie todos os recursos e acelere seus resultados.
             </p>
