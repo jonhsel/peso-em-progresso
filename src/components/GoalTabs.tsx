@@ -19,10 +19,12 @@ export default function GoalTabs({
   goals,
   kpisByGoal,
   predictionsByGoal,
+  plan,
 }: {
   goals: Goal[];
   kpisByGoal: Record<string, PeriodKpi[]>;
   predictionsByGoal: Record<string, GoalPredictions>;
+  plan?: "free" | "pro";
 }) {
   const [activeId, setActiveId] = useState<string | null>(goals[0]?.id ?? null);
 
@@ -76,6 +78,7 @@ export default function GoalTabs({
             prediction={
               kpi.period === "week" ? predictions.week : kpi.period === "month" ? predictions.month : undefined
             }
+            predictionLocked={plan === "free" && (kpi.period === "week" || kpi.period === "month")}
           />
         ))}
       </div>

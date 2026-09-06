@@ -50,8 +50,8 @@ export default async function DashboardPage() {
     const weekKpi = kpis.find((k) => k.period === "week");
     const monthKpi = kpis.find((k) => k.period === "month");
     predictionsByGoal[goal.id] = {
-      week: weekKpi ? computeGoalPrediction(trend, weekKpi, goal.target_value) : undefined,
-      month: monthKpi ? computeGoalPrediction(trend, monthKpi, goal.target_value) : undefined,
+      week: weekKpi && profile.plan === "pro" ? computeGoalPrediction(trend, weekKpi, goal.target_value) : undefined,
+      month: monthKpi && profile.plan === "pro" ? computeGoalPrediction(trend, monthKpi, goal.target_value) : undefined,
     };
   }
 
@@ -144,7 +144,7 @@ export default async function DashboardPage() {
           <TrendBadge trend={trend} />
         </div>
 
-        <GoalTabs goals={activeGoals} kpisByGoal={kpisByGoal} predictionsByGoal={predictionsByGoal} />
+        <GoalTabs goals={activeGoals} kpisByGoal={kpisByGoal} predictionsByGoal={predictionsByGoal} plan={profile.plan} />
 
         <BodyMeasurementsSummaryCard measurements={measurements} />
         </main>

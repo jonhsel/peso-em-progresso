@@ -24,7 +24,8 @@ na tela `/dashboard/goals`, não fixas no código.
 (múltiplas metas simultâneas) + Fase 6.3 (desafios) + Fase 6.4 (papel de
 coach/visualizador) + Fase 7 (monetização em camadas — gate free/pro +
 Kiwify, validada em produção 05/09/2026) + Fase 8.1 (sidebar de navegação)
-completos, Fase 8.1 ainda não validada em produção
++ Fase 8.1.1 (página de previsão da meta) completos, nenhuma das duas
+ainda validada em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -2729,6 +2730,124 @@ Próximos passos do próprio spec: quando os itens `comingSoon` ganharem
 página própria (8.1.1–8.1.3), remover a flag de cada um em `Sidebar.tsx`;
 quando a Fase 8.2 (Topbar) existir, remover o `ThemeToggle` da sidebar e
 da barra mobile.
+
+## Fase 8.1.1 — Página de Previsão da Meta (implementada 06/09/2026)
+
+Spec completo em `claude_fase8.1.1_previsao_pagina_v2.md` (na raiz do
+repo, não versionado — mesmo padrão dos specs anteriores; v2 = v1 +
+auditoria completa contra o código real, achados no Apêndice B do próprio
+arquivo). Implementado nesta sessão: `npx tsc --noEmit` e `npm run build`
+limpos. **Ainda não visto num navegador real** — ver checklist abaixo.
+Patch aplicado ao pé da letra do spec, com 1 correção de nome de campo não
+coberta pela auditoria do spec (ver abaixo). Primeira sub-fase da Fase 8.1
+(o item `comingSoon` de "Previsão da Meta" na Sidebar ganha rota própria).
+
+- **Achado corrigido nesta sessão, fora do gate original**: `dashboard/page.tsx`
+  calculava `predictionsByGoal` para qualquer plano e o `GoalTabs` não
+  recebia `plan` — na prática, uma conta Grátis via a previsão completa
+  (📈 "meta em ~N dias") no dashboard principal, mesmo com a Sidebar já
+  marcando o item como Pro desde o hotfix 1 da Fase 8.1. Corrigido nesta
+  sessão: o card de KPI (4 status) continua Grátis — só a *linha de
+  previsão* dentro dele é Pro agora.
+- `KpiCard.tsx` ganhou `import Link` (era Server Component sem nenhum
+  import de `next/link` até aqui — confirmado que `Link` funciona em
+  Server Component sem precisar de `"use client"`) + prop opcional
+  `predictionLocked` (default `false`): quando `true` e nenhuma
+  `prediction` é passada, mostra "🔒 Previsão da meta é Pro" linkando pra
+  `/dashboard/upgrade`, na mesma posição/hierarquia visual (`text-xs
+  text-ink-faint`) da linha de previsão real — zero mudança de altura do
+  card entre os dois estados.
+- `GoalTabs.tsx` ganhou prop opcional `plan?: "free" | "pro"` e passa
+  `predictionLocked={plan === "free" && (kpi.period === "week" ||
+  kpi.period === "month")}` pra cada `KpiCard`.
+- `dashboard/page.tsx`: `predictionsByGoal` só chama `computeGoalPrediction`
+  de verdade quando `profile.plan === "pro"` (senão fica `undefined`, que
+  já é o valor que ativa o teaser trancado via `predictionLocked`); `plan={profile.plan}`
+  passado pro `GoalTabs`.
+- **`reports/page.tsx`/`ReportsClient` não mudaram** — a página inteira já
+  vive atrás de `PlanGate featureName="Relatórios"`, sem gap ali.
+  **`coach/[ownerId]/page.tsx` também não muda** — não passa `plan` pro
+  `GoalTabs` (mesma decisão já registrada na Fase 6.4/7: o coach sempre
+  vê os dados do cliente completos, independente do plano de qualquer um
+  dos dois), então o teaser trancado nunca aparece nessa tela.
+- Rota nova `/dashboard/prediction` (Server Component, `export const
+  dynamic = "force-dynamic"`, mesmo padrão de `reports/page.tsx`): calcula
+  KPIs + previsão **sem gate no cálculo** (`PlanGate` embrulha a página
+  inteira, então quem está dentro já é Pro) pra cada meta de peso ativa
+  (`activeGoals.filter(g => g.metric === "weight")`, previsão continua
+  peso-only, mesma decisão técnica da Fase 6.2/5.1) — 1 `<section>` por
+  meta (cabeçalho só aparece com 2+ metas de peso), 2 `KpiCard`
+  (semana/mês), `PredictionChart`, `PredictionExplainer`. Sem nenhuma meta
+  de peso ativa: mensagem com link pra `/dashboard/goals`.
+- `src/components/PredictionExplainer.tsx` (novo) — Server Component
+  puro, sem estado: texto fixo explicando a regressão linear de 21 dias +
+  aviso condicional por `prediction.kind`
+  (`insufficient_data`/`wrong_direction`/`already_reached`), cores
+  `signal-caution`/`signal-behind`/`signal-ahead` já usadas no resto do
+  app.
+- `src/components/PredictionChart.tsx` (novo, client) — gráfico **isolado**
+  do `WeightChart.tsx` compartilhado (decisão explícita do spec: não vale
+  o risco de tocar num componente com 6+ callers pra reaproveitar ~10
+  linhas de `readChartColors`/`FALLBACK_CHART_COLORS`, que foram
+  duplicadas aqui). `ComposedChart` (não `AreaChart` — mesma lição da Fase
+  5.2, recharts descarta `<Line>` dentro de `<AreaChart>` silenciosamente),
+  janela fixa de 90 dias (sem seletor de período — não faz sentido numa
+  página de previsão), `Area` de peso real + `Line` tracejada de projeção
+  só quando `goal.target_value != null` **e** `prediction.kind ===
+  "projected"` (sem target, não há peso de chegada claro pra desenhar — o
+  texto do `PredictionExplainer` já cobre esse caso, decisão B2 do spec).
+  **Correção sobre o snippet do spec, não coberta pela auditoria v1→v2**:
+  o pseudocódigo original acessava `entry.weight`/`lastEntry.weight` —
+  `WeightEntry` (confirmado em `src/types/database.ts`, e em todo o resto
+  do código: `dashboard/page.tsx`, `WeightChart.tsx`) usa `weight_kg`, não
+  `weight`. Corrigido nas 2 ocorrências (`peso: Number(e.weight_kg)` e
+  `Number(lastEntry.weight_kg)`) antes de rodar `tsc` — o erro teria sido
+  pego de qualquer forma na checagem de tipos, mas ficou registrado aqui
+  pra não repetir o mesmo desvio numa specificação futura que copie este
+  trecho.
+- `Sidebar.tsx` — item "Previsão da Meta" perdeu `comingSoon: true` (badge
+  "Pro" mantido); volta a navegar em vez de renderizar como `<span>`
+  desabilitado.
+- **Sem migração, sem mudança de tipos** (`database.ts` não mudou) —
+  leitura pura sobre dados já calculados por `computeAllKpis`/
+  `computeTrend`/`computeGoalPrediction`, nenhuma mudança nessas 3 funções.
+
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
+      dev — **ainda não visto rodando num navegador real**).
+- [ ] **Gate no dashboard (Grátis):** KPI de semana/mês aparece
+      normalmente, mas a linha de previsão é substituída por
+      "🔒 Previsão da meta é Pro" com link pra `/dashboard/upgrade`.
+- [ ] **Gate na página (Grátis):** `/dashboard/prediction` mostra o bloco
+      de `PlanGate` (trancado), sem dados vazando.
+- [ ] **Conta Pro, 1 meta de peso com `target_value`:** `/dashboard/prediction`
+      mostra 2 cards (semana/mês) + gráfico com `ReferenceLine` verde na
+      meta + linha tracejada azul até a data estimada + texto explicativo.
+- [ ] **Conta Pro, 1 meta de peso sem `target_value`:** gráfico mostra só
+      a `Area` de peso real (sem linha de projeção), cards mostram a
+      previsão baseada em `targetLossKg`, texto explica.
+- [ ] **Conta Pro, 2+ metas de peso:** uma `<section>` por meta, cada uma
+      com seu gráfico/previsão independente.
+- [ ] **Sem nenhuma meta de peso ativa:** mensagem "Nenhuma meta de peso
+      ativa" com link pra Metas.
+- [ ] **Tendência `insufficient_data`/`wrong_direction`/`already_reached`:**
+      texto amarelo/vermelho/verde correto no `PredictionExplainer`, sem
+      linha de projeção nos 2 primeiros casos.
+- [ ] **Sidebar:** "Previsão da Meta" agora navega (não é mais `<span>`
+      desabilitado cinza). Badge Pro continua.
+- [ ] **Tema claro/escuro:** gráfico novo respeita CSS vars, teaser "🔒"
+      tem contraste adequado.
+- [ ] **Mobile:** gráfico `h-80` responsivo, cards empilham em
+      `grid-cols-1`.
+- [ ] **`reports/page.tsx`:** sem mudança, previsão continua funcionando
+      (protegida pelo `PlanGate` de Relatórios).
+- [ ] **`coach/[ownerId]/page.tsx`:** sem mudança, coach continua vendo
+      previsão (sem `plan` passado pro `GoalTabs` = sem lock).
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 8
+— Navegação/UX → "Previsão da Meta") e atualizar os checkboxes acima.
+Remover este item da lista `comingSoon` já foi feito no patch de
+`Sidebar.tsx` acima — próximas sub-fases pendentes: 8.1.2 (Conquistas),
+8.1.3 (Exportar Dados).
 
 ## Pendências / próximos passos sugeridos (não iniciados)
 

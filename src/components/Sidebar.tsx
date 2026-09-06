@@ -48,7 +48,7 @@ const links: NavItem[] = [
   { href: "/dashboard/photos", label: "Fotos de Progresso", icon: Camera, premium: true },
   { href: "/dashboard/goals", label: "Metas", icon: Target },
   { href: "/dashboard/reports", label: "Relatórios", icon: FileBarChart, premium: true },
-  { href: "/dashboard/prediction", label: "Previsão da Meta", icon: TrendingUp, premium: true, comingSoon: true },
+  { href: "/dashboard/prediction", label: "Previsão da Meta", icon: TrendingUp, premium: true },
   { href: "/dashboard/achievements", label: "Conquistas", icon: Award, premium: true, comingSoon: true },
   { href: "/dashboard/challenges", label: "Desafios", icon: Swords, premium: true },
   { href: "/dashboard/coach", label: "Coach", icon: Users, premium: true },

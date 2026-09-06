@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { GoalPrediction, PeriodKpi } from "@/lib/analytics";
 
 // O dot/ring seguem os tokens signal-* (hex fixo, iguais nos dois temas).
@@ -17,10 +18,12 @@ export default function KpiCard({
   kpi,
   prediction,
   unit = "kg",
+  predictionLocked = false,
 }: {
   kpi: PeriodKpi;
   prediction?: GoalPrediction;
   unit?: string;
+  predictionLocked?: boolean;
 }) {
   const style = STATUS_STYLES[kpi.status];
   const hasData = kpi.currentWeightKg !== null && kpi.baselineWeightKg !== null;
@@ -58,6 +61,14 @@ export default function KpiCard({
             <p className="text-xs text-ink-faint">
               Hoje você está em <span className="text-ink-muted">{kpi.currentWeightKg?.toFixed(1)} {unit}</span>{" "}
               · esperado pela meta: <span className="text-ink-muted">{kpi.expectedWeightNowKg.toFixed(1)} {unit}</span>
+            </p>
+          )}
+
+          {predictionLocked && !prediction && (
+            <p className="text-xs text-ink-faint">
+              <Link href="/dashboard/upgrade" className="inline-flex items-center gap-1 text-accent hover:text-accent-hover transition">
+                🔒 Previsão da meta é Pro
+              </Link>
             </p>
           )}
 
