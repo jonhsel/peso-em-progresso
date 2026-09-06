@@ -23,7 +23,8 @@ na tela `/dashboard/goals`, não fixas no código.
 (widget-resumo de medidas corporais) + Fase 6.1 (fotos de progresso) + Fase 6.2
 (múltiplas metas simultâneas) + Fase 6.3 (desafios) + Fase 6.4 (papel de
 coach/visualizador) + Fase 7 (monetização em camadas — gate free/pro +
-Kiwify) completos, não validados em produção
+Kiwify, validada em produção 05/09/2026) + Fase 8.1 (sidebar de navegação)
+completos, Fase 8.1 ainda não validada em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -2555,6 +2556,111 @@ period no downgrade, múltiplos produtos Kiwify, painel de conciliação
 manual de `pending_payments`, notificação de renovação por e-mail,
 "compartilhar progresso" — item 3 da fase, spec separada ainda não
 escrita).
+
+## Fase 8.1 — Sidebar de navegação (implementada 06/09/2026)
+
+Spec completo em `claude_fase8_sidebar_v4.md` (na raiz do repo, não
+versionado — mesmo padrão dos specs anteriores; v4 = v3 + auditoria contra
+as 12 páginas reais). Implementado nesta sessão: `npx tsc --noEmit` e
+`npm run build` limpos. **Ainda não visto num navegador real** — ver
+checklist abaixo. Patch aplicado ao pé da letra do spec, mais 1 gap
+encontrado e corrigido nesta sessão (ver abaixo). Primeiro item da Fase 8
+(navegação/UX), roadmap que começa depois do fechamento das fases
+numeradas 0–7.
+
+- **`NavBar.tsx` (topo horizontal) substituído por `Sidebar.tsx` (coluna
+  fixa lateral, 256px)** em todo o app logado. `tailwind.config.ts` ganhou
+  `accent.tint: "var(--accent-tint)"` (a var já existia em `globals.css`,
+  só não estava registrada — sem isso `bg-accent-tint` não geraria CSS,
+  mesma armadilha da decisão 13). Novo `src/components/Avatar.tsx`
+  (iniciais do nome, `bg-accent-tint`/`text-accent`).
+- `Sidebar.tsx` — client component, mesmas props de `NavBar`
+  (`displayName`/`theme`/`plan`) + `activeGoals?: Goal[]` (default `[]`,
+  só pra mostrar "Meta: X,X kg" da meta de peso ativa no bloco de perfil).
+  13 itens de menu (`lucide-react`, já dependência do projeto desde a
+  Fase 7): 5 marcados `premium: true` (badge "Premium" com ícone de
+  cadeado — Medidas, Fotos, Relatórios, Previsão da Meta, Exportar Dados)
+  e 3 marcados `comingSoon: true` (renderizam como `<span>` desabilitado
+  em vez de `<Link>`, pra não dar 404: Previsão da Meta, Conquistas,
+  Exportar Dados — rotas que ainda não existem). "Lembretes" aponta pra
+  `/dashboard/settings#checkin`. Rodapé com card "Seja Premium"/"Plano
+  Atual: Pro" + botão "Sair". Mobile: barra compacta (logo + `ThemeToggle`
+  + ☰) + drawer que fecha ao clicar fora ou num link.
+  **`ThemeToggle` mora na sidebar/barra mobile só temporariamente** — nota
+  deixada no próprio componente: quando a Fase 8.2 (Topbar) existir, mover
+  pra lá.
+- Padrão de layout de duas colunas aplicado nas 12 páginas do spec
+  (`dashboard`, `entries`, `measurements`, `photos`, `goals`, `challenges`,
+  `reports`, `coach`, `coach/[ownerId]`, `settings`, `upgrade`, `import`):
+  `<div className="flex min-h-screen"><Sidebar .../><div className="flex-1
+  overflow-x-hidden"><main className="max-w-Xyl ...">` — o `max-w-*` de
+  cada página não mudou. `coach/[ownerId]/page.tsx` é caso especial (já
+  prescrito no spec): **não** recebe `activeGoals` — a variável desse
+  escopo é do **cliente** sendo visualizado, e passá-la faria a sidebar do
+  coach mostrar a meta do cliente por engano; o componente aceita
+  `undefined` (default `[]`) e some a linha "Meta:" silenciosamente.
+  `SettingsForm.tsx` ganhou `id="checkin"` + `scroll-mt-8` no `<div>` que
+  envolve o campo "Horário de registro" (não existe um `<h2>` dedicado
+  pra "check-in" no form real — o campo vive dentro do card "Perfil" — a
+  âncora foi aplicada ao wrapper do campo, mesmo efeito de scroll pedido).
+- **Gap encontrado nesta sessão, fora da auditoria do spec (corrigido, não
+  só documentado):** o spec migrou "todas as 12 páginas conhecidas", mas
+  havia uma 13ª chamadora de `NavBar` não coberta pela auditoria —
+  `src/app/(app)/dashboard/coach/accept/page.tsx` (tela de aceite de
+  convite de coach, Fase 6.4). Migrada nesta sessão pro mesmo padrão
+  (`Sidebar` + `activeGoals`), porque deixá-la pra trás resultaria numa
+  tela com o nav antigo (topo horizontal) no meio de um app inteiro já
+  migrado pra sidebar lateral — inconsistência visível, não uma decisão
+  deliberada de manter fora de escopo.
+- **`NavBar.tsx` removido nesta sessão** — o spec recomendava manter o
+  arquivo até confirmar que nenhum caller inesperado quebraria o build
+  ("se o build passar sem nenhum import remanescente, o arquivo pode ser
+  removido como limpeza final"); depois de migrar a 13ª página acima, a
+  busca por `NavBar` no repo não retornou nenhum import remanescente
+  (só o próprio arquivo), `tsc`/`build` confirmados limpos, e o arquivo foi
+  deletado como limpeza final da própria fase, não adiado pra depois.
+- **Fora de escopo** (idem spec): remover `comingSoon` dos 3 itens (só
+  quando as sub-fases 8.1.1/8.1.2/8.1.3 implementarem essas rotas), mover
+  `ThemeToggle` pra fora da sidebar (só quando a Fase 8.2/Topbar existir),
+  qualquer mudança em `PlanGate`/gate de plano (idêntico à Fase 7).
+
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
+      dev — **ainda não visto rodando num navegador real**).
+- [ ] Sidebar aparece fixa em desktop nas 13 páginas (12 do spec + a 13ª
+      migrada nesta sessão), sem quebrar `max-w-2xl`/`max-w-6xl` de cada
+      uma.
+- [ ] Mobile: barra compacta (logo + toggle + ☰) no topo; drawer abre ao
+      clicar no ☰, fecha ao clicar fora ou num link.
+- [ ] Badge "Premium" aparece nos 5 itens certos: Medidas Corporais, Fotos
+      de Progresso, Relatórios, Previsão da Meta, Exportar Dados.
+- [ ] 3 itens "Em breve" (`comingSoon`) renderizam como `<span>` cinza, não
+      navegam: Previsão da Meta, Conquistas, Exportar Dados.
+- [ ] "Meta: X,X kg" aparece quando há meta de peso ativa com
+      `target_value` definido; some quando não há meta ou
+      `target_value === null`.
+- [ ] Card de rodapé: "Seja Premium" pro free, "Plano Atual: Pro" pro pro,
+      nos dois temas (claro/escuro).
+- [ ] `ThemeToggle` funciona na sidebar (desktop) e na barra mobile.
+- [ ] Item ativo do menu destaca corretamente em cada rota (inclusive
+      `/dashboard/settings` sem confundir com "Lembretes", que aponta pra
+      mesma rota com `#checkin`).
+- [ ] Clicar em "Lembretes" rola até o campo de horário de registro em
+      Configurações.
+- [ ] "Sair" continua funcionando.
+- [ ] `/dashboard/coach/[ownerId]` renderiza sidebar sem "Meta:" (sem
+      `activeGoals`), sem erros.
+- [ ] `/dashboard/coach/accept` (13ª página, migrada fora do spec original)
+      renderiza sidebar normalmente, aceite de convite continua funcionando.
+- [ ] Contraste do badge "Premium" aceitável em tema light (visual check).
+- [ ] Nenhum link de gate/`PlanGate` mudou — gate de página continua
+      idêntico ao da Fase 7.
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 8
+— Navegação/UX → "Sidebar de navegação") e atualizar os checkboxes acima.
+Próximos passos do próprio spec: quando os itens `comingSoon` ganharem
+página própria (8.1.1–8.1.3), remover a flag de cada um em `Sidebar.tsx`;
+quando a Fase 8.2 (Topbar) existir, remover o `ThemeToggle` da sidebar e
+da barra mobile.
 
 ## Pendências / próximos passos sugeridos (não iniciados)
 

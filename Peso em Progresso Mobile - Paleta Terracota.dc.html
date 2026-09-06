@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/modernist-d9438ed4-b8b1-4ade-89ba-05ad17b038e2/styles.css">
+<script src="_ds/modernist-d9438ed4-b8b1-4ade-89ba-05ad17b038e2/_ds_bundle.js"></script>
+<style>
+body{margin:0}
+a{color:var(--color-accent)}
+a:hover{color:var(--color-accent-600)}
+</style>
+</helmet>
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#e4e2e2;padding:48px;font-family:var(--font-body)">
+<div style="display:flex;flex-direction:column;align-items:center;gap:16px">
+<p style="margin:0;font:600 11px var(--font-body);letter-spacing:0.08em;text-transform:uppercase;color:#8a8686">Peso em Progresso — protótipo mobile</p>
+<x-import component-from-global-scope="{{ deviceComponent }}" from="./ios-frame.jsx ./android-frame.jsx" dark="{{ isDark }}" keyboard="{{ screen==='login' }}" width="{{ frameWidth }}" height="{{ frameHeight }}" hint-size="410,890">
+<div style="height:100%;display:flex;flex-direction:column;background:{{ pal.bg }};color:{{ pal.text }};font-family:var(--font-body)">
+
+<sc-if value="{{ screen==='onboarding' }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;overflow:auto;display:flex;flex-direction:column;padding:{{ headerPadTop }} var(--space-6) var(--space-6)">
+<div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-6)">
+<div style="width:36px;height:36px;flex-shrink:0;background:{{ pal.accent }};display:flex;align-items:center;justify-content:center;font:800 18px var(--font-heading);color:{{ pal.accentText }}">P</div>
+<span style="font:800 15px var(--font-heading)">peso em progresso</span>
+</div>
+<h1 style="font:800 29px/1.18 var(--font-heading);margin:0 0 var(--space-3);letter-spacing:-0.015em">Descer o peso é fácil.<br>Manter <span style="color:{{ pal.accent }}">o ritmo certo</span> é a parte que ninguém mostra.</h1>
+<p style="margin:0 0 var(--space-5);font-size:14px;line-height:1.55;color:{{ pal.muted }}">Defina sua meta por semana, mês, trimestre ou semestre. A cada pesagem, o app mostra se você está adiantado, no ritmo ou atrasado — não só se o número caiu.</p>
+<div style="border:1px solid {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};padding:var(--space-3);margin-bottom:var(--space-4)">
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+<span style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:{{ pal.muted }}">Evolução real de um usuário</span>
+<span style="font:800 13px var(--font-body);color:{{ pal.accent }}">{{ totalChangeLabel }}</span>
+</div>
+<svg viewBox="0 0 {{ chart.w }} {{ chart.h }}" style="width:100%;height:88px;display:block;overflow:visible">
+<path d="{{ chart.areaD }}" fill="{{ pal.accent }}" stroke="none" style="opacity:{{ obAreaOpacity }};transition:opacity 1.1s ease"></path>
+<path d="{{ chart.pathD }}" fill="none" stroke="{{ pal.accent }}" strokeWidth="2.25" strokeLinecap="round" style="stroke-dasharray:{{ chart.pathLen }};stroke-dashoffset:{{ obLineOffset }};transition:stroke-dashoffset 1.6s cubic-bezier(.35,0,.25,1)"></path>
+<sc-for list="{{ obPoints }}" as="pt" hint-placeholder-count="14">
+<circle cx="{{ pt.x }}" cy="{{ pt.y }}" r="2.2" fill="{{ pal.bg }}" stroke="{{ pal.accent }}" strokeWidth="1.5" style="opacity:{{ pt.opacity }};transition:opacity 0.4s ease {{ pt.delay }}ms"></circle>
+</sc-for>
+</svg>
+</div>
+<hr style="height:2px;border:0;margin:0 0 var(--space-4);background:{{ pal.divider }}">
+<div style="display:flex;flex-direction:column;gap:var(--space-4);margin-bottom:var(--space-8)">
+<div><span style="font:800 11px var(--font-heading);color:{{ pal.muted }}">01</span><h4 style="margin:var(--space-1) 0 2px">Defina sua meta</h4><p style="margin:0;font-size:13px;color:{{ pal.muted }}">Semana, mês, trimestre ou semestre — o que fizer sentido.</p></div>
+<div><span style="font:800 11px var(--font-heading);color:{{ pal.muted }}">02</span><h4 style="margin:var(--space-1) 0 2px">Registre seu peso</h4><p style="margin:0;font-size:13px;color:{{ pal.muted }}">Uma pesagem por dia, direto da balança. Uns 10 segundos.</p></div>
+<div><span style="font:800 11px var(--font-heading);color:{{ pal.muted }}">03</span><h4 style="margin:var(--space-1) 0 2px">Veja se está no ritmo</h4><p style="margin:0;font-size:13px;color:{{ pal.muted }}">Comparamos hoje com o que era esperado nesse ponto da meta.</p></div>
+</div>
+<div style="margin-top:auto;display:flex;flex-direction:column;gap:var(--space-3)">
+<button type="button" onClick="{{ goSignup }}" style="border:none;cursor:pointer;background:{{ pal.accent }};color:{{ pal.accentText }};font:800 14px var(--font-heading);padding:var(--space-3) var(--space-4);width:100%;border-radius:12px">Criar conta grátis</button>
+<button type="button" onClick="{{ goLoginMode }}" style="border:none;background:transparent;cursor:pointer;color:{{ pal.accent }};font:800 13px var(--font-heading);padding:var(--space-2)">Já tenho conta</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ screen==='login' }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;overflow:auto;display:flex;flex-direction:column;padding:{{ headerPadTop }} var(--space-6) var(--space-6)">
+<button type="button" onClick="{{ backToOnboarding }}" style="align-self:flex-start;border:none;background:none;cursor:pointer;color:{{ pal.muted }};font:600 20px var(--font-body);padding:0;margin-bottom:var(--space-4)">‹</button>
+<h2 style="margin:0 0 var(--space-4)">{{ loginTitle }}</h2>
+<div style="display:inline-flex;border:1px solid {{ pal.divider }};border-radius:12px;overflow:hidden;margin-bottom:var(--space-6);align-self:flex-start">
+<button type="button" onClick="{{ setAuthSignup }}" style="border:none;cursor:pointer;padding:7px 14px;font-size:13px;background:{{ authSignupBg }};color:{{ authSignupText }}">Criar conta</button>
+<button type="button" onClick="{{ setAuthLogin }}" style="border:none;border-left:1px solid {{ pal.divider }};cursor:pointer;padding:7px 14px;font-size:13px;background:{{ authLoginBg }};color:{{ authLoginText }}">Entrar</button>
+</div>
+<form onSubmit="{{ submitLogin }}" style="display:flex;flex-direction:column;gap:var(--space-4)">
+<sc-if value="{{ isSignup }}" hint-placeholder-val="{{ true }}">
+<div>
+<label style="display:block;font-size:12px;margin-bottom:5px;color:{{ pal.muted }}">Nome</label>
+<input type="text" value="{{ loginName }}" onChange="{{ setLoginName }}" placeholder="seu nome" style="width:100%;box-sizing:border-box;min-height:38px;padding:6px 10px;font-size:14px;font-family:var(--font-body);background:{{ pal.surface }};color:{{ pal.text }};border:1px solid {{ pal.divider }};border-radius:12px"></input>
+</div>
+</sc-if>
+<div>
+<label style="display:block;font-size:12px;margin-bottom:5px;color:{{ pal.muted }}">E-mail</label>
+<input type="email" value="{{ loginEmail }}" onChange="{{ setLoginEmail }}" placeholder="voce@email.com" style="width:100%;box-sizing:border-box;min-height:38px;padding:6px 10px;font-size:14px;font-family:var(--font-body);background:{{ pal.surface }};color:{{ pal.text }};border:1px solid {{ pal.divider }};border-radius:12px"></input>
+</div>
+<div>
+<label style="display:block;font-size:12px;margin-bottom:5px;color:{{ pal.muted }}">Senha</label>
+<input type="password" value="{{ loginPass }}" onChange="{{ setLoginPass }}" placeholder="••••••••" style="width:100%;box-sizing:border-box;min-height:38px;padding:6px 10px;font-size:14px;font-family:var(--font-body);background:{{ pal.surface }};color:{{ pal.text }};border:1px solid {{ pal.divider }};border-radius:12px"></input>
+</div>
+<sc-if value="{{ loginError }}" hint-placeholder-val="{{ false }}">
+<p style="margin:0;font-size:13px;color:{{ pal.accent }}">{{ loginError }}</p>
+</sc-if>
+<button type="submit" style="border:none;cursor:pointer;background:{{ pal.accent }};color:{{ pal.accentText }};font:800 14px var(--font-heading);padding:var(--space-3) var(--space-4);width:100%;border-radius:12px;margin-top:var(--space-2)">Continuar</button>
+</form>
+<p style="margin-top:var(--space-6);font-size:11px;line-height:1.5;color:{{ pal.muted }}">Ao continuar você concorda em manter seus dados de peso privados — cada conta só vê os próprios registros.</p>
+</div>
+</sc-if>
+
+<sc-if value="{{ screen==='main' }}" hint-placeholder-val="{{ true }}">
+<div style="height:100%;display:flex;flex-direction:column;position:relative">
+
+<sc-if value="{{ !overlayOpen }}" hint-placeholder-val="{{ true }}">
+<div style="padding:{{ headerPadTop }} var(--space-4) var(--space-3);border-bottom:2px solid {{ pal.divider }};flex-shrink:0;display:flex;align-items:center;justify-content:space-between">
+<span style="font:600 11px var(--font-body);letter-spacing:0.1em;text-transform:uppercase;color:{{ pal.muted }}">{{ tabLabel }}</span>
+<button type="button" onClick="{{ openHelp }}" aria-label="Ajuda" style="width:22px;height:22px;border-radius:50%;border:1px solid {{ pal.divider }};background:none;color:{{ pal.muted }};cursor:pointer;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0">?</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ helpOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;z-index:20;background:color-mix(in srgb, black 45%, transparent);display:flex;align-items:flex-end">
+<div style="width:100%;max-height:82%;overflow-y:auto;background:{{ pal.surface }};border-radius:20px 20px 0 0;padding:var(--space-4);box-sizing:border-box;display:flex;flex-direction:column;gap:var(--space-3)">
+<div style="display:flex;align-items:center;justify-content:space-between">
+<h4 style="margin:0;font:800 16px var(--font-heading)">Como funciona</h4>
+<button type="button" onClick="{{ closeHelp }}" style="border:none;background:none;cursor:pointer;color:{{ pal.text }};font-size:18px;padding:0">×</button>
+</div>
+<p style="margin:0;font-size:12px;color:{{ pal.muted }};line-height:1.5">Defina sua meta, registre seu peso, e veja se está no ritmo. Comparamos seu peso atual com o previsto para hoje e mostramos um status por período.</p>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)">
+<sc-for list="{{ kpiLegend }}" as="lg" hint-placeholder-count="4">
+<div style="border:1px solid {{ pal.divider }};border-radius:12px;padding:var(--space-2);display:flex;flex-direction:column;gap:4px">
+<span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700"><span style="width:8px;height:8px;border-radius:50%;background:{{ lg.color }};display:inline-block"></span>{{ lg.label }}</span>
+<span style="font-size:11px;color:{{ pal.muted }};line-height:1.4">{{ lg.desc }}</span>
+</div>
+</sc-for>
+</div>
+<p style="margin:0;font-size:11px;color:{{ pal.muted }};line-height:1.5">Sequência: dias seguidos com pesagem registrada — só zera se faltar hoje e ontem. Conquistas: 7 no total, nunca são revogadas. Horário de check-in é opcional, em Configurações.</p>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ overlayOpen }}" hint-placeholder-val="{{ false }}">
+<div style="padding:{{ headerPadTop }} var(--space-4) var(--space-3);border-bottom:2px solid {{ pal.divider }};display:flex;align-items:center;gap:var(--space-2);flex-shrink:0">
+<button type="button" onClick="{{ closeOverlay }}" style="border:none;background:none;cursor:pointer;color:{{ pal.text }};font-size:20px;padding:0">‹</button>
+<span style="font:800 15px var(--font-heading)">{{ overlayTitle }}</span>
+</div>
+</sc-if>
+
+<div style="flex:1;overflow:auto;padding:var(--space-4);padding-bottom:100px">
+
+<sc-if value="{{ achievementsOpen }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:var(--space-2)">
+<p style="margin:0 0 var(--space-2);font-size:12px;color:{{ pal.muted }}">{{ unlockedCount }} de {{ totalCount }} conquistadas</p>
+<sc-for list="{{ achievements }}" as="a" hint-placeholder-count="10">
+<div style="border:1px solid {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};padding:var(--space-3);display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-3)">
+<div>
+<p style="margin:0;font:700 14px var(--font-body)">{{ a.label }}</p>
+<p style="margin:3px 0 0;font-size:12px;color:{{ pal.muted }}">{{ a.desc }}</p>
+<sc-if value="{{ a.reason }}" hint-placeholder-val="{{ false }}">
+<p style="margin:3px 0 0;font-size:11px;color:{{ pal.muted }}">{{ a.reason }}</p>
+</sc-if>
+</div>
+<span style="flex-shrink:0;font-size:10px;padding:2px 8px;border:1px solid {{ a.tagBorder }};border-radius:6px;background:{{ a.tagBg }};color:{{ a.tagText }};white-space:nowrap">{{ a.tagLabel }}</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ photosOpen }}" hint-placeholder-val="{{ false }}">
+<sc-if value="{{ !isPro }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px dashed {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};padding:var(--space-5);text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px">
+<span style="font-size:20px">🔒</span>
+<p style="margin:0;font:700 14px var(--font-heading)">Fotos de progresso é Pro</p>
+<p style="margin:0;font-size:12px;color:{{ pal.muted }}">Disponível no plano Pro — R$ 11,90/mês.</p>
+<button type="button" onClick="{{ openUpgrade }}" style="margin-top:6px;border:none;border-radius:12px;background:{{ pal.accent }};color:{{ pal.accentText }};cursor:pointer;padding:9px 18px;font-size:13px;font-weight:700">Fazer upgrade</button>
+</div>
+</sc-if>
+<sc-if value="{{ isPro }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:var(--space-5)">
+<button type="button" style="border:1px dashed {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};cursor:pointer;padding:var(--space-4);display:flex;flex-direction:column;align-items:center;gap:6px;color:{{ pal.muted }};font-size:13px">
+<span style="font-size:22px">+</span>
+Adicionar foto de progresso
+</button>
+<div>
+<h5 style="margin:0 0 var(--space-2);text-transform:uppercase;letter-spacing:0.08em;font-size:11px;color:{{ pal.muted }}">Comparar</h5>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+<div style="border:1px solid {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};aspect-ratio:3/4;display:flex;align-items:center;justify-content:center;color:{{ pal.muted }};font-size:12px">15 jun 2026</div>
+<div style="border:1px solid {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};aspect-ratio:3/4;display:flex;align-items:center;justify-content:center;color:{{ pal.muted }};font-size:12px">31 ago 2026</div>
+</div>
+</div>
+<div>
+<h5 style="margin:0 0 var(--space-2);text-transform:uppercase;letter-spacing:0.08em;font-size:11px;color:{{ pal.muted }}">Histórico</h5>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-2)">
+<sc-for list="{{ photoDates }}" as="pd" hint-placeholder-count="6">
+<div style="border:1px solid {{ pal.divider }};border-radius:10px;background:{{ pal.surface }};aspect-ratio:1;display:flex;align-items:center;justify-content:center;color:{{ pal.muted }};font-size:10px">{{ pd }}</div>
+</sc-for>
+</div>
+</div>
+</div>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{ reportsOpen }}" hint-placeholder-val="{{ false }}">
+<sc-if value="{{ !isPro }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px dashed {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};padding:var(--space-5);text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px">
+<span style="font-size:20px">🔒</span>
+<p style="margin:0;font:700 14px var(--font-heading)">Relatórios é Pro</p>
+<p style="margin:0;font-size:12px;color:{{ pal.muted }}">Disponível no plano Pro — R$ 11,90/mês.</p>
+<button type="button" onClick="{{ openUpgrade }}" style="margin-top:6px;border:none;border-radius:12px;background:{{ pal.accent }};color:{{ pal.accentText }};cursor:pointer;padding:9px 18px;font-size:13px;font-weight:700">Fazer upgrade</button>
+</div>
+</sc-if>
+<sc-if value="{{ isPro }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:var(--space-4)">
+<div style="display:inline-flex;border:1px solid {{ pal.divider }};border-radius:12px;overflow:hidden">
+<sc-for list="{{ reportTabs }}" as="rt" hint-placeholder-count="4">
+<button type="button" onClick="{{ rt.select }}" style="border:none;cursor:pointer;padding:7px 12px;font-size:12px;background:{{ rt.bg }};color:{{ rt.color }}">{{ rt.label }}</button>
+</sc-for>
+</div>
+<div style="border:1px solid {{ reportKpi.cardBorder }};border-radius:12px;background:{{ reportKpi.cardBg }};padding:var(--space-3);display:flex;flex-direction:column;gap:6px">
+<span style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:{{ pal.muted }}">{{ reportKpi.label }}</span>
+<span style="font:800 24px var(--font-heading)">{{ reportKpi.actualLossLabel }}<span style="font-size:12px;font-weight:600;color:{{ pal.muted }}"> {{ reportKpi.targetLossLabel }}</span></span>
+<span style="display:inline-flex;align-self:flex-start;font-size:11px;padding:3px 9px;border-radius:6px;background:{{ reportKpi.tagBg }};color:{{ reportKpi.tagText }}">{{ reportKpi.statusLabel }}</span>
+</div>
+<p style="margin:0;font-size:12px;color:{{ pal.muted }}">Previsão: {{ trend.description }}</p>
+<button type="button" style="display:inline-flex;align-self:flex-start;font-size:12px;border:1px solid {{ pal.divider }};border-radius:12px;padding:7px 14px;background:none;color:{{ pal.muted }};cursor:pointer">Salvar em PDF</button>
+</div>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{ importOpen }}" hint-placeholder-val="{{ false }}">
+<sc-if value="{{ !isPro }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px dashed {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};padding:var(--space-5);text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px">
+<span style="font-size:20px">🔒</span>
+<p style="margin:0;font:700 14px var(--font-heading)">Importar CSV é Pro</p>
+<p style="margin:0;font-size:12px;color:{{ pal.muted }}">Disponível no plano Pro — R$ 11,90/mês.</p>
+<button type="button" onClick="{{ openUpgrade }}" style="margin-top:6px;border:none;border-radius:12px;background:{{ pal.accent }};color:{{ pal.accentText }};cursor:pointer;padding:9px 18px;font-size:13px;font-weight:700">Fazer upgrade</button>
+</div>
+</sc-if>
+<sc-if value="{{ isPro }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:var(--space-4)">
+<p style="margin:0;font-size:13px;color:{{ pal.muted }}">Importe pesagens de outro app ou planilha. O arquivo precisa ter pelo menos uma coluna de data e uma de peso.</p>
+<button type="button" style="border:1px dashed {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};cursor:pointer;padding:var(--space-5);display:flex;flex-direction:column;align-items:center;gap:6px;color:{{ pal.muted }};font-size:13px">
+<span style="font-size:22px">⇧</span>
+Selecionar arquivo CSV
+</button>
+</div>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{ challengesOpen }}" hint-placeholder-val="{{ false }}">
+<sc-if value="{{ !isPro }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px dashed {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};padding:var(--space-5);text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px">
+<span style="font-size:20px">🔒</span>
+<p style="margin:0;font:700 14px var(--font-heading)">Desafios é Pro</p>
+<p style="margin:0;font-size:12px;color:{{ pal.muted }}">Disponível no plano Pro — R$ 11,90/mês.</p>
+<button type="button" onClick="{{ openUpgrade }}" style="margin-top:6px;border:none;border-radius:12px;background:{{ pal.accent }};color:{{ pal.accentText }};cursor:pointer;padding:9px 18px;font-size:13px;font-weight:700">Fazer upgrade</button>
+</div>
+</sc-if>
+<sc-if value="{{ isPro }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:var(--space-3)">
+<sc-for list="{{ challenges }}" as="ch" hint-placeholder-count="2">
+<div style="border:1px solid {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};padding:var(--space-3);display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;justify-content:space-between;font-size:13px"><span>{{ ch.label }}</span><span style="color:{{ pal.muted }};font-size:11px">{{ ch.days }}</span></div>
+<div style="height:6px;border-radius:3px;background:{{ pal.divider }};overflow:hidden"><div style="height:100%;background:{{ ch.barColor }};width:{{ ch.pct }}%"></div></div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{ upgradeOpen }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:var(--space-3)">
+<sc-for list="{{ plans }}" as="pl" hint-placeholder-count="2">
+<div style="border:1px solid {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};padding:var(--space-4);display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:baseline;justify-content:space-between"><h5 style="margin:0;font:800 15px var(--font-heading)">{{ pl.name }}</h5><span style="font:700 14px var(--font-body);color:{{ pal.muted }}">{{ pl.price }}</span></div>
+<ul style="margin:0;padding-left:16px;display:flex;flex-direction:column;gap:3px">
+<sc-for list="{{ pl.features }}" as="f" hint-placeholder-count="4">
+<li style="font-size:12px;color:{{ pal.text }}">{{ f }}</li>
+</sc-for>
+</ul>
+</div>
+</sc-for>
+<button type="button" onClick="{{ setPlanPro }}" style="border:none;border-radius:12px;background:{{ pal.accent }};color:{{ pal.accentText }};cursor:pointer;padding:12px;font-size:14px;font-weight:700">Assinar Pro</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ showDashboard }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:var(--space-4)">
+<div>
+<h1 style="margin:0;font:800 44px/1 var(--font-heading);letter-spacing:-0.02em">{{ latestWeightLabel }}<span style="font-size:18px;font-weight:600;color:{{ pal.muted }};margin-left:4px">kg</span></h1>
+<p style="margin:6px 0 0;font-size:12px;color:{{ pal.muted }}">Última pesagem: {{ lastMeasuredLabel }}</p>
+<div style="display:inline-flex;align-items:center;gap:6px;margin-top:var(--space-2);border:1px solid {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};padding:4px 10px">
+<span style="font:700 13px var(--font-body);color:{{ totalChangeColor }}">{{ totalChangeLabel }}</span>
+<span style="font-size:11px;color:{{ pal.muted }}">desde o 1º registro</span>
+</div>
+</div>
+<hr style="height:2px;border:0;margin:0;background:{{ pal.divider }}">
+<div style="border:1px solid {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};padding:var(--space-3);display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);flex-wrap:wrap">
+<div>
+<div style="display:flex;align-items:baseline;gap:6px">
+<span style="font:800 24px var(--font-heading);color:{{ pal.accent }}">{{ streak.current }}</span>
+<span style="font-size:11px;color:{{ pal.muted }}">dias seguidos</span>
+</div>
+<span style="font-size:11px;color:{{ pal.muted }}">melhor: {{ streak.best }} dias</span>
+</div>
+<div style="display:flex;gap:5px">
+<sc-for list="{{ streakDays }}" as="d" hint-placeholder-count="7">
+<span style="display:block;width:9px;height:9px;border-radius:50%;background:{{ d.bg }};border:{{ d.border }}"></span>
+</sc-for>
+</div>
+</div>
+<button type="button" onClick="{{ openAchievements }}" style="border:1px solid {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};cursor:pointer;padding:var(--space-3);display:flex;align-items:center;justify-content:space-between;text-align:left">
+<span style="font-size:13px">Conquistas <span style="color:{{ pal.muted }}">· {{ unlockedCount }}/{{ totalCount }}</span></span>
+<span style="color:{{ pal.muted }};font-size:13px">›</span>
+</button>
+<div style="border:1px solid {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};padding:var(--space-3)">
+<div style="display:flex;justify-content:space-between;margin-bottom:6px">
+<span style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:{{ pal.muted }}">Tendência (21 dias)</span>
+<span style="font:700 15px var(--font-body)">{{ trend.icon }}</span>
+</div>
+<p style="margin:0;font:800 16px var(--font-heading)">{{ trend.text }}</p>
+<p style="margin:2px 0 0;font-size:12px;color:{{ pal.muted }}">{{ trend.description }}</p>
+</div>
+<div style="border:1px solid {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};padding:var(--space-3)">
+<span style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:{{ pal.muted }}">Evolução do peso</span>
+<svg key="{{ chartKey }}" viewBox="0 0 {{ chart.w }} {{ chart.h }}" style="width:100%;height:132px;margin-top:6px;display:block;overflow:visible">
+<path d="{{ chart.areaD }}" fill="{{ pal.accent }}" stroke="none" style="opacity:{{ chart.areaOpacity }};transition:opacity 1s ease 0.3s"></path>
+<path d="{{ chart.dashedD }}" fill="none" stroke="{{ pal.muted }}" strokeWidth="1.2" strokeDasharray="4 4" style="opacity:{{ chart.dashedOpacity }};transition:opacity 0.8s ease 0.9s"></path>
+<path d="{{ chart.pathD }}" fill="none" stroke="{{ pal.accent }}" strokeWidth="2.25" strokeLinecap="round" style="stroke-dasharray:{{ chart.pathLen }};stroke-dashoffset:{{ chart.lineDashoffset }};transition:stroke-dashoffset 1.3s cubic-bezier(.35,0,.25,1)"></path>
+<sc-for list="{{ chart.points }}" as="pt" hint-placeholder-count="14">
+<circle cx="{{ pt.x }}" cy="{{ pt.y }}" r="2.4" fill="{{ pal.bg }}" stroke="{{ pal.accent }}" strokeWidth="1.6" style="opacity:{{ pt.opacity }};transition:opacity 0.4s ease {{ pt.delay }}ms"></circle>
+</sc-for>
+<text x="{{ chart.metaX }}" y="{{ chart.metaY }}" dx="-4" dy="-6" textAnchor="end" fontSize="8" fill="{{ pal.muted }}" style="opacity:{{ chart.metaOpacity }};transition:opacity 0.8s ease 1.1s">meta</text>
+</svg>
+<div style="display:flex;justify-content:space-between;margin-top:4px">
+<span style="font-size:10px;color:{{ pal.muted }}">peso real</span>
+<span style="font-size:10px;color:{{ pal.signal.onpace }};display:flex;align-items:center;gap:4px"><span style="width:5px;height:5px;border-radius:50%;background:{{ pal.signal.onpace }};display:inline-block"></span>no ritmo</span>
+</div>
+</div>
+<div>
+<span style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:{{ pal.muted }};display:block;margin-bottom:var(--space-2)">Metas por período</span>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+<sc-for list="{{ kpis }}" as="kpi" hint-placeholder-count="4">
+<div style="border:1px solid {{ kpi.cardBorder }};border-radius:12px;background:{{ kpi.cardBg }};padding:var(--space-3);display:flex;flex-direction:column;gap:6px">
+<span style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:{{ pal.muted }}">{{ kpi.label }}</span>
+<span style="font:800 18px var(--font-heading)">{{ kpi.actualLossLabel }}<span style="font-size:11px;font-weight:600;color:{{ pal.muted }}"> {{ kpi.targetLossLabel }}</span></span>
+<div style="height:5px;background:{{ pal.divider }}">
+<div style="height:100%;background:{{ kpi.tagBg }};width:{{ kpi.progressPct }}%"></div>
+</div>
+<span style="display:inline-flex;align-self:flex-start;font-size:10px;padding:2px 8px;border:1px solid {{ kpi.tagBorder }};border-radius:6px;background:{{ kpi.tagBg }};color:{{ kpi.tagText }}">{{ kpi.statusLabel }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:var(--space-2)">
+<button type="button" onClick="{{ openPhotos }}" style="position:relative;border:1px solid {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};cursor:pointer;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;color:{{ pal.text }}">
+<span style="font-size:18px;line-height:1">▣</span>
+<span style="font-size:11px;font-weight:600">Fotos</span>
+<sc-if value="{{ !isPro }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:4px;right:6px;font-size:9px;color:{{ pal.muted }}">🔒</span></sc-if>
+</button>
+<button type="button" onClick="{{ openReports }}" style="position:relative;border:1px solid {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};cursor:pointer;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;color:{{ pal.text }}">
+<span style="font-size:18px;line-height:1">▤</span>
+<span style="font-size:11px;font-weight:600">Relatórios</span>
+<sc-if value="{{ !isPro }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:4px;right:6px;font-size:9px;color:{{ pal.muted }}">🔒</span></sc-if>
+</button>
+<button type="button" onClick="{{ openChallenges }}" style="position:relative;border:1px solid {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};cursor:pointer;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;color:{{ pal.text }}">
+<span style="font-size:18px;line-height:1">◈</span>
+<span style="font-size:11px;font-weight:600">Desafios</span>
+<sc-if value="{{ !isPro }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:4px;right:6px;font-size:9px;color:{{ pal.muted }}">🔒</span></sc-if>
+</button>
+<button type="button" onClick="{{ openImport }}" style="position:relative;border:1px solid {{ pal.divider }};border-radius:12px;background:{{ pal.surface }};cursor:pointer;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;color:{{ pal.text }}">
+<span style="font-size:18px">⇧</span>
+<span style="font-size:11px;font-weight:600">Importar</span>
+<sc-if value="{{ !isPro }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:4px;right:6px;font-size:9px;color:{{ pal.muted }}">🔒</span></sc-if>
+</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ showHistory }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column">
+<div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-bottom:var(--space-3);flex-wrap:wrap">
+<sc-if value="{{ isPro }}" hint-placeholder-val="{{ true }}">
+<button type="button" style="border:1px solid {{ pal.divider }};border-radius:10px;background:none;cursor:pointer;padding:6px 12px;font-size:12px;color:{{ pal.muted }}">Exportar CSV</button>
+<button type="button" style="border:1px solid {{ pal.divider }};border-radius:10px;background:none;cursor:pointer;padding:6px 12px;font-size:12px;color:{{ pal.muted }}">Exportar PDF</button>
+</sc-if>
+<button type="button" onClick="{{ openImport }}" style="border:1px solid {{ pal.divider }};border-radius:10px;background:none;cursor:pointer;padding:6px 12px;font-size:12px;color:{{ pal.muted }}">Importar CSV</button>
+</div>
+<sc-for list="{{ entriesDesc }}" as="en" hint-placeholder-count="6">
+<div style="border-bottom:1px solid {{ pal.divider }};padding:var(--space-2) 0;display:flex;align-items:center;justify-content:space-between;gap:var(--space-2)">
+<div>
+<p style="margin:0;font:700 14px var(--font-body)">{{ en.weightLabel }}</p>
+<p style="margin:2px 0 0;font-size:11px;color:{{ pal.muted }}">{{ en.dateLabel }}</p>
+</div>
+<div style="display:flex;align-items:center;gap:var(--space-3)">
+<span style="font-size:12px;color:{{ en.diffColor }}">{{ en.diffLabel }}</span>
+<button type="button" onClick="{{ en.onDelete }}" style="border:none;background:none;cursor:pointer;color:{{ pal.muted }};font-size:11px;padding:0">Excluir</button>
+</div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ tab==='goals' }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:var(--space-6)">
+<form onSubmit="{{ submitGoals }}" style="display:flex;flex-direction:column;gap:var(--space-3)">
+<h4 style="margin:0">Suas metas de perda</h4>
+<p style="margin:0 0 var(--space-2);font-size:12px;color:{{ pal.muted }}">Os KPIs do painel usam esses valores.</p>
+<div><label style="display:block;font-size:12px;margin-bottom:5px;color:{{ pal.muted }}">Meta semanal (kg)</label><input type="text" inputMode="decimal" value="{{ gForm.weekly }}" onChange="{{ setGWeekly }}" placeholder="0.25" style="width:100%;box-sizing:border-box;min-height:38px;padding:6px 10px;font-size:14px;font-family:var(--font-body);background:{{ pal.surface }};color:{{ pal.text }};border:1px solid {{ pal.divider }};border-radius:12px"></input></div>
+<div><label style="display:block;font-size:12px;margin-bottom:5px;color:{{ pal.muted }}">Meta mensal (kg)</label><input type="text" inputMode="decimal" value="{{ gForm.monthly }}" onChange="{{ setGMonthly }}" placeholder="1.0" style="width:100%;box-sizing:border-box;min-height:38px;padding:6px 10px;font-size:14px;font-family:var(--font-body);background:{{ pal.surface }};color:{{ pal.text }};border:1px solid {{ pal.divider }};border-radius:12px"></input></div>
+<div><label style="display:block;font-size:12px;margin-bottom:5px;color:{{ pal.muted }}">Meta trimestral (kg)</label><input type="text" inputMode="decimal" value="{{ gForm.quarterly }}" onChange="{{ setGQuarterly }}" placeholder="3.0" style="width:100%;box-sizing:border-box;min-height:38px;padding:6px 10px;font-size:14px;font-family:var(--font-body);background:{{ pal.surface }};color:{{ pal.text }};border:1px solid {{ pal.divider }};border-radius:12px"></input></div>
+<div><label style="display:block;font-size:12px;margin-bottom:5px;color:{{ pal.muted }}">Meta semestral (kg)</label><input type="text" inputMode="decimal" value="{{ gForm.semester }}" onChange="{{ setGSemester }}" placeholder="6.0" style="width:100%;box-sizing:border-box;min-height:38px;padding:6px 10px;font-size:14px;font-family:var(--font-body);background:{{ pal.surface }};color:{{ pal.text }};border:1px solid {{ pal.divider }};border-radius:12px"></input></div>
+<div><label style="display:block;font-size:12px;margin-bottom:5px;color:{{ pal.muted }}">Peso alvo final (kg) — opcional</label><input type="text" inputMode="decimal" value="{{ gForm.target }}" onChange="{{ setGTarget }}" placeholder="ex: 80" style="width:100%;box-sizing:border-box;min-height:38px;padding:6px 10px;font-size:14px;font-family:var(--font-body);background:{{ pal.surface }};color:{{ pal.text }};border:1px solid {{ pal.divider }};border-radius:12px"></input></div>
+<sc-if value="{{ gError }}" hint-placeholder-val="{{ false }}"><p style="margin:0;color:{{ pal.accent }};font-size:13px">{{ gError }}</p></sc-if>
+<sc-if value="{{ goalsSaved }}" hint-placeholder-val="{{ false }}"><p style="margin:0;font-size:13px">Metas atualizadas.</p></sc-if>
+<button type="submit" style="border:none;cursor:pointer;background:{{ pal.accent }};color:{{ pal.accentText }};font:800 14px var(--font-heading);padding:var(--space-3) var(--space-4);width:100%;border-radius:12px">Salvar metas</button>
+</form>
+<div>
+<h5 style="margin:0 0 var(--space-2);text-transform:uppercase;letter-spacing:0.08em;font-size:11px;color:{{ pal.muted }}">Histórico de metas</h5>
+<sc-for list="{{ goalsHistory }}" as="h" hint-placeholder-count="3">
+<div style="border-bottom:1px solid {{ pal.divider }};padding:8px 0;display:flex;justify-content:space-between;gap:var(--space-2)">
+<span style="font-size:13px">{{ h.text }}</span>
+<span style="font-size:11px;color:{{ pal.muted }};white-space:nowrap">{{ h.dateLabel }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ tab==='measurements' }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:var(--space-6)">
+<form onSubmit="{{ submitMeasurement }}" style="display:flex;flex-direction:column;gap:var(--space-3)">
+<h4 style="margin:0">Registrar medidas</h4>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+<div><label style="display:block;font-size:12px;margin-bottom:5px;color:{{ pal.muted }}">Cintura (cm)</label><input type="text" inputMode="decimal" value="{{ mForm.waist }}" onChange="{{ setMWaist }}" style="width:100%;box-sizing:border-box;min-height:38px;padding:6px 10px;font-size:14px;font-family:var(--font-body);background:{{ pal.surface }};color:{{ pal.text }};border:1px solid {{ pal.divider }};border-radius:12px"></input></div>
+<div><label style="display:block;font-size:12px;margin-bottom:5px;color:{{ pal.muted }}">Quadril (cm)</label><input type="text" inputMode="decimal" value="{{ mForm.hip }}" onChange="{{ setMHip }}" style="width:100%;box-sizing:border-box;min-height:38px;padding:6px 10px;font-size:14px;font-family:var(--font-body);background:{{ pal.surface }};color:{{ pal.text }};border:1px solid {{ pal.divider }};border-radius:12px"></input></div>
+<div><label style="display:block;font-size:12px;margin-bottom:5px;color:{{ pal.muted }}">Peito (cm)</label><input type="text" inputMode="decimal" value="{{ mForm.chest }}" onChange="{{ setMChest }}" style="width:100%;box-sizing:border-box;min-height:38px;padding:6px 10px;font-size:14px;font-family:var(--font-body);background:{{ pal.surface }};color:{{ pal.text }};border:1px solid {{ pal.divider }};border-radius:12px"></input></div>
+<div><label style="display:block;font-size:12px;margin-bottom:5px;color:{{ pal.muted }}">Braço (cm)</label><input type="text" inputMode="decimal" value="{{ mForm.arm }}" onChange="{{ setMArm }}" style="width:100%;box-sizing:border-box;min-height:38px;padding:6px 10px;font-size:14px;font-family:var(--font-body);background:{{ pal.surface }};color:{{ pal.text }};border:1px solid {{ pal.divider }};border-radius:12px"></input></div>
+</div>
+<sc-if value="{{ mError }}" hint-placeholder-val="{{ false }}"><p style="margin:0;color:{{ pal.accent }};font-size:13px">{{ mError }}</p></sc-if>
+<sc-if value="{{ measureSaved }}" hint-placeholder-val="{{ false }}"><p style="margin:0;font-size:13px">Medidas registradas.</p></sc-if>
+<button type="submit" style="border:none;cursor:pointer;background:{{ pal.accent }};color:{{ pal.accentText }};font:800 14px var(--font-heading);padding:var(--space-3) var(--space-4);width:100%;border-radius:12px">Salvar medidas</button>
+</form>
+<div>
+<h5 style="margin:0 0 var(--space-2);text-transform:uppercase;letter-spacing:0.08em;font-size:11px;color:{{ pal.muted }}">Histórico</h5>
+<sc-for list="{{ measurementsList }}" as="m" hint-placeholder-count="3">
+<div style="border-bottom:1px solid {{ pal.divider }};padding:8px 0">
+<p style="margin:0;font-size:11px;color:{{ pal.muted }}">{{ m.dateLabel }}</p>
+<p style="margin:2px 0 0;font-size:13px">{{ m.line }}</p>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ showSettings }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:var(--space-6)">
+<div>
+<h5 style="margin:0 0 var(--space-2);text-transform:uppercase;letter-spacing:0.08em;font-size:11px;color:{{ pal.muted }}">Plano</h5>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);flex-wrap:wrap">
+<div style="display:inline-flex;border:1px solid {{ pal.divider }};border-radius:12px;overflow:hidden">
+<button type="button" onClick="{{ setPlanFree }}" style="border:none;cursor:pointer;padding:7px 16px;font-size:13px;background:{{ planFreeBg }};color:{{ planFreeText }}">Grátis</button>
+<button type="button" onClick="{{ setPlanPro }}" style="border:none;border-left:1px solid {{ pal.divider }};cursor:pointer;padding:7px 16px;font-size:13px;background:{{ planProBg }};color:{{ planProText }}">Pro</button>
+</div>
+<button type="button" onClick="{{ openUpgrade }}" style="border:none;background:none;color:{{ pal.accent }};cursor:pointer;font-size:12px;padding:0">Ver planos</button>
+</div>
+</div>
+<div>
+<h5 style="margin:0 0 var(--space-2);text-transform:uppercase;letter-spacing:0.08em;font-size:11px;color:{{ pal.muted }}">Conta</h5>
+<div style="display:flex;flex-direction:column;gap:var(--space-3)">
+<div><label style="display:block;font-size:12px;margin-bottom:5px;color:{{ pal.muted }}">Nome de exibição</label><input type="text" value="{{ displayName }}" onChange="{{ setDisplayName }}" style="width:100%;box-sizing:border-box;min-height:38px;padding:6px 10px;font-size:14px;font-family:var(--font-body);background:{{ pal.surface }};color:{{ pal.text }};border:1px solid {{ pal.divider }};border-radius:12px"></input></div>
+<div><label style="display:block;font-size:12px;margin-bottom:5px;color:{{ pal.muted }}">Horário de check-in</label>
+<select value="{{ checkinHour }}" onChange="{{ setCheckinHour }}" style="width:100%;box-sizing:border-box;min-height:38px;padding:6px 10px;font-size:14px;font-family:var(--font-body);background:{{ pal.surface }};color:{{ pal.text }};border:1px solid {{ pal.divider }};border-radius:12px">
+<sc-for list="{{ checkinHours }}" as="h" hint-placeholder-count="24">
+<option value="{{ h.v }}">{{ h.label }}</option>
+</sc-for>
+</select>
+</div>
+</div>
+</div>
+<div>
+<h5 style="margin:0 0 var(--space-2);text-transform:uppercase;letter-spacing:0.08em;font-size:11px;color:{{ pal.muted }}">Aparência</h5>
+<div style="display:inline-flex;border:1px solid {{ pal.divider }};border-radius:12px;overflow:hidden">
+<button type="button" onClick="{{ setThemeLight }}" style="border:none;cursor:pointer;padding:7px 16px;font-size:13px;background:{{ themeLightBg }};color:{{ themeLightText }}">Claro</button>
+<button type="button" onClick="{{ setThemeDark }}" style="border:none;border-left:1px solid {{ pal.divider }};cursor:pointer;padding:7px 16px;font-size:13px;background:{{ themeDarkBg }};color:{{ themeDarkText }}">Escuro</button>
+</div>
+</div>
+<div>
+<h5 style="margin:0 0 var(--space-2);text-transform:uppercase;letter-spacing:0.08em;font-size:11px;color:{{ pal.muted }}">Plataforma (protótipo)</h5>
+<div style="display:inline-flex;border:1px solid {{ pal.divider }};border-radius:12px;overflow:hidden">
+<button type="button" onClick="{{ setPlatformIos }}" style="border:none;cursor:pointer;padding:7px 16px;font-size:13px;background:{{ platformIosBg }};color:{{ platformIosText }}">iOS</button>
+<button type="button" onClick="{{ setPlatformAndroid }}" style="border:none;border-left:1px solid {{ pal.divider }};cursor:pointer;padding:7px 16px;font-size:13px;background:{{ platformAndroidBg }};color:{{ platformAndroidText }}">Android</button>
+</div>
+</div>
+<div>
+<h5 style="margin:0 0 var(--space-2);text-transform:uppercase;letter-spacing:0.08em;font-size:11px;color:{{ pal.muted }}">Balança Bluetooth</h5>
+<sc-if value="{{ btConnected }}" hint-placeholder-val="{{ false }}">
+<p style="margin:0 0 4px;font-size:13px">Conectada: Fitdays Scale</p>
+<button type="button" onClick="{{ disconnectBt }}" style="border:none;background:none;color:{{ pal.accent }};cursor:pointer;font-size:12px;padding:0">Desconectar</button>
+</sc-if>
+<sc-if value="{{ !btConnected }}" hint-placeholder-val="{{ true }}">
+<p style="margin:0;font-size:13px;color:{{ pal.muted }}">Nenhuma balança conectada. Conecte ao registrar uma pesagem.</p>
+</sc-if>
+</div>
+<button type="button" onClick="{{ logout }}" style="border:1px solid {{ pal.divider }};border-radius:12px;background:none;cursor:pointer;padding:var(--space-3);font-size:13px;text-align:left">Sair</button>
+</div>
+</sc-if>
+
+</div>
+
+<sc-if value="{{ !overlayOpen }}" hint-placeholder-val="{{ true }}">
+<button type="button" onClick="{{ openSheet }}" style="position:absolute;right:16px;bottom:78px;width:52px;height:52px;background:{{ pal.accent }};color:{{ pal.accentText }};border:none;cursor:pointer;font:800 26px var(--font-heading);box-shadow:var(--shadow-lg);z-index:20;border-radius:50%">+</button>
+<div style="display:flex;border-top:2px solid {{ pal.divider }};background:{{ pal.bg }};flex-shrink:0">
+<button type="button" onClick="{{ setTabDashboard }}" style="flex:1;border:none;background:none;cursor:pointer;border-top:2px solid {{ t.dashboard.bd }};padding:8px 0 10px;display:flex;flex-direction:column;align-items:center;gap:3px;color:{{ t.dashboard.color }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 10.5 12 4l8 6.5"></path><path d="M6 9.5V19a1 1 0 0 0 1 1h4v-6h2v6h4a1 1 0 0 0 1-1V9.5"></path></svg><span style="font-size:10px">Início</span></button>
+<button type="button" onClick="{{ setTabHistory }}" style="flex:1;border:none;background:none;cursor:pointer;border-top:2px solid {{ t.history.bd }};padding:8px 0 10px;display:flex;flex-direction:column;align-items:center;gap:3px;color:{{ t.history.color }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="8" y1="6" x2="20" y2="6"></line><line x1="8" y1="12" x2="20" y2="12"></line><line x1="8" y1="18" x2="14" y2="18"></line><circle cx="4" cy="6" r="1"></circle><circle cx="4" cy="12" r="1"></circle><circle cx="4" cy="18" r="1"></circle></svg><span style="font-size:10px">Pesagens</span></button>
+<button type="button" onClick="{{ setTabGoals }}" style="flex:1;border:none;background:none;cursor:pointer;border-top:2px solid {{ t.goals.bd }};padding:8px 0 10px;display:flex;flex-direction:column;align-items:center;gap:3px;color:{{ t.goals.color }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"></circle></svg><span style="font-size:10px">Metas</span></button>
+<button type="button" onClick="{{ setTabMeasurements }}" style="flex:1;border:none;background:none;cursor:pointer;border-top:2px solid {{ t.measurements.bd }};padding:8px 0 10px;display:flex;flex-direction:column;align-items:center;gap:3px;color:{{ t.measurements.color }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3" y="9" width="18" height="6"></rect><line x1="7" y1="9" x2="7" y2="12"></line><line x1="11" y1="9" x2="11" y2="12"></line><line x1="15" y1="9" x2="15" y2="12"></line></svg><span style="font-size:10px">Medidas</span></button>
+<button type="button" onClick="{{ setTabSettings }}" style="flex:1;border:none;background:none;cursor:pointer;border-top:2px solid {{ t.settings.bd }};padding:8px 0 10px;display:flex;flex-direction:column;align-items:center;gap:3px;color:{{ t.settings.color }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="3.2"></circle><path d="M12 3v3M12 18v3M4.2 7.5l2.6 1.5M17.2 15l2.6 1.5M4.2 16.5l2.6-1.5M17.2 9l2.6-1.5"></path></svg><span style="font-size:10px">Config</span></button>
+</div>
+</sc-if>
+
+<sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;background:rgba(11,18,32,0.6);display:flex;align-items:flex-end;z-index:40">
+<div style="width:100%;max-height:88%;overflow:auto;box-sizing:border-box;background:{{ pal.surface2 }};padding:var(--space-4) var(--space-4) var(--space-6);border-radius:20px 20px 0 0;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;gap:var(--space-3)">
+<div style="display:flex;justify-content:space-between;align-items:center">
+<h4 style="margin:0">Registrar pesagem</h4>
+<button type="button" onClick="{{ closeSheet }}" style="border:none;background:none;cursor:pointer;font-size:18px;color:{{ pal.muted }}">×</button>
+</div>
+<sc-if value="{{ btConnected }}" hint-placeholder-val="{{ false }}">
+<p style="margin:0;font-size:12px;color:{{ pal.muted }}">✓ Conectado à Fitdays Scale — peso preenchido automaticamente.</p>
+</sc-if>
+<sc-if value="{{ showBtScan }}" hint-placeholder-val="{{ true }}">
+<button type="button" onClick="{{ startBluetooth }}" style="border:1px solid {{ pal.divider }};border-radius:12px;background:none;cursor:pointer;padding:8px 12px;font-size:12px;text-align:left;color:{{ pal.text }}">Sincronizar via Bluetooth</button>
+</sc-if>
+<sc-if value="{{ btStatus==='scanning' }}" hint-placeholder-val="{{ false }}">
+<p style="margin:0;font-size:12px;color:{{ pal.muted }}">Procurando balança…</p>
+</sc-if>
+<sc-if value="{{ btStatus==='found' }}" hint-placeholder-val="{{ false }}">
+<button type="button" onClick="{{ connectBluetooth }}" style="border:1px solid {{ pal.accent }};border-radius:12px;background:none;cursor:pointer;padding:8px 12px;font-size:12px;text-align:left;color:{{ pal.accent }}">Fitdays Scale encontrada — conectar</button>
+</sc-if>
+<form onSubmit="{{ submitEntry }}" style="display:flex;flex-direction:column;gap:var(--space-3)">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
+<div><label style="display:block;font-size:12px;margin-bottom:5px;color:{{ pal.muted }}">Data</label><input type="date" value="{{ formDate }}" onChange="{{ setFormDate }}" style="width:100%;box-sizing:border-box;min-height:38px;padding:6px 10px;font-size:14px;background:{{ pal.surface }};color:{{ pal.text }};border:1px solid {{ pal.divider }};border-radius:12px"></input></div>
+<div><label style="display:block;font-size:12px;margin-bottom:5px;color:{{ pal.muted }}">Peso (kg)</label><input type="text" inputMode="decimal" value="{{ formWeight }}" onChange="{{ setFormWeight }}" placeholder="ex: 87,4" style="width:100%;box-sizing:border-box;min-height:38px;padding:6px 10px;font-size:14px;font-family:var(--font-body);background:{{ pal.surface }};color:{{ pal.text }};border:1px solid {{ pal.divider }};border-radius:12px"></input></div>
+</div>
+<div><label style="display:block;font-size:12px;margin-bottom:5px;color:{{ pal.muted }}">Nota (opcional)</label><input type="text" value="{{ formNote }}" onChange="{{ setFormNote }}" placeholder="ex: pós-treino, em jejum" style="width:100%;box-sizing:border-box;min-height:38px;padding:6px 10px;font-size:14px;font-family:var(--font-body);background:{{ pal.surface }};color:{{ pal.text }};border:1px solid {{ pal.divider }};border-radius:12px"></input></div>
+<sc-if value="{{ formError }}" hint-placeholder-val="{{ false }}"><p style="margin:0;color:{{ pal.accent }};font-size:13px">{{ formError }}</p></sc-if>
+<button type="submit" style="border:none;cursor:pointer;background:{{ pal.accent }};color:{{ pal.accentText }};font:800 14px var(--font-heading);padding:var(--space-3) var(--space-4);width:100%;border-radius:12px">Salvar pesagem</button>
+</form>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ confirmDelete }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;background:rgba(11,18,32,0.6);display:flex;align-items:center;justify-content:center;padding:var(--space-6);z-index:50">
+<div style="width:100%;box-sizing:border-box;background:{{ pal.surface2 }};padding:var(--space-4);border-radius:16px;display:flex;flex-direction:column;gap:var(--space-3);box-shadow:var(--shadow-lg)">
+<h4 style="margin:0">Excluir pesagem?</h4>
+<p style="margin:0;font-size:13px;color:{{ pal.muted }}">{{ confirmDeleteText }}</p>
+<div style="display:flex;justify-content:flex-end;gap:var(--space-2)">
+<button type="button" onClick="{{ cancelDelete }}" style="border:1px solid {{ pal.divider }};border-radius:12px;background:none;cursor:pointer;padding:8px 14px;font-size:13px">Cancelar</button>
+<button type="button" onClick="{{ confirmDeleteNow }}" style="border:none;background:{{ pal.accent }};color:{{ pal.accentText }};cursor:pointer;padding:8px 14px;font-size:13px;border-radius:12px">Excluir</button>
+</div>
+</div>
+</div>
+</sc-if>
+
+</div>
+</sc-if>
+
+</div>
+</x-import>
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:480,&quot;height&quot;:960},&quot;platform&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;ios&quot;,&quot;options&quot;:[&quot;ios&quot;,&quot;android&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;light&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;main&quot;,&quot;options&quot;:[&quot;onboarding&quot;,&quot;main&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;}}">
+class Component extends DCLogic {
+  state = {
+    screen: this.props.startScreen === 'main' ? 'main' : 'onboarding',
+    authMode: 'signup',
+    tab: 'dashboard',
+    achievementsOpen: false,
+    photosOpen: false,
+    reportsOpen: false,
+    importOpen: false,
+    challengesOpen: false,
+    upgradeOpen: false,
+    plan: 'pro',
+    reportsPeriod: 'week',
+    sheetOpen: false,
+    confirmDelete: null,
+    theme: this.props.theme === 'dark' ? 'dark' : 'light',
+    platform: this.props.platform === 'android' ? 'android' : 'ios',
+    displayName: 'Você',
+    checkinHour: 8,
+    btStatus: 'idle',
+    formDate: '2026-08-31',
+    formWeight: '',
+    formNote: '',
+    formError: null,
+    gForm: { weekly: '0.25', monthly: '1.0', quarterly: '3.0', semester: '6.0', target: '80' },
+    gError: null,
+    goalsSaved: false,
+    mForm: { waist: '', hip: '', chest: '', arm: '' },
+    mError: null,
+    measureSaved: false,
+    loginEmail: '', loginPass: '', loginName: '', loginError: null,
+    chartReady: false, chartKey: 0, obChartReady: false,
+    entries: [
+      { id: 1, date: '2026-08-01', weight: 93.4, note: null },
+      { id: 2, date: '2026-08-05', weight: 92.8, note: null },
+      { id: 3, date: '2026-08-09', weight: 92.1, note: null },
+      { id: 4, date: '2026-08-13', weight: 91.3, note: null },
+      { id: 5, date: '2026-08-17', weight: 90.6, note: 'pós-treino' },
+      { id: 6, date: '2026-08-18', weight: 90.4, note: null },
+      { id: 7, date: '2026-08-19', weight: 90.1, note: null },
+      { id: 8, date: '2026-08-20', weight: 90.0, note: null },
+      { id: 9, date: '2026-08-21', weight: 89.8, note: null },
+      { id: 10, date: '2026-08-22', weight: 89.7, note: null },
+      { id: 11, date: '2026-08-23', weight: 89.5, note: 'jantar fora' },
+      { id: 12, date: '2026-08-24', weight: 89.4, note: null },
+      { id: 13, date: '2026-08-25', weight: 89.2, note: null },
+      { id: 14, date: '2026-08-26', weight: 89.0, note: null },
+      { id: 15, date: '2026-08-27', weight: 88.8, note: null },
+      { id: 16, date: '2026-08-28', weight: 88.6, note: null },
+      { id: 17, date: '2026-08-29', weight: 88.4, note: null },
+      { id: 18, date: '2026-08-30', weight: 88.3, note: null },
+      { id: 19, date: '2026-08-31', weight: 88.1, note: 'em jejum' },
+    ],
+    goals: { weekly: 0.25, monthly: 1.0, quarterly: 3.0, semester: 6.0, target: 80 },
+    heightCm: '178', periodMode: 'fixed', weekStartsOn: 'monday', helpOpen: false,
+    goalsHistory: [
+      { id: 1, text: 'Peso alvo definido em 80 kg', date: '2026-06-01' },
+      { id: 2, text: 'Meta mensal alterada de 0.8 kg para 1.0 kg', date: '2026-07-15' },
+      { id: 3, text: 'Meta semanal alterada de 0.20 kg para 0.25 kg', date: '2026-07-15' },
+    ],
+    measurements: [
+      { id: 1, date: '2026-08-01', waist: 98, hip: 108, chest: 104, arm: 34 },
+      { id: 2, date: '2026-08-25', waist: 95, hip: 106, chest: 103, arm: 33.5 },
+    ],
+  };
+
+  componentDidMount() {
+    setTimeout(() => this.setState({ chartReady: true }), 150);
+    setTimeout(() => this.setState({ obChartReady: true }), 200);
+    this.obLoopTimer = setInterval(() => {
+      this.setState({ obChartReady: false });
+      setTimeout(() => this.setState({ obChartReady: true }), 150);
+    }, 4200);
+  }
+  componentWillUnmount() { if (this.obLoopTimer) clearInterval(this.obLoopTimer); }
+
+  nextEntryId = 20;
+  nextGoalHistId = 4;
+  nextMeasureId = 3;
+  btTimer = null;
+  MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+
+  getPalette(theme) {
+    const signal = { ahead:'#34D399', onpace:'#60A5FA', caution:'#FBBF24', behind:'#FB7185' };
+    const signalText = { ahead:'#0B1220', onpace:'#0B1220', caution:'#8A5A0B', behind:'#0B1220' };
+    if (theme === 'dark') {
+      return { bg:'#0B1220', surface:'#141B2D', surface2:'#1B2438', divider:'#26314A',
+        text:'#E7ECF7', muted:'#8C97B4', faint:'#5B6584',
+        accent:'#D97A45', accentHover:'#E08B5C', accentText:'#0B1220',
+        signal, signalText };
+    }
+    return { bg:'#FAF3EC', surface:'#FFFFFF', surface2:'#F3E7DB', divider:'#E4D2C0',
+      text:'#3A2A1F', muted:'#8A7362', faint:'#B4A192',
+      accent:'#C1652F', accentHover:'#A8531F', accentText:'#0B1220',
+      signal, signalText };
+  }
+
+  parseDate(s) { return new Date(s + 'T00:00:00'); }
+  fmtDate(s) { const d = this.parseDate(s); return `${d.getDate()} de ${this.MONTHS[d.getMonth()]}, ${d.getFullYear()}`; }
+  fmtDateShort(s) { const d = this.parseDate(s); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`; }
+
+  findBaseline(entries, periodStart) {
+    let best = null;
+    for (const e of entries) {
+      const d = this.parseDate(e.date);
+      if (d <= periodStart && (!best || d > this.parseDate(best.date))) best = e;
+    }
+    return best || entries[0];
+  }
+
+  computeKpi(entries, key, label, targetLoss, periodStart, periodEnd, now, pal) {
+    const baseline = this.findBaseline(entries, periodStart);
+    const current = entries[entries.length - 1];
+    const totalMs = periodEnd - periodStart;
+    const elapsed = totalMs > 0 ? Math.min(1, Math.max(0, (now - periodStart) / totalMs)) : 1;
+    const expectedNow = baseline.weight - targetLoss * elapsed;
+    const diff = current.weight - expectedNow;
+    let signalKey, statusLabel;
+    if (diff <= -0.15) { signalKey = 'ahead'; statusLabel = 'Adiantado'; }
+    else if (diff <= 0.15) { signalKey = 'onpace'; statusLabel = 'No ritmo'; }
+    else if (diff <= 0.4) { signalKey = 'caution'; statusLabel = 'Atenção'; }
+    else { signalKey = 'behind'; statusLabel = 'Atrasado'; }
+    const actualLoss = baseline.weight - current.weight;
+    const progressPct = targetLoss > 0 ? Math.round(Math.max(0, Math.min(100, (actualLoss / targetLoss) * 100))) : 0;
+    const tagBg = pal.signal[signalKey];
+    const tagText = pal.signalText[signalKey];
+    const tagBorder = 'transparent';
+    const cardBg = `color-mix(in srgb, ${pal.signal[signalKey]} 16%, ${pal.surface})`;
+    const cardBorder = `color-mix(in srgb, ${pal.signal[signalKey]} 55%, transparent)`;
+    return {
+      key, label, signal: signalKey, statusLabel,
+      actualLossLabel: (actualLoss >= 0 ? '-' : '+') + Math.abs(actualLoss).toFixed(2),
+      targetLossLabel: '-' + targetLoss.toFixed(2) + ' kg meta',
+      progressPct, tagBg, tagText, tagBorder, cardBg, cardBorder,
+      baselineDate: baseline.date, baselineWeight: baseline.weight, expectedNowWeight: expectedNow,
+    };
+  }
+
+  computeAllKpis(entries, goals, now, pal) {
+    const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay()); weekStart.setHours(0,0,0,0);
+    const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 7);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const qStartMonth = Math.floor(now.getMonth() / 3) * 3;
+    const quarterStart = new Date(now.getFullYear(), qStartMonth, 1);
+    const quarterEnd = new Date(now.getFullYear(), qStartMonth + 3, 1);
+    const hStartMonth = now.getMonth() < 6 ? 0 : 6;
+    const semStart = new Date(now.getFullYear(), hStartMonth, 1);
+    const semEnd = new Date(now.getFullYear(), hStartMonth + 6, 1);
+    return [
+      this.computeKpi(entries, 'week', 'Semana', goals.weekly, weekStart, weekEnd, now, pal),
+      this.computeKpi(entries, 'month', 'Mês', goals.monthly, monthStart, monthEnd, now, pal),
+      this.computeKpi(entries, 'quarter', 'Trimestre', goals.quarterly, quarterStart, quarterEnd, now, pal),
+      this.computeKpi(entries, 'semester', 'Semestre', goals.semester, semStart, semEnd, now, pal),
+    ];
+  }
+
+  computeTrend(entries, now) {
+    const cutoff = new Date(now); cutoff.setDate(now.getDate() - 21);
+    const pts = entries.filter(e => this.parseDate(e.date) >= cutoff);
+    const use = pts.length >= 2 ? pts : entries.slice(-3);
+    if (use.length < 2) return { text: 'Sem dados recentes', icon: '—', description: 'Registre mais pesagens para ver a tendência.' };
+    const t0 = this.parseDate(use[0].date).getTime();
+    const xs = use.map(e => (this.parseDate(e.date).getTime() - t0) / 86400000);
+    const ys = use.map(e => e.weight);
+    const n = xs.length;
+    const sumX = xs.reduce((a,b)=>a+b,0), sumY = ys.reduce((a,b)=>a+b,0);
+    const sumXY = xs.reduce((a,x,i)=>a+x*ys[i],0), sumXX = xs.reduce((a,x)=>a+x*x,0);
+    const denom = n * sumXX - sumX * sumX;
+    const slopePerDay = denom !== 0 ? (n * sumXY - sumX * sumY) / denom : 0;
+    const perWeek = slopePerDay * 7;
+    let text;
+    if (perWeek <= -0.4) text = 'Perdendo rápido';
+    else if (perWeek <= -0.05) text = 'Perdendo peso';
+    else if (perWeek < 0.05) text = 'Estável';
+    else text = 'Ganhando peso';
+    const icon = perWeek <= -0.4 ? '↓↓' : perWeek <= -0.05 ? '↓' : perWeek < 0.05 ? '→' : '↑';
+    return { text, icon, description: `~${Math.abs(perWeek).toFixed(2)} kg/semana nos últimos 21 dias` };
+  }
+
+  computeStreak(entries, now) {
+    const set = new Set(entries.map(e => e.date));
+    const toStr = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    let cur = 0; let d = new Date(now);
+    const isActiveToday = set.has(toStr(now));
+    if (!isActiveToday) d.setDate(d.getDate() - 1);
+    while (set.has(toStr(d))) { cur++; d.setDate(d.getDate() - 1); }
+    const dates = entries.map(e => this.parseDate(e.date).getTime()).sort((a,b)=>a-b);
+    let best = 0, run = 0, prev = null;
+    for (const t of dates) {
+      if (prev !== null && t - prev === 86400000) run++; else run = 1;
+      if (run > best) best = run;
+      prev = t;
+    }
+    const last7 = [];
+    for (let i = 6; i >= 0; i--) {
+      const dd = new Date(now); dd.setDate(now.getDate() - i);
+      last7.push({ date: toStr(dd), has: set.has(toStr(dd)) });
+    }
+    return { current: cur, best, last7 };
+  }
+
+  buildChart(entries, weekInfo) {
+    const w = 300, h = 130, padX = 10, padY = 14;
+    const weights = entries.map(e => e.weight);
+    const min = Math.min(...weights), max = Math.max(...weights);
+    const pad = Math.max(0.3, (max - min) * 0.25);
+    const lo = min - pad, hi = max + pad;
+    const n = entries.length;
+    const mapY = (val) => padY + (1 - (val - lo) / (hi - lo)) * (h - 2*padY);
+    const pts = entries.map((e, i) => ({
+      x: padX + (i * (w - 2*padX)) / (n - 1),
+      y: mapY(e.weight),
+      delay: Math.round((i / (n - 1)) * 500),
+    }));
+    const smooth = (p) => {
+      if (p.length < 2) return '';
+      let d = `M ${p[0].x.toFixed(1)},${p[0].y.toFixed(1)}`;
+      for (let i = 0; i < p.length - 1; i++) {
+        const p0 = p[i - 1] || p[i], p1 = p[i], p2 = p[i + 1], p3 = p[i + 2] || p2;
+        const c1x = p1.x + (p2.x - p0.x) / 6, c1y = p1.y + (p2.y - p0.y) / 6;
+        const c2x = p2.x - (p3.x - p1.x) / 6, c2y = p2.y - (p3.y - p1.y) / 6;
+        d += ` C ${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+      }
+      return d;
+    };
+    const pathD = smooth(pts);
+    const areaD = pathD + ` L${pts[n-1].x.toFixed(1)},${h} L${pts[0].x.toFixed(1)},${h} Z`;
+    let pathLen = 0;
+    for (let i = 1; i < pts.length; i++) pathLen += Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y);
+    pathLen = Math.round(pathLen * 1.15);
+    let dashedD = '', metaX = 0, metaY = 0;
+    if (weekInfo) {
+      let startIdx = entries.findIndex(e => e.date === weekInfo.baselineDate);
+      if (startIdx < 0) startIdx = 0;
+      const x1 = pts[startIdx].x, y1 = mapY(weekInfo.baselineWeight);
+      const x2 = pts[n-1].x, y2 = mapY(weekInfo.expectedNowWeight);
+      dashedD = `M ${x1.toFixed(1)},${y1.toFixed(1)} L ${x2.toFixed(1)},${y2.toFixed(1)}`;
+      metaX = x2; metaY = y2;
+    }
+    return { w, h, pathD, areaD, dashedD, pathLen, points: pts, lastPoint: pts[n-1], metaX, metaY };
+  }
+
+  goSignup = () => this.setState({ screen: 'login', authMode: 'signup', loginError: null });
+  goLoginMode = () => this.setState({ screen: 'login', authMode: 'login', loginError: null });
+  backToOnboarding = () => this.setState({ screen: 'onboarding' });
+  setAuthSignup = () => this.setState({ authMode: 'signup' });
+  setAuthLogin = () => this.setState({ authMode: 'login' });
+  setLoginName = (e) => this.setState({ loginName: e.target.value });
+  setLoginEmail = (e) => this.setState({ loginEmail: e.target.value });
+  setLoginPass = (e) => this.setState({ loginPass: e.target.value });
+  submitLogin = (e) => {
+    e.preventDefault();
+    if (!this.state.loginEmail.trim() || !this.state.loginPass.trim()) {
+      this.setState({ loginError: 'Informe e-mail e senha para continuar.' });
+      return;
+    }
+    this.setState({ screen: 'main', tab: 'dashboard', loginError: null, displayName: this.state.loginName.trim() || 'Você' });
+  };
+
+  setTabDashboard = () => this.setState({ tab: 'dashboard', achievementsOpen: false });
+  setTabHistory = () => this.setState({ tab: 'history' });
+  setTabGoals = () => this.setState({ tab: 'goals' });
+  setTabMeasurements = () => this.setState({ tab: 'measurements' });
+  setTabSettings = () => this.setState({ tab: 'settings' });
+  openAchievements = () => this.setState({ achievementsOpen: true });
+  openPhotos = () => this.setState({ photosOpen: true });
+  openReports = () => this.setState({ reportsOpen: true });
+  openImport = () => this.setState({ importOpen: true });
+  openChallenges = () => this.setState({ challengesOpen: true });
+  openUpgrade = () => this.setState({ achievementsOpen: false, photosOpen: false, reportsOpen: false, importOpen: false, challengesOpen: false, upgradeOpen: true });
+  closeOverlay = () => this.setState({ achievementsOpen: false, photosOpen: false, reportsOpen: false, importOpen: false, challengesOpen: false, upgradeOpen: false });
+  setPlanFree = () => this.setState({ plan: 'free' });
+  setPlanPro = () => this.setState({ plan: 'pro' });
+
+  openSheet = () => this.setState({ sheetOpen: true, formDate: '2026-08-31', formWeight: '', formNote: '', formError: null });
+  closeSheet = () => { if (this.btTimer) clearTimeout(this.btTimer); this.setState({ sheetOpen: false }); };
+  setFormDate = (e) => this.setState({ formDate: e.target.value });
+  setFormWeight = (e) => this.setState({ formWeight: e.target.value });
+  setFormNote = (e) => this.setState({ formNote: e.target.value });
+  submitEntry = (e) => {
+    e.preventDefault();
+    const w = Number(this.state.formWeight.replace(',', '.'));
+    if (!w || w <= 0 || w >= 500) { this.setState({ formError: 'Informe um peso válido em kg.' }); return; }
+    const entries = this.state.entries.filter(en => en.date !== this.state.formDate);
+    entries.push({ id: this.nextEntryId++, date: this.state.formDate, weight: w, note: this.state.formNote || null });
+    entries.sort((a, b) => a.date.localeCompare(b.date));
+    this.setState({ entries, sheetOpen: false, formError: null, chartReady: false, chartKey: this.state.chartKey + 1 });
+    setTimeout(() => this.setState({ chartReady: true }), 150);
+  };
+
+  startBluetooth = () => {
+    this.setState({ btStatus: 'scanning' });
+    this.btTimer = setTimeout(() => this.setState({ btStatus: 'found' }), 1200);
+  };
+  connectBluetooth = () => {
+    const last = this.state.entries[this.state.entries.length - 1];
+    const simulated = Math.max(30, last.weight - 0.1).toFixed(1);
+    this.setState({ btStatus: 'connected', formWeight: simulated, formNote: 'via Bluetooth' });
+  };
+  disconnectBt = () => this.setState({ btStatus: 'idle' });
+
+  requestDelete = (entry) => this.setState({ confirmDelete: entry });
+  cancelDelete = () => this.setState({ confirmDelete: null });
+  confirmDeleteNow = () => {
+    const id = this.state.confirmDelete.id;
+    this.setState({ entries: this.state.entries.filter(e => e.id !== id), confirmDelete: null });
+  };
+
+  setGWeekly = (e) => this.setState({ gForm: { ...this.state.gForm, weekly: e.target.value } });
+  setGMonthly = (e) => this.setState({ gForm: { ...this.state.gForm, monthly: e.target.value } });
+  setGQuarterly = (e) => this.setState({ gForm: { ...this.state.gForm, quarterly: e.target.value } });
+  setGSemester = (e) => this.setState({ gForm: { ...this.state.gForm, semester: e.target.value } });
+  setGTarget = (e) => this.setState({ gForm: { ...this.state.gForm, target: e.target.value } });
+  submitGoals = (e) => {
+    e.preventDefault();
+    const parse = (v) => Number(String(v).trim().replace(',', '.'));
+    const w = parse(this.state.gForm.weekly), m = parse(this.state.gForm.monthly),
+          q = parse(this.state.gForm.quarterly), s = parse(this.state.gForm.semester);
+    const t = this.state.gForm.target.trim() === '' ? null : parse(this.state.gForm.target);
+    if ([w,m,q,s].some(v => isNaN(v) || v < 0)) { this.setState({ gError: 'Informe valores válidos (use ponto ou vírgula).' }); return; }
+    if (t !== null && (isNaN(t) || t <= 0 || t >= 500)) { this.setState({ gError: 'Peso alvo deve estar entre 0 e 500 kg.' }); return; }
+    const goals = { weekly: w, monthly: m, quarterly: q, semester: s, target: t };
+    const hist = { id: this.nextGoalHistId++, text: 'Metas atualizadas', date: '2026-08-31' };
+    this.setState({ goals, gError: null, goalsSaved: true, goalsHistory: [hist, ...this.state.goalsHistory] });
+    setTimeout(() => this.setState({ goalsSaved: false }), 3000);
+  };
+
+  setMWaist = (e) => this.setState({ mForm: { ...this.state.mForm, waist: e.target.value } });
+  setMHip = (e) => this.setState({ mForm: { ...this.state.mForm, hip: e.target.value } });
+  setMChest = (e) => this.setState({ mForm: { ...this.state.mForm, chest: e.target.value } });
+  setMArm = (e) => this.setState({ mForm: { ...this.state.mForm, arm: e.target.value } });
+  submitMeasurement = (e) => {
+    e.preventDefault();
+    const { waist, hip, chest, arm } = this.state.mForm;
+    const vals = [waist, hip, chest, arm];
+    if (!vals.every(v => v.trim() !== '' && !isNaN(Number(v.replace(',', '.'))))) {
+      this.setState({ mError: 'Preencha todas as medidas em cm.' }); return;
+    }
+    const m = { id: this.nextMeasureId++, date: '2026-08-31',
+      waist: Number(waist.replace(',', '.')), hip: Number(hip.replace(',', '.')),
+      chest: Number(chest.replace(',', '.')), arm: Number(arm.replace(',', '.')) };
+    this.setState({ measurements: [m, ...this.state.measurements], mForm: { waist:'',hip:'',chest:'',arm:'' }, mError: null, measureSaved: true });
+    setTimeout(() => this.setState({ measureSaved: false }), 3000);
+  };
+
+  setDisplayName = (e) => this.setState({ displayName: e.target.value });
+  setHeightCm = (e) => this.setState({ heightCm: e.target.value });
+  setCheckinHour = (e) => this.setState({ checkinHour: e.target.value === '' ? null : Number(e.target.value) });
+  setPeriodModeFixed = () => this.setState({ periodMode: 'fixed' });
+  setPeriodModeRolling = () => this.setState({ periodMode: 'rolling' });
+  setWeekMonday = () => this.setState({ weekStartsOn: 'monday' });
+  setWeekSunday = () => this.setState({ weekStartsOn: 'sunday' });
+  openHelp = () => this.setState({ helpOpen: true });
+  closeHelp = () => this.setState({ helpOpen: false });
+  setThemeLight = () => this.setState({ theme: 'light' });
+  setThemeDark = () => this.setState({ theme: 'dark' });
+  setPlatformIos = () => this.setState({ platform: 'ios' });
+  setPlatformAndroid = () => this.setState({ platform: 'android' });
+  logout = () => this.setState({ screen: 'onboarding' });
+
+  renderVals() {
+    const s = this.state;
+    const pal = this.getPalette(s.theme);
+    const now = this.parseDate('2026-08-31');
+    const kpis = this.computeAllKpis(s.entries, s.goals, now, pal);
+    const trend = this.computeTrend(s.entries, now);
+    const streak = this.computeStreak(s.entries, now);
+    const chart = this.buildChart(s.entries, { baselineDate: kpis[0].baselineDate, baselineWeight: kpis[0].baselineWeight, expectedNowWeight: kpis[0].expectedNowWeight });
+    chart.areaOpacity = s.chartReady ? 0.08 : 0;
+    chart.dashedOpacity = s.chartReady ? 1 : 0;
+    chart.metaOpacity = s.chartReady ? 1 : 0;
+    chart.lineDashoffset = s.chartReady ? 0 : chart.pathLen;
+    const obPoints = chart.points.map(p => ({ ...p, opacity: s.obChartReady ? 1 : 0 }));
+    chart.points = chart.points.map(p => ({ ...p, opacity: s.chartReady ? 1 : 0 }));
+    const obLineOffset = s.obChartReady ? 0 : chart.pathLen;
+    const obAreaOpacity = s.obChartReady ? 0.1 : 0;
+    const latest = s.entries[s.entries.length - 1];
+    const first = s.entries[0];
+    const totalChange = latest.weight - first.weight;
+
+    const overlayOpen = s.achievementsOpen || s.photosOpen || s.reportsOpen || s.importOpen || s.challengesOpen || s.upgradeOpen;
+    const overlayTitle = s.achievementsOpen ? 'Conquistas' : s.photosOpen ? 'Fotos de progresso' : s.reportsOpen ? 'Relatórios' : s.importOpen ? 'Importar CSV' : s.challengesOpen ? 'Desafios' : s.upgradeOpen ? 'Planos' : '';
+    const isPro = s.plan === 'pro';
+    const challenges = [
+      { id: 1, label: 'Sem doces por 14 dias', pct: 64, days: '5d restantes' },
+      { id: 2, label: '-5 kg até 30/09', pct: 42, days: '24d restantes' },
+    ].map(c => ({ ...c, barColor: c.pct >= 100 ? pal.signal.onpace : pal.accent }));
+    const plans = [
+      { id: 'gratis', name: 'Grátis', price: 'R$ 0', features: ['Registro diário de peso', 'Gráfico de evolução', '1 meta ativa', 'Conquistas'] },
+      { id: 'pro', name: 'Pro', price: 'R$ 11,90/mês', features: ['Tudo do Grátis', 'Até 3 metas simultâneas', 'Medidas e fotos de progresso', 'Previsão e relatórios', 'Desafios', 'Exportar e importar dados'] },
+    ];
+    const kpiLegend = [
+      { key: 'ahead', label: 'Adiantado', color: pal.signal.ahead, desc: 'Você está perdendo peso mais rápido que o previsto pela meta.' },
+      { key: 'onpace', label: 'No ritmo', color: pal.signal.onpace, desc: 'Seu peso está alinhado ao ritmo previsto pela meta.' },
+      { key: 'caution', label: 'Atenção', color: pal.signal.caution, desc: 'Você está levemente atrás do ritmo previsto.' },
+      { key: 'behind', label: 'Atrasado', color: pal.signal.behind, desc: 'Você está bem atrás do ritmo previsto pela meta.' },
+    ];
+    const reportKpi = kpis.find(k => k.key === s.reportsPeriod) || kpis[0];
+    const reportTabs = [['week','Semana'],['month','Mês'],['quarter','Trimestre'],['semester','Semestre']].map(([key,label]) => ({
+      label,
+      bg: s.reportsPeriod === key ? pal.accent : 'transparent',
+      color: s.reportsPeriod === key ? pal.accentText : pal.muted,
+      select: () => this.setState({ reportsPeriod: key }),
+    }));
+    const photoDates = ['15 jun','29 jun','13 jul','27 jul','10 ago','31 ago'];
+
+    const entriesDesc = [...s.entries].sort((a,b) => b.date.localeCompare(a.date)).map((en, i, arr) => {
+      const prev = arr[i+1];
+      const diff = prev ? en.weight - prev.weight : null;
+      return {
+        id: en.id,
+        weightLabel: en.weight.toFixed(1) + ' kg',
+        dateLabel: this.fmtDate(en.date) + (en.note ? ' · ' + en.note : ''),
+        diffLabel: diff === null ? '' : diff === 0 ? '=' : (diff < 0 ? diff.toFixed(1) : '+' + diff.toFixed(1)),
+        diffColor: diff !== null && diff > 0 ? pal.signal.behind : pal.muted,
+        onDelete: () => this.requestDelete(en),
+      };
+    });
+
+    const streakDays = streak.last7.map(d => ({
+      date: d.date, bg: d.has ? pal.accent : 'transparent', border: d.has ? 'none' : ('1px solid ' + pal.divider),
+    }));
+
+    const totalLoss = first.weight - latest.weight;
+    const targetW = s.goals.target;
+    const hasTarget = targetW !== null && targetW > 0;
+    const firstAboveTarget = hasTarget && first.weight > targetW;
+    const progressPct = hasTarget && firstAboveTarget ? (totalLoss / (first.weight - targetW)) * 100 : null;
+    const ACHIEVEMENT_RULES = [
+      { key:'lost_1kg', label:'Primeiro kg', desc:'Perdeu 1 kg desde o primeiro registro.', met: totalLoss >= 1, pct:false },
+      { key:'lost_5kg', label:'-5 kg', desc:'Perdeu 5 kg desde o primeiro registro.', met: totalLoss >= 5, pct:false },
+      { key:'lost_10kg', label:'-10 kg', desc:'Perdeu 10 kg desde o primeiro registro.', met: totalLoss >= 10, pct:false },
+      { key:'pct_25', label:'25% da meta', desc:'25% do caminho até o peso alvo.', met: progressPct !== null && progressPct >= 25, pct:true },
+      { key:'pct_50', label:'50% da meta', desc:'Metade do caminho até o peso alvo.', met: progressPct !== null && progressPct >= 50, pct:true },
+      { key:'pct_75', label:'75% da meta', desc:'75% do caminho até o peso alvo.', met: progressPct !== null && progressPct >= 75, pct:true },
+      { key:'pct_100', label:'Meta atingida', desc:'Chegou no peso alvo!', met: progressPct !== null && progressPct >= 100, pct:true },
+    ];
+    const achievements = ACHIEVEMENT_RULES.map(r => {
+      const blocked = r.pct && !hasTarget;
+      const unlocked = !blocked && r.met;
+      return {
+        id: r.key, label: r.label, desc: r.desc, unlocked,
+        reason: blocked ? 'defina um peso alvo em Metas' : (!unlocked && r.pct ? `${Math.max(0, Math.round(progressPct || 0))}% até agora` : ''),
+        tagLabel: unlocked ? 'Conquistado' : blocked ? 'Bloqueado' : 'Em progresso',
+        tagBg: unlocked ? pal.accent : 'transparent',
+        tagText: unlocked ? pal.accentText : pal.muted,
+        tagBorder: unlocked ? 'transparent' : pal.divider,
+      };
+    });
+    const unlockedCount = achievements.filter(a => a.unlocked).length;
+
+    const measurementsList = s.measurements.map(m => ({
+      id: m.id, dateLabel: this.fmtDateShort(m.date),
+      line: `Cintura ${m.waist} · Quadril ${m.hip} · Peito ${m.chest} · Braço ${m.arm} cm`,
+    }));
+
+    const checkinHours = Array.from({length:24}, (_,h) => ({ v: h, label: String(h).padStart(2,'0') + ':00' }));
+
+    return {
+      screen: s.screen, tab: s.tab, achievementsOpen: s.achievementsOpen, sheetOpen: s.sheetOpen,
+      overlayOpen, overlayTitle, closeOverlay: this.closeOverlay,
+      photosOpen: s.photosOpen, reportsOpen: s.reportsOpen, importOpen: s.importOpen,
+      openPhotos: this.openPhotos, openReports: this.openReports, openImport: this.openImport,
+      reportKpi, reportTabs, photoDates,
+      challengesOpen: s.challengesOpen, upgradeOpen: s.upgradeOpen, openChallenges: this.openChallenges, openUpgrade: this.openUpgrade,
+      isPro, challenges, plans,
+      planFreeBg: !isPro?pal.accent:'transparent', planFreeText: !isPro?pal.accentText:pal.text,
+      planProBg: isPro?pal.accent:'transparent', planProText: isPro?pal.accentText:pal.text,
+      setPlanFree: this.setPlanFree, setPlanPro: this.setPlanPro, kpiLegend,
+      showDashboard: !overlayOpen && s.tab === 'dashboard',
+      showHistory: !overlayOpen && s.tab === 'history',
+      showSettings: !overlayOpen && s.tab === 'settings',
+      showBtScan: s.btStatus === 'idle',
+      theme: s.theme, platform: s.platform,
+      isDark: s.theme === 'dark',
+      deviceComponent: s.platform === 'android' ? 'AndroidDevice' : 'IOSDevice',
+      frameWidth: s.platform === 'android' ? 412 : 402,
+      frameHeight: s.platform === 'android' ? 892 : 874,
+      headerPadTop: s.platform === 'android' ? '20px' : '54px',
+      pal,
+      authMode: s.authMode, loginTitle: s.authMode === 'signup' ? 'Criar conta' : 'Entrar', isSignup: s.authMode === 'signup',
+      loginName: s.loginName, loginEmail: s.loginEmail, loginPass: s.loginPass, loginError: s.loginError,
+      displayName: s.displayName, checkinHour: s.checkinHour === null ? '' : s.checkinHour, checkinHours,
+      heightCm: s.heightCm, periodMode: s.periodMode, weekStartsOn: s.weekStartsOn, helpOpen: s.helpOpen,
+      periodModeFixedBorder: s.periodMode==='fixed'?pal.accent:pal.divider, periodModeRollingBorder: s.periodMode==='rolling'?pal.accent:pal.divider,
+      weekMondayBg: s.weekStartsOn==='monday'?pal.accent:'transparent', weekMondayText: s.weekStartsOn==='monday'?pal.accentText:pal.text,
+      weekSundayBg: s.weekStartsOn==='sunday'?pal.accent:'transparent', weekSundayText: s.weekStartsOn==='sunday'?pal.accentText:pal.text,
+      openHelp: this.openHelp, closeHelp: this.closeHelp, setHeightCm: this.setHeightCm,
+      setPeriodModeFixed: this.setPeriodModeFixed, setPeriodModeRolling: this.setPeriodModeRolling,
+      setWeekMonday: this.setWeekMonday, setWeekSunday: this.setWeekSunday,
+      btStatus: s.btStatus, btConnected: s.btStatus === 'connected',
+      formDate: s.formDate, formWeight: s.formWeight, formNote: s.formNote, formError: s.formError,
+      latestWeightLabel: latest.weight.toFixed(1),
+      lastMeasuredLabel: this.fmtDate(latest.date),
+      totalChangeLabel: (totalChange <= 0 ? '↓ ' : '↑ ') + Math.abs(totalChange).toFixed(1) + ' kg',
+      totalChangeColor: totalChange <= 0 ? pal.text : pal.signal.behind,
+      goalTargetLabel: s.goals.target ? s.goals.target + ' kg' : 'não definida',
+      chartReady: s.chartReady, chartKey: s.chartKey,
+      obPoints, obLineOffset, obAreaOpacity,
+      authSignupBg: s.authMode==='signup'?pal.accent:'transparent', authSignupText: s.authMode==='signup'?pal.accentText:pal.text,
+      authLoginBg: s.authMode!=='signup'?pal.accent:'transparent', authLoginText: s.authMode!=='signup'?pal.accentText:pal.text,
+      themeLightBg: s.theme==='light'?pal.accent:'transparent', themeLightText: s.theme==='light'?pal.accentText:pal.text,
+      themeDarkBg: s.theme==='dark'?pal.accent:'transparent', themeDarkText: s.theme==='dark'?pal.accentText:pal.text,
+      platformIosBg: s.platform==='ios'?pal.accent:'transparent', platformIosText: s.platform==='ios'?pal.accentText:pal.text,
+      platformAndroidBg: s.platform==='android'?pal.accent:'transparent', platformAndroidText: s.platform==='android'?pal.accentText:pal.text,
+      kpis, trend, streak, streakDays,
+      achievements, unlockedCount, totalCount: achievements.length,
+      chart, entriesDesc,
+      goalsHistory: s.goalsHistory.map(h => ({ id: h.id, text: h.text, dateLabel: this.fmtDateShort(h.date) })),
+      measurementsList,
+      gForm: s.gForm, gError: s.gError, goalsSaved: s.goalsSaved,
+      mForm: s.mForm, mError: s.mError, measureSaved: s.measureSaved,
+      confirmDelete: s.confirmDelete,
+      confirmDeleteText: s.confirmDelete ? `Excluir a pesagem de ${s.confirmDelete.weight.toFixed(1)} kg em ${this.fmtDate(s.confirmDelete.date)}? Essa ação não pode ser desfeita.` : '',
+      goSignup: this.goSignup, goLoginMode: this.goLoginMode, backToOnboarding: this.backToOnboarding,
+      setAuthSignup: this.setAuthSignup, setAuthLogin: this.setAuthLogin,
+      setLoginName: this.setLoginName, setLoginEmail: this.setLoginEmail, setLoginPass: this.setLoginPass, submitLogin: this.submitLogin,
+      setTabDashboard: this.setTabDashboard, setTabHistory: this.setTabHistory, setTabGoals: this.setTabGoals,
+      setTabMeasurements: this.setTabMeasurements, setTabSettings: this.setTabSettings,
+      openAchievements: this.openAchievements, closeAchievements: this.closeAchievements,
+      openSheet: this.openSheet, closeSheet: this.closeSheet,
+      setFormDate: this.setFormDate, setFormWeight: this.setFormWeight, setFormNote: this.setFormNote, submitEntry: this.submitEntry,
+      startBluetooth: this.startBluetooth, connectBluetooth: this.connectBluetooth, disconnectBt: this.disconnectBt,
+      cancelDelete: this.cancelDelete, confirmDeleteNow: this.confirmDeleteNow,
+      setGWeekly: this.setGWeekly, setGMonthly: this.setGMonthly, setGQuarterly: this.setGQuarterly, setGSemester: this.setGSemester, setGTarget: this.setGTarget, submitGoals: this.submitGoals,
+      setMWaist: this.setMWaist, setMHip: this.setMHip, setMChest: this.setMChest, setMArm: this.setMArm, submitMeasurement: this.submitMeasurement,
+      setDisplayName: this.setDisplayName, setCheckinHour: this.setCheckinHour,
+      setThemeLight: this.setThemeLight, setThemeDark: this.setThemeDark,
+      setPlatformIos: this.setPlatformIos, setPlatformAndroid: this.setPlatformAndroid,
+      logout: this.logout,
+      t: {
+        dashboard: { color: s.tab==='dashboard'?pal.accent:pal.muted, bd: s.tab==='dashboard'?pal.accent:'transparent' },
+        history: { color: s.tab==='history'?pal.accent:pal.muted, bd: s.tab==='history'?pal.accent:'transparent' },
+        goals: { color: s.tab==='goals'?pal.accent:pal.muted, bd: s.tab==='goals'?pal.accent:'transparent' },
+        measurements: { color: s.tab==='measurements'?pal.accent:pal.muted, bd: s.tab==='measurements'?pal.accent:'transparent' },
+        settings: { color: s.tab==='settings'?pal.accent:pal.muted, bd: s.tab==='settings'?pal.accent:'transparent' },
+      },
+      tabLabel: { dashboard:'Visão geral', history:'Histórico', goals:'Metas', measurements:'Medidas', settings:'Configurações' }[s.tab],
+    };
+  }
+}
+
+</script>
+</body>
+</html>

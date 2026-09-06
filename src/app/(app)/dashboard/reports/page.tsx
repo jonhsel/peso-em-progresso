@@ -8,7 +8,7 @@ import {
   METRIC_UNIT,
   type PeriodKpi,
 } from "@/lib/analytics";
-import NavBar from "@/components/NavBar";
+import Sidebar from "@/components/Sidebar";
 import PlanGate from "@/components/PlanGate";
 import ReportsClient from "./ReportsClient";
 import type { WeightGoalKpi } from "@/components/WeightChart";
@@ -51,9 +51,10 @@ export default async function ReportsPage() {
   }));
 
   return (
-    <div>
-      <NavBar displayName={profile.display_name} theme={theme} plan={profile.plan} />
-      <main className="max-w-6xl mx-auto px-4 py-8">
+    <div className="flex min-h-screen">
+      <Sidebar displayName={profile.display_name} theme={theme} plan={profile.plan} activeGoals={activeGoals} />
+      <div className="flex-1 overflow-x-hidden">
+        <main className="max-w-6xl mx-auto px-4 py-8">
         <PlanGate plan={profile.plan} featureName="Relatórios">
           <div className="space-y-6">
             <p className="text-xs uppercase tracking-wide text-ink-muted">Relatórios</p>
@@ -67,7 +68,8 @@ export default async function ReportsPage() {
             />
           </div>
         </PlanGate>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

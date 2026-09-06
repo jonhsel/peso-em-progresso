@@ -1,19 +1,20 @@
 import { loadUserData } from "@/lib/loadUserData";
 import { getTheme } from "@/lib/get-theme";
-import NavBar from "@/components/NavBar";
+import Sidebar from "@/components/Sidebar";
 import WeightEntryForm from "@/components/WeightEntryForm";
 import EntriesList from "@/components/EntriesList";
 import ExportButtons from "@/components/entries/ExportButtons";
 import Link from "next/link";
 
 export default async function EntriesPage() {
-  const { user, profile, entries } = await loadUserData();
+  const { user, profile, entries, activeGoals } = await loadUserData();
   const theme = await getTheme();
 
   return (
-    <div>
-      <NavBar displayName={profile.display_name} theme={theme} plan={profile.plan} />
-      <main className="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="flex min-h-screen">
+      <Sidebar displayName={profile.display_name} theme={theme} plan={profile.plan} activeGoals={activeGoals} />
+      <div className="flex-1 overflow-x-hidden">
+        <main className="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="md:sticky md:top-8 self-start">
           <WeightEntryForm userId={user.id} />
         </div>
@@ -42,7 +43,8 @@ export default async function EntriesPage() {
           </div>
           <EntriesList entries={entries} />
         </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

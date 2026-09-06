@@ -1,17 +1,18 @@
 import { loadUserData } from "@/lib/loadUserData";
 import { getTheme } from "@/lib/get-theme";
-import NavBar from "@/components/NavBar";
+import Sidebar from "@/components/Sidebar";
 import PlanGate from "@/components/PlanGate";
 import CsvImporter from "@/components/import/CsvImporter";
 
 export default async function ImportPage() {
-  const { user, profile } = await loadUserData();
+  const { user, profile, activeGoals } = await loadUserData();
   const theme = await getTheme();
 
   return (
-    <div>
-      <NavBar displayName={profile.display_name} theme={theme} plan={profile.plan} />
-      <main className="max-w-2xl mx-auto px-4 py-8">
+    <div className="flex min-h-screen">
+      <Sidebar displayName={profile.display_name} theme={theme} plan={profile.plan} activeGoals={activeGoals} />
+      <div className="flex-1 overflow-x-hidden">
+        <main className="max-w-2xl mx-auto px-4 py-8">
         <PlanGate plan={profile.plan} featureName="Importação de CSV">
           <div className="space-y-6">
             <div>
@@ -27,7 +28,8 @@ export default async function ImportPage() {
             <CsvImporter userId={user.id} />
           </div>
         </PlanGate>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

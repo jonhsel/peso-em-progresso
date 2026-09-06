@@ -14,7 +14,7 @@ import {
   type PeriodKpi,
 } from "@/lib/analytics";
 import type { GoalPredictions } from "@/components/GoalTabs";
-import NavBar from "@/components/NavBar";
+import Sidebar from "@/components/Sidebar";
 import PlanGate from "@/components/PlanGate";
 import GoalTabs from "@/components/GoalTabs";
 import TrendBadge from "@/components/TrendBadge";
@@ -105,9 +105,10 @@ export default async function CoachClientPage({
   }
 
   return (
-    <div>
-      <NavBar displayName={coachProfile.display_name} theme={theme} plan={coachProfile.plan} />
-      <main className="max-w-6xl mx-auto px-4 py-8">
+    <div className="flex min-h-screen">
+      <Sidebar displayName={coachProfile.display_name} theme={theme} plan={coachProfile.plan} />
+      <div className="flex-1 overflow-x-hidden">
+        <main className="max-w-6xl mx-auto px-4 py-8">
         {/* Gate é sobre o plano do COACH (quem está vendo esta página), não
             do dono dos dados — o dono pode ser free, o coach sempre vê tudo
             do cliente sem gate interno (WeightChart recebe plan=undefined
@@ -166,7 +167,8 @@ export default async function CoachClientPage({
             </section>
           </div>
         </PlanGate>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

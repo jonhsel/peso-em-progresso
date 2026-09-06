@@ -1,14 +1,14 @@
 import { loadUserData } from "@/lib/loadUserData";
 import { getTheme } from "@/lib/get-theme";
 import { createClient } from "@/lib/supabase/server";
-import NavBar from "@/components/NavBar";
+import Sidebar from "@/components/Sidebar";
 import PlanGate from "@/components/PlanGate";
 import CoachShareSection from "@/components/coach/CoachShareSection";
 import CoachClientsList from "@/components/coach/CoachClientsList";
 import type { CoachLink } from "@/types/database";
 
 export default async function CoachPage() {
-  const { user, profile } = await loadUserData();
+  const { user, profile, activeGoals } = await loadUserData();
   const theme = await getTheme();
   const supabase = createClient();
 
@@ -30,9 +30,10 @@ export default async function CoachPage() {
     .order("accepted_at", { ascending: false });
 
   return (
-    <div>
-      <NavBar displayName={profile.display_name} theme={theme} plan={profile.plan} />
-      <main className="max-w-2xl mx-auto px-4 py-8">
+    <div className="flex min-h-screen">
+      <Sidebar displayName={profile.display_name} theme={theme} plan={profile.plan} activeGoals={activeGoals} />
+      <div className="flex-1 overflow-x-hidden">
+        <main className="max-w-2xl mx-auto px-4 py-8">
         <PlanGate plan={profile.plan} featureName="Coach">
           <div className="space-y-8">
             <CoachShareSection
@@ -43,7 +44,8 @@ export default async function CoachPage() {
             <CoachClientsList clients={(clientLinks as CoachLink[]) ?? []} />
           </div>
         </PlanGate>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

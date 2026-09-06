@@ -1,7 +1,7 @@
 import { loadUserData } from "@/lib/loadUserData";
 import { getTheme } from "@/lib/get-theme";
 import { createClient } from "@/lib/supabase/server";
-import NavBar from "@/components/NavBar";
+import Sidebar from "@/components/Sidebar";
 import AcceptInviteButton from "@/components/coach/AcceptInviteButton";
 import type { CoachLink } from "@/types/database";
 
@@ -10,7 +10,7 @@ export default async function AcceptInvitePage({
 }: {
   searchParams: { code?: string };
 }) {
-  const { user, profile } = await loadUserData();
+  const { user, profile, activeGoals } = await loadUserData();
   const theme = await getTheme();
   const code = searchParams.code;
 
@@ -41,9 +41,10 @@ export default async function AcceptInvitePage({
   }
 
   return (
-    <div>
-      <NavBar displayName={profile.display_name} theme={theme} />
-      <main className="max-w-md mx-auto px-4 py-16 text-center space-y-4">
+    <div className="flex min-h-screen">
+      <Sidebar displayName={profile.display_name} theme={theme} plan={profile.plan} activeGoals={activeGoals} />
+      <div className="flex-1 overflow-x-hidden">
+        <main className="max-w-md mx-auto px-4 py-16 text-center space-y-4">
         {message && <p className="text-sm text-ink-faint">{message}</p>}
         {link && (
           <div className="bg-base-surface border border-base-border rounded-card p-6 space-y-4">
@@ -55,7 +56,8 @@ export default async function AcceptInvitePage({
             <AcceptInviteButton linkId={link.id} coachDisplayName={profile.display_name} />
           </div>
         )}
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

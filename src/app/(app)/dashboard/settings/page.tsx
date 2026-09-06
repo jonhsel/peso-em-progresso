@@ -1,16 +1,17 @@
 import { loadUserData } from "@/lib/loadUserData";
 import { getTheme } from "@/lib/get-theme";
-import NavBar from "@/components/NavBar";
+import Sidebar from "@/components/Sidebar";
 import SettingsForm from "@/components/SettingsForm";
 
 export default async function SettingsPage() {
-  const { user, profile } = await loadUserData();
+  const { user, profile, activeGoals } = await loadUserData();
   const theme = await getTheme();
 
   return (
-    <div>
-      <NavBar displayName={profile.display_name} theme={theme} plan={profile.plan} />
-      <main className="max-w-2xl mx-auto px-4 py-8">
+    <div className="flex min-h-screen">
+      <Sidebar displayName={profile.display_name} theme={theme} plan={profile.plan} activeGoals={activeGoals} />
+      <div className="flex-1 overflow-x-hidden">
+        <main className="max-w-2xl mx-auto px-4 py-8">
         <SettingsForm
           userId={user.id}
           displayName={profile.display_name}
@@ -20,7 +21,8 @@ export default async function SettingsPage() {
           checkinHour={profile.checkin_hour}
           plan={profile.plan}
         />
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

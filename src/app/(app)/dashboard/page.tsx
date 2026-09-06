@@ -9,7 +9,7 @@ import {
   METRIC_UNIT,
   type PeriodKpi,
 } from "@/lib/analytics";
-import NavBar from "@/components/NavBar";
+import Sidebar from "@/components/Sidebar";
 import GoalTabs, { type GoalPredictions } from "@/components/GoalTabs";
 import KpiWeeklyTeaser from "@/components/KpiWeeklyTeaser";
 import StreakCard from "@/components/StreakCard";
@@ -83,9 +83,10 @@ export default async function DashboardPage() {
     : null;
 
   return (
-    <div>
-      <NavBar displayName={profile.display_name} theme={theme} plan={profile.plan} />
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
+    <div className="flex min-h-screen">
+      <Sidebar displayName={profile.display_name} theme={theme} plan={profile.plan} activeGoals={activeGoals} />
+      <div className="flex-1 overflow-x-hidden">
+        <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-end justify-between flex-wrap gap-4">
           <div>
             <p className="text-xs uppercase tracking-wide text-ink-muted mb-2">Visão geral</p>
@@ -146,7 +147,8 @@ export default async function DashboardPage() {
         <GoalTabs goals={activeGoals} kpisByGoal={kpisByGoal} predictionsByGoal={predictionsByGoal} />
 
         <BodyMeasurementsSummaryCard measurements={measurements} />
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

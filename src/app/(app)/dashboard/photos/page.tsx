@@ -1,7 +1,7 @@
 import { loadUserData } from "@/lib/loadUserData";
 import { getTheme } from "@/lib/get-theme";
 import { createClient } from "@/lib/supabase/server";
-import NavBar from "@/components/NavBar";
+import Sidebar from "@/components/Sidebar";
 import PlanGate from "@/components/PlanGate";
 import PhotoUploadForm from "@/components/photos/PhotoUploadForm";
 import PhotoHistoryGrid from "@/components/photos/PhotoHistoryGrid";
@@ -9,7 +9,7 @@ import PhotoComparisonView from "@/components/photos/PhotoComparisonView";
 import type { ProgressPhoto } from "@/types/database";
 
 export default async function PhotosPage() {
-  const { user, profile, entries } = await loadUserData();
+  const { user, profile, entries, activeGoals } = await loadUserData();
   const theme = await getTheme();
   const supabase = createClient();
 
@@ -44,9 +44,10 @@ export default async function PhotosPage() {
   }
 
   return (
-    <div>
-      <NavBar displayName={profile.display_name} theme={theme} plan={profile.plan} />
-      <main className="max-w-6xl mx-auto px-4 py-8">
+    <div className="flex min-h-screen">
+      <Sidebar displayName={profile.display_name} theme={theme} plan={profile.plan} activeGoals={activeGoals} />
+      <div className="flex-1 overflow-x-hidden">
+        <main className="max-w-6xl mx-auto px-4 py-8">
         <PlanGate plan={profile.plan} featureName="Fotos de progresso">
           <div className="space-y-8">
             <PhotoUploadForm userId={user.id} />
@@ -60,7 +61,8 @@ export default async function PhotosPage() {
             </section>
           </div>
         </PlanGate>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

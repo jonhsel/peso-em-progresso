@@ -185,7 +185,7 @@ export default function SettingsForm({
             />
           </div>
 
-          <div>
+          <div id="checkin" className="scroll-mt-8">
             <label className="block text-xs text-ink-muted mb-1.5">
               Horário de registro — opcional
             </label>
