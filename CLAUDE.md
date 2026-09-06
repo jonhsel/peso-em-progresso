@@ -2657,14 +2657,44 @@ conteúdo visível atrás. `npx tsc --noEmit`/`npm run build` limpos.
   fechar" (padrão Material/iOS). Desktop (`sm:`+): sem mudança, 256px
   fixo.
 
+**Hotfix 3 — `flex-row` do wrapper de página no mobile, causa raiz de um
+bug visto em produção (mesmo dia, 06/09/2026).** Spec
+`claude_fase8_sidebar_hotfix2_flex_direction.md` (raiz do repo, não
+versionado) — bug real reportado por print de produção: no mobile, a
+barra superior (logo + tema + ☰) aparecia como uma coluna estreita à
+esquerda em vez de barra horizontal no topo, cortando o conteúdo. **O
+hotfix 2 (largura do drawer) não resolvia isso** — bug diferente, na
+direção do flex do wrapper de página, não na largura do drawer que só
+afeta o drawer aberto. `npx tsc --noEmit`/`npm run build` limpos.
+- **Causa raiz:** as 12 páginas usam `<div className="flex min-h-screen">`
+  como wrapper de `Sidebar` + conteúdo — `flex` sem `flex-col`/`flex-row`
+  é `flex-row` por padrão. Certo pro desktop (sidebar à esquerda,
+  conteúdo à direita), errado pro mobile: lá o `Sidebar` (via Fragment)
+  renderiza 2 `div`s irmãos diretos desse wrapper (a barra mobile
+  `sm:hidden` + o `<div className="flex-1 overflow-x-hidden">` do
+  conteúdo) — com o pai em `flex-row`, os dois ficam lado a lado em vez
+  de empilhados.
+- Corrigido trocando `flex` por `flex flex-col sm:flex-row` no wrapper —
+  1 palavra por arquivo, sem tocar em `Sidebar.tsx`. Mobile empilha
+  (barra no topo, conteúdo embaixo); desktop volta pra linha, sem mudança
+  visual.
+- **Aplicado nas 13 páginas** (as 12 do spec original + `coach/accept`,
+  que usa o mesmo padrão de wrapper por ter sido migrada pra `Sidebar`
+  fora do escopo do spec original, ver gap documentado acima) —
+  confirmado por busca exaustiva (`grep` pelo wrapper antigo) que
+  nenhuma ficou pra trás.
+
 - [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
-      dev — **ainda não visto rodando num navegador real**, nem os 2
+      dev — **ainda não visto rodando num navegador real**, nem os 3
       hotfixes acima).
 - [ ] Sidebar aparece fixa em desktop nas 13 páginas (12 do spec + a 13ª
       migrada nesta sessão), sem quebrar `max-w-2xl`/`max-w-6xl` de cada
       uma.
-- [ ] Mobile: barra compacta (logo + toggle + ☰) no topo; drawer abre ao
-      clicar no ☰, fecha ao clicar fora ou num link.
+- [ ] Mobile: barra compacta (logo + toggle + ☰) ocupa 100% da largura,
+      no topo — não mais uma coluna estreita à esquerda (bug do hotfix 3,
+      corrigido); conteúdo aparece embaixo, largura toda, sem corte nas
+      bordas. Drawer abre ao clicar no ☰, fecha ao clicar fora ou num
+      link (não afetado pelo hotfix 3, é `fixed`).
 - [ ] Mobile (375px): sidebar drawer ocupa ~85% da tela (hotfix 2), overlay
       escuro visível e clicável na faixa restante; mobile (414px+): sidebar
       não ultrapassa 280px.

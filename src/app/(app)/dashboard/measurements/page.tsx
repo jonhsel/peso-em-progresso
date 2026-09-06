@@ -10,7 +10,7 @@ export default async function MeasurementsPage() {
   const theme = await getTheme();
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex flex-col sm:flex-row min-h-screen">
       <Sidebar displayName={profile.display_name} theme={theme} plan={profile.plan} activeGoals={activeGoals} />
       <div className="flex-1 overflow-x-hidden">
         <main className="max-w-6xl mx-auto px-4 py-8">
