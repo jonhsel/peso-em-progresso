@@ -3,8 +3,6 @@ import { getTheme } from "@/lib/get-theme";
 import Sidebar from "@/components/Sidebar";
 import WeightEntryForm from "@/components/WeightEntryForm";
 import EntriesList from "@/components/EntriesList";
-import ExportButtons from "@/components/entries/ExportButtons";
-import Link from "next/link";
 
 export default async function EntriesPage() {
   const { user, profile, entries, activeGoals } = await loadUserData();
@@ -21,25 +19,12 @@ export default async function EntriesPage() {
         <div>
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs uppercase tracking-wide text-ink-muted">Histórico</p>
-            <div className="flex items-center gap-2">
-              <a
-                href="/dashboard/import"
-                className="text-xs border border-base-border rounded-lg px-3 py-1.5 text-ink-muted hover:text-ink transition"
-              >
-                Importar CSV
-              </a>
-              {entries.length > 0 &&
-                (profile.plan === "pro" ? (
-                  <ExportButtons />
-                ) : (
-                  <Link
-                    href="/dashboard/upgrade"
-                    className="text-xs border border-base-border rounded-lg px-3 py-1.5 text-ink-muted hover:text-ink transition"
-                  >
-                    Exportar (Pro)
-                  </Link>
-                ))}
-            </div>
+            <a
+              href="/dashboard/import"
+              className="text-xs border border-base-border rounded-lg px-3 py-1.5 text-ink-muted hover:text-ink transition"
+            >
+              Importar CSV
+            </a>
           </div>
           <EntriesList entries={entries} />
         </div>

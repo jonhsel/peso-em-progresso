@@ -76,33 +76,23 @@ export default function ReportsClient({
         </div>
       )}
 
-      {/* Tabs de período + botão de exportação do período/meta selecionados */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex gap-0.5 rounded-lg border border-base-border bg-base-surface2 p-0.5 w-fit">
-          {PERIOD_TABS.map((t) => (
-            <button
-              key={t.value}
-              type="button"
-              onClick={() => setSelectedPeriod(t.value)}
-              className={`px-3 py-1 rounded-md text-xs font-medium transition ${
-                selectedPeriod === t.value
-                  ? "bg-accent text-base-bg"
-                  : "text-ink-faint hover:text-ink-muted"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        {/* Link, não fetch — mesmo padrão de ExportButtons.tsx (o navegador
-            trata a resposta application/pdf como download). ?period/?goalId
-            refletem a seleção atual no momento do clique. */}
-        <a
-          href={`/api/export/report-pdf?period=${selectedPeriod}&goalId=${goal.id}`}
-          className="text-xs border border-base-border rounded-lg px-3 py-1.5 text-ink-muted hover:text-ink transition"
-        >
-          Salvar em PDF
-        </a>
+      {/* Tabs de período — exportação em PDF centralizada em
+          /dashboard/export (Fase 8.1.3). */}
+      <div className="flex gap-0.5 rounded-lg border border-base-border bg-base-surface2 p-0.5 w-fit">
+        {PERIOD_TABS.map((t) => (
+          <button
+            key={t.value}
+            type="button"
+            onClick={() => setSelectedPeriod(t.value)}
+            className={`px-3 py-1 rounded-md text-xs font-medium transition ${
+              selectedPeriod === t.value
+                ? "bg-accent text-base-bg"
+                : "text-ink-faint hover:text-ink-muted"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {/* KPI da meta/período selecionados */}

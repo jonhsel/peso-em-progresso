@@ -53,7 +53,7 @@ const links: NavItem[] = [
   { href: "/dashboard/challenges", label: "Desafios", icon: Swords, premium: true },
   { href: "/dashboard/coach", label: "Coach", icon: Users, premium: true },
   { href: "/dashboard/settings#checkin", label: "Lembretes", icon: Bell, premium: true },
-  { href: "/dashboard/export", label: "Exportar Dados", icon: Download, premium: true, comingSoon: true },
+  { href: "/dashboard/export", label: "Exportar Dados", icon: Download, premium: true },
   { href: "/dashboard/settings", label: "Configurações", icon: Settings },
 ];
 

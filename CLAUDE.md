@@ -25,7 +25,8 @@ na tela `/dashboard/goals`, não fixas no código.
 coach/visualizador) + Fase 7 (monetização em camadas — gate free/pro +
 Kiwify, validada em produção 05/09/2026) + Fase 8.1 (sidebar de navegação)
 + Fase 8.1.1 (página de previsão da meta) + Fase 8.1.2 (página de
-conquistas) + Fase 8.x (marco de período customizado "A partir de uma
+conquistas) + Fase 8.1.3 (página de exportação de dados, fecha a Fase 8.1)
++ Fase 8.x (marco de período customizado "A partir de uma
 data") completos, nenhuma dessas ainda validada em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
@@ -3162,6 +3163,117 @@ kg" (proporcional a 26/90). `npx tsc --noEmit`/`npm run build` limpos.
 Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 8
 — Navegação/UX, ou onde fizer mais sentido categorizar "marco de período
 customizado") e atualizar os checkboxes acima.
+
+## Fase 8.1.3 — Página de Exportação de Dados (implementada 07/09/2026)
+
+Spec completo em `claude_fase8.1.3_export_pagina_v2.md` (na raiz do
+repo, não versionado — mesmo padrão dos specs anteriores; v2 já auditada
+contra o código real via busca direcionada, achados do Apêndice B do
+próprio arquivo todos resolvidos/sem correção necessária). Implementado
+nesta sessão: `npx tsc --noEmit` e `npm run build` limpos. **Ainda não
+visto num navegador real** — ver checklist abaixo. Patch aplicado ao pé
+da letra do spec, sem desvios. Terceira e última sub-fase da Fase 8.1
+(itens `comingSoon` da Sidebar ganhando página própria): previsão da
+meta (8.1.1) → conquistas (8.1.2) → **exportação de dados (8.1.3)**. Com
+essa sub-fase, **a Fase 8.1 fecha por completo** (nenhum item
+`comingSoon` resta na Sidebar).
+
+- **`/dashboard/export` centraliza as três exportações que já existiam
+  em produção** (CSV genérico, PDF genérico, PDF de relatório por
+  período/meta) — antes espalhadas em `entries/page.tsx`
+  (`ExportButtons`) e `reports/ReportsClient.tsx` (botão "Salvar em
+  PDF"). Nenhuma rota de API mudou — `/api/export/csv`,
+  `/api/export/pdf` e `/api/export/report-pdf` continuam exatamente
+  como estavam desde a Fase 5.4/7 (gate 403 pra quem não é Pro já
+  garantido ali); só o ponto de entrada de UI mudou.
+- Mesmo padrão de página das duas sub-fases anteriores: Server Component
+  (`export/page.tsx`) chama `loadUserData()` + `getTheme()`, renderiza
+  `Sidebar` + `PlanGate plan={profile.plan} featureName="Exportar
+  Dados"` envolvendo todo o conteúdo. Nenhuma escrita em tabela — página
+  é 100% leitura/links.
+- Texto informativo (contagem de pesagens + intervalo de datas) calculado
+  inline a partir de `entries` já carregado por `loadUserData()` (sem
+  nova query, sem novo helper em `analytics.ts`) — `entries[0]`/
+  `entries[entries.length - 1]` como primeira/última pesagem, já que
+  `loadUserData()` ordena ascendente por `measured_at`. Formatação de
+  data via `Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo"
+  })`, mesma regra do projeto (nunca `.toISOString()`).
+- **0 pesagens não esconde os cards** — mostra "Nenhuma pesagem
+  registrada ainda." no lugar da contagem, mas os 3 links continuam
+  clicáveis (as rotas de API já tratam 0 entradas graciosamente: CSV só
+  com cabeçalho, PDF com mensagem própria, confirmado desde a Fase 1) —
+  decisão deliberada de nunca esconder uma ação que a API já trata sem
+  erro.
+- `src/components/export/ReportExportCard.tsx` (novo, client component,
+  único motivo do `"use client"` é o estado dos 2 seletores) — reaproveita
+  o *padrão* visual de `ReportsClient.tsx` (tabs de meta + tabs de
+  período), não o componente em si (que é acoplado a `KpiCard`/
+  `WeightChart`/previsão, sem sentido numa tela só de exportação). Sem
+  meta ativa: mensagem "Nenhuma meta ativa — configure uma em Metas para
+  gerar este PDF.", sem link de download. Com 1 meta: sem seletor de meta
+  visível (mesmo critério de `ReportsClient`/`GoalTabs`, `goals.length >
+  1`). `<a href>` de download, não fetch — mesmo padrão de sempre, URL
+  reflete a seleção atual no momento do clique.
+- **`ExportButtons.tsx` deixou de ser importado, mas o arquivo
+  permanece no repo** (decisão deliberada, mesmo critério cauteloso já
+  usado pro `NavBar.tsx` na Fase 8 original) — pode ser removido numa
+  limpeza futura se nenhum outro caller aparecer.
+- `entries/page.tsx` — removidos os imports órfãos `ExportButtons` e
+  `Link` (de `next/link`, usado só pelo link condicional "Exportar
+  (Pro)"); a barra do histórico ficou só com "Importar CSV" (ação
+  diferente — entrada de dados, fora do escopo desta sub-fase).
+- `reports/ReportsClient.tsx` — removido o `<a href>` "Salvar em PDF",
+  sem substituto (decisão fechada com o usuário: nenhum link apontando
+  pra `/dashboard/export` fica no lugar; descoberta da exportação passa a
+  ser exclusivamente via Sidebar). Nenhuma prop do componente mudou —
+  `goal.id`/`selectedPeriod` continuam alimentando `KpiCard`/
+  `WeightChart` normalmente, só o botão de download saiu do JSX.
+- `Sidebar.tsx` — item "Exportar Dados" perdeu `comingSoon: true` (badge
+  "Pro" mantido, some pra quem já é Pro desde o hotfix 4 da Fase 8.1);
+  volta a navegar em vez de renderizar como `<span>` desabilitado.
+- **Sem migração, sem mudança de tipos** — leitura pura sobre `entries`/
+  `activeGoals` já carregados por `loadUserData()`, nenhuma mudança em
+  `analytics.ts`/`database.ts`.
+- **Fora de escopo** (idem spec): qualquer exportação nova além das 3 já
+  existentes (fotos, medidas isoladas), histórico de exportações, mudar
+  formato/conteúdo de qualquer PDF/CSV, mudar gate das rotas de API,
+  remover `ExportButtons.tsx` do repositório.
+
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
+      dev — **ainda não visto rodando num navegador real**).
+- [ ] Sidebar: item "Exportar Dados" navega normalmente (não é mais
+      `<span>` desabilitado); badge "Pro" continua aparecendo pra free,
+      some pra pro.
+- [ ] `/dashboard/export` free: `PlanGate` bloqueia com "Exportar Dados é
+      Pro", nenhum dos 3 cards nem a contagem de pesagens aparece.
+- [ ] `/dashboard/export` pro, com pesagens: texto "N pesagens
+      registradas, de DD/MM/AAAA a DD/MM/AAAA." correto (singular
+      "1 pesagem registrada" com N=1).
+- [ ] `/dashboard/export` pro, sem pesagens: texto "Nenhuma pesagem
+      registrada ainda."; os 3 cards continuam com os links clicáveis.
+- [ ] Card 1 (CSV) baixa `/api/export/csv` — arquivo idêntico ao gerado
+      antes da mudança (mesma rota, sem alteração).
+- [ ] Card 2 (PDF genérico) baixa `/api/export/pdf` — arquivo idêntico.
+- [ ] Card 3 (PDF de relatório): com 1 meta ativa, sem seletor de meta
+      visível; com 2+ metas, seletor aparece e `goalId` no link muda
+      corretamente ao trocar de aba. Trocar de período muda o `period`
+      no link sem reload.
+- [ ] Card 3 sem nenhuma meta ativa: mensagem "Nenhuma meta ativa —
+      configure uma em Metas.", sem link de download.
+- [ ] `/dashboard/entries`: botões de exportação sumiram; link "Importar
+      CSV" continua funcionando normalmente, sozinho na barra.
+- [ ] `/dashboard/reports`: botão "Salvar em PDF" sumiu; tabs de período
+      continuam funcionando e atualizando o `KpiCard` normalmente.
+- [ ] Deslogado em qualquer uma das 3 rotas de API → 401 (sem mudança,
+      já coberto pela Fase 7 — só confirmar que nada quebrou).
+- [ ] Free tentando acessar as 3 rotas de API diretamente pela URL → 403
+      (sem mudança, já coberto pela Fase 7 — só confirmar).
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 8
+— Navegação/UX → "Exportar Dados") e atualizar os checkboxes acima. **Com
+esta sub-fase, a Fase 8.1 (itens `comingSoon` da Sidebar) fecha por
+completo** — previsão da meta, conquistas e exportação de dados agora têm
+página própria.
 
 ## Pendências / próximos passos sugeridos (não iniciados)
 
