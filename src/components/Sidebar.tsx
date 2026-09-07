@@ -49,7 +49,7 @@ const links: NavItem[] = [
   { href: "/dashboard/goals", label: "Metas", icon: Target },
   { href: "/dashboard/reports", label: "Relatórios", icon: FileBarChart, premium: true },
   { href: "/dashboard/prediction", label: "Previsão da Meta", icon: TrendingUp, premium: true },
-  { href: "/dashboard/achievements", label: "Conquistas", icon: Award, premium: true, comingSoon: true },
+  { href: "/dashboard/achievements", label: "Conquistas", icon: Award, premium: true },
   { href: "/dashboard/challenges", label: "Desafios", icon: Swords, premium: true },
   { href: "/dashboard/coach", label: "Coach", icon: Users, premium: true },
   { href: "/dashboard/settings#checkin", label: "Lembretes", icon: Bell, premium: true },

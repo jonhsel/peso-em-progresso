@@ -24,8 +24,8 @@ na tela `/dashboard/goals`, não fixas no código.
 (múltiplas metas simultâneas) + Fase 6.3 (desafios) + Fase 6.4 (papel de
 coach/visualizador) + Fase 7 (monetização em camadas — gate free/pro +
 Kiwify, validada em produção 05/09/2026) + Fase 8.1 (sidebar de navegação)
-+ Fase 8.1.1 (página de previsão da meta) completos, nenhuma das duas
-ainda validada em produção
++ Fase 8.1.1 (página de previsão da meta) + Fase 8.1.2 (página de
+conquistas) completos, nenhuma das três ainda validada em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -2848,6 +2848,110 @@ Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 8
 Remover este item da lista `comingSoon` já foi feito no patch de
 `Sidebar.tsx` acima — próximas sub-fases pendentes: 8.1.2 (Conquistas),
 8.1.3 (Exportar Dados).
+
+## Fase 8.1.2 — Página de Conquistas (implementada 07/09/2026)
+
+Spec completo em `claude_fase8.1.2_conquistas_pagina_v2.md` (na raiz do
+repo, não versionado — mesmo padrão dos specs anteriores; v2 = v1 +
+auditoria completa contra o código real, achados no Apêndice A do próprio
+arquivo, todos incorporados). Implementado nesta sessão: `npx tsc
+--noEmit` e `npm run build` limpos. **Ainda não visto num navegador
+real** — ver checklist abaixo. Patch aplicado ao pé da letra do spec, sem
+desvios. Segunda sub-fase da Fase 8.1 (o item `comingSoon` de "Conquistas"
+na Sidebar ganha rota própria), depois da previsão da meta (8.1.1).
+
+- **Mesmo padrão de gate da 8.1.1** (decisão de produto, não gap
+  acidental): `AchievementsCard` no dashboard continua grátis (teaser, sem
+  mudança nenhuma além de 1 link novo), só a página dedicada
+  `/dashboard/achievements` é Pro — fecha o gap do badge "Pro" que já
+  existia na Sidebar desde o hotfix da Fase 8.1.
+- `src/lib/achievements.ts` — cada `AchievementRule` ganhou `threshold`
+  (1/5/10 kg para as absolutas, 25/50/75/100% para as percentuais),
+  fonte única de verdade tanto pro `check()`/`isBlocked()` (agora tomam
+  a `rule` inteira em vez de comparar por `key` num `switch`/`find`) quanto
+  pro cálculo de progresso da página nova. `evaluateAchievements` ganhou um
+  3º campo de retorno, `metrics: { totalLostKg, progressPct }` — aditivo,
+  não quebra `AchievementsCard.tsx` (que só desestruturava `all`/
+  `newlyUnlocked`). Nova função `getNextMilestone(all, category)` retorna a
+  próxima conquista não desbloqueada de uma categoria (pode vir com status
+  `"blocked"` — quem chama decide como exibir).
+- 3 componentes novos, todos Server Component puro (sem `"use client"`,
+  sem estado): `AchievementsGrid.tsx` (grid 4/7 colunas com ícone maior +
+  rótulo visível, não só tooltip — usa `bg-accent-tint` forma curta,
+  registrada no `tailwind.config.ts` desde a Fase 8.1, diferente da forma
+  longa `bg-[var(--accent-tint)]` do `AchievementsCard` original, que é
+  anterior ao registro existir), `AchievementsProgress.tsx` (até 2 barras,
+  uma por categoria, usando `threshold` da próxima conquista + `metrics`;
+  reaproveita `blockedReason` já existente em vez de duplicar texto — cobre
+  "sem meta" com link pra `/dashboard/goals` e "peso alvo já alcançado"
+  sem o link) e `AchievementsTimeline.tsx` (lista das desbloqueadas, mais
+  recente primeiro, com type guard no `.filter()` em vez de non-null
+  assertion).
+- Rota nova `/dashboard/achievements` (`export const dynamic =
+  "force-dynamic"`, mesmo padrão de `challenges/page.tsx`/
+  `prediction/page.tsx`): `Sidebar` + `PlanGate plan={profile.plan}
+  featureName="Conquistas"` envolvendo a página inteira (free não vê nem o
+  `unlockedCount`, fica dentro do gate) + grid + card "Próxima conquista" +
+  card "Linha do tempo". **Sem nenhuma persistência nesta página** —
+  `newlyUnlocked` não é usado aqui de propósito; a gravação de conquistas
+  novas em `user_achievements` continua só no `AchievementsCard` do
+  dashboard (única fonte de escrita, evita duas rotas gravando a mesma
+  coisa em paralelo). `max-w-2xl`, mesmo padrão de página de coluna única.
+- `Sidebar.tsx` — item "Conquistas" perdeu `comingSoon: true` (badge "Pro"
+  mantido); volta a navegar em vez de renderizar como `<span>`
+  desabilitado.
+- `AchievementsCard.tsx` (dashboard) ganhou só 1 link novo, "Ver todas as
+  conquistas →", abaixo do grid pequeno de 7 colunas — nenhuma outra
+  mudança (persistência, grid, tudo igual).
+- **Sem migração, sem mudança de tipos em `database.ts`** — camada de
+  leitura pura sobre `evaluateAchievements`, já usada pelo
+  `AchievementsCard`. `getPrimaryWeightGoal`/`loadUserData()`/`PlanGate`/
+  `Sidebar` usados exatamente como já existiam, sem nenhuma mudança de
+  assinatura nesta sub-fase.
+- **Fora de escopo** (idem spec): conquistas baseadas em streak/medidas
+  corporais, animação/confetti ao desbloquear, conquistas no PDF
+  exportado, compartilhamento social, conquistas na visão do coach
+  (`coach/[ownerId]/page.tsx` não muda), filtro/busca na timeline.
+
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
+      dev — **ainda não visto rodando num navegador real**).
+- [ ] Sidebar: "Conquistas" agora navega (não é mais `<span>` cinza
+      desabilitado); badge "Pro" continua aparecendo.
+- [ ] Dashboard (qualquer plano): `AchievementsCard` continua idêntico
+      (grid 7 colunas pequeno) + novo link "Ver todas as conquistas →".
+- [ ] Conta Grátis: clicar no link/menu leva pra `/dashboard/achievements`
+      e mostra o bloco de `PlanGate` (trancado), sem nenhum número vazando.
+- [ ] Conta Pro, sem nenhuma pesagem: grid com 7 tiles locked/blocked,
+      progresso mostra "0.0/1 kg" e (se sem meta) "Defina um peso alvo em
+      Metas — ir para Metas" linkando certo, timeline mostra mensagem
+      vazia.
+- [ ] Conta Pro, com pesagens mas sem meta: conquistas absolutas avaliam
+      normal (progresso de kg funciona), percentual continua bloqueado com
+      a mensagem certa.
+- [ ] Conta Pro, com meta e progresso parcial (ex: 30% do caminho): barra
+      de "Próxima: 50% da meta" mostra ~30/50 preenchido proporcionalmente
+      (não 30/100).
+- [ ] Conta Pro com todas as 3 absolutas desbloqueadas (10kg+ perdidos):
+      seção de progresso absoluto mostra "🎉 Todas... desbloqueadas" em vez
+      de barra; `pct_100` desbloqueada mostra a mesma celebração pro lado
+      percentual.
+- [ ] Timeline: conquistas ordenadas da mais recente pra mais antiga,
+      datas formatadas `dd/MM/yyyy`.
+- [ ] Peso já abaixo do alvo antes de qualquer registro
+      (`firstAboveTarget === false`): mensagem "Peso alvo já alcançado"
+      sem o link "ir para Metas" (só aparece quando a razão inclui
+      "Defina").
+- [ ] Tema claro/escuro: grid, barras de progresso (`bg-accent` sobre
+      `bg-base-surface2`) e timeline com contraste adequado nos dois
+      temas.
+- [ ] Mobile (375px): grid `grid-cols-4` cabe sem cortar rótulos; barras
+      de progresso ocupam a largura toda; timeline não quebra layout.
+- [ ] `dashboard/coach/[ownerId]/page.tsx`: sem mudança, nenhuma conquista
+      aparece lá (nunca apareceu, fora de escopo).
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 8
+— Navegação/UX → "Conquistas") e atualizar os checkboxes acima. Próxima
+sub-fase pendente: 8.1.3 (Exportar Dados).
 
 ## Pendências / próximos passos sugeridos (não iniciados)
 

@@ -9,6 +9,8 @@ export type AchievementRule = {
   label: string;
   description: string;
   category: AchievementCategory;
+  /** Valor numérico da condição — kg perdidos (absolute) ou % da meta (percentage). */
+  threshold: number;
   /** Ícone representativo (emoji) — usado no card do dashboard. */
   icon: string;
 };
@@ -20,6 +22,7 @@ export const ACHIEVEMENT_RULES: AchievementRule[] = [
     label: "Primeiro kg",
     description: "Perdeu 1 kg desde o primeiro registro.",
     category: "absolute",
+    threshold: 1,
     icon: "🎯",
   },
   {
@@ -27,6 +30,7 @@ export const ACHIEVEMENT_RULES: AchievementRule[] = [
     label: "-5 kg",
     description: "Perdeu 5 kg desde o primeiro registro.",
     category: "absolute",
+    threshold: 5,
     icon: "💪",
   },
   {
@@ -34,6 +38,7 @@ export const ACHIEVEMENT_RULES: AchievementRule[] = [
     label: "-10 kg",
     description: "Perdeu 10 kg desde o primeiro registro.",
     category: "absolute",
+    threshold: 10,
     icon: "🔥",
   },
   // Progresso percentual
@@ -42,6 +47,7 @@ export const ACHIEVEMENT_RULES: AchievementRule[] = [
     label: "25% da meta",
     description: "25% do caminho até o peso alvo.",
     category: "percentage",
+    threshold: 25,
     icon: "🌱",
   },
   {
@@ -49,6 +55,7 @@ export const ACHIEVEMENT_RULES: AchievementRule[] = [
     label: "50% da meta",
     description: "Metade do caminho até o peso alvo.",
     category: "percentage",
+    threshold: 50,
     icon: "⚡",
   },
   {
@@ -56,6 +63,7 @@ export const ACHIEVEMENT_RULES: AchievementRule[] = [
     label: "75% da meta",
     description: "75% do caminho até o peso alvo.",
     category: "percentage",
+    threshold: 75,
     icon: "🚀",
   },
   {
@@ -63,6 +71,7 @@ export const ACHIEVEMENT_RULES: AchievementRule[] = [
     label: "Meta atingida",
     description: "Chegou no peso alvo!",
     category: "percentage",
+    threshold: 100,
     icon: "🏆",
   },
 ];
@@ -96,13 +105,20 @@ export type EvaluatedAchievement = {
  * peso "primária" (a mais antiga ativa), nunca contra metas de outras
  * métricas.
  */
+export type AchievementMetrics = {
+  totalLostKg: number;
+  /** null quando não há meta de peso ativa/válida (blocked). */
+  progressPct: number | null;
+};
+
 export function evaluateAchievements(
   entries: WeightEntry[],
   primaryWeightGoal: Goal | null,
   existing: UserAchievement[]
 ): {
   all: EvaluatedAchievement[];
-  newlyUnlocked: string[]; // achievement_keys a persistir
+  newlyUnlocked: string[];
+  metrics: AchievementMetrics;
 } {
   const existingKeys = new Set(existing.map((a) => a.achievement_key));
   const existingMap = new Map(existing.map((a) => [a.achievement_key, a]));
@@ -128,30 +144,13 @@ export function evaluateAchievements(
 
   const newlyUnlocked: string[] = [];
 
-  function check(key: string): boolean {
-    switch (key) {
-      case "lost_1kg":
-        return totalLostKg >= 1;
-      case "lost_5kg":
-        return totalLostKg >= 5;
-      case "lost_10kg":
-        return totalLostKg >= 10;
-      case "pct_25":
-        return progressPct !== null && progressPct >= 25;
-      case "pct_50":
-        return progressPct !== null && progressPct >= 50;
-      case "pct_75":
-        return progressPct !== null && progressPct >= 75;
-      case "pct_100":
-        return progressPct !== null && progressPct >= 100;
-      default:
-        return false;
-    }
+  function check(rule: AchievementRule): boolean {
+    if (rule.category === "absolute") return totalLostKg >= rule.threshold;
+    return progressPct !== null && progressPct >= rule.threshold;
   }
 
-  function isBlocked(key: string): string | null {
-    const rule = ACHIEVEMENT_RULES.find((r) => r.key === key);
-    if (!rule || rule.category !== "percentage") return null;
+  function isBlocked(rule: AchievementRule): string | null {
+    if (rule.category !== "percentage") return null;
     if (!hasTarget) return "Defina um peso alvo em Metas";
     if (!firstAboveTarget) return "Peso alvo já alcançado";
     return null;
@@ -167,7 +166,7 @@ export function evaluateAchievements(
       };
     }
 
-    const blocked = isBlocked(rule.key);
+    const blocked = isBlocked(rule);
     if (blocked) {
       return {
         rule,
@@ -177,7 +176,7 @@ export function evaluateAchievements(
       };
     }
 
-    const met = check(rule.key);
+    const met = check(rule);
     if (met) {
       newlyUnlocked.push(rule.key);
       return {
@@ -196,5 +195,19 @@ export function evaluateAchievements(
     };
   });
 
-  return { all, newlyUnlocked };
+  return { all, newlyUnlocked, metrics: { totalLostKg, progressPct } };
+}
+
+/**
+ * Retorna a próxima conquista não desbloqueada de uma categoria (a de
+ * menor threshold, já que ACHIEVEMENT_RULES está em ordem crescente).
+ * `null` quando a categoria inteira já está desbloqueada. Pode retornar
+ * uma conquista com status "blocked" — quem chama decide como exibir
+ * (ver AchievementsProgress.tsx).
+ */
+export function getNextMilestone(
+  all: EvaluatedAchievement[],
+  category: AchievementCategory
+): EvaluatedAchievement | null {
+  return all.find((a) => a.rule.category === category && a.status !== "unlocked") ?? null;
 }

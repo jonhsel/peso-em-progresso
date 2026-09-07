@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
   evaluateAchievements,
@@ -69,6 +70,12 @@ export default function AchievementsCard({
           <AchievementDot key={a.rule.key} achievement={a} />
         ))}
       </div>
+      <Link
+        href="/dashboard/achievements"
+        className="mt-3 block text-right text-xs text-accent hover:text-accent-hover"
+      >
+        Ver todas as conquistas →
+      </Link>
     </div>
   );
 }
