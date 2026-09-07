@@ -27,7 +27,9 @@ Kiwify, validada em produção 05/09/2026) + Fase 8.1 (sidebar de navegação)
 + Fase 8.1.1 (página de previsão da meta) + Fase 8.1.2 (página de
 conquistas) + Fase 8.1.3 (página de exportação de dados, fecha a Fase 8.1)
 + Fase 8.x (marco de período customizado "A partir de uma
-data") completos, nenhuma dessas ainda validada em produção
+data") + Fase 8.x (tendência precisa — números de suporte no card de
+Tendência e linha de tendência em `/dashboard/prediction`) completos,
+nenhuma dessas ainda validada em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -3274,6 +3276,121 @@ Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 8
 esta sub-fase, a Fase 8.1 (itens `comingSoon` da Sidebar) fecha por
 completo** — previsão da meta, conquistas e exportação de dados agora têm
 página própria.
+
+## Fase 8.x — Tendência precisa (implementada 07/09/2026)
+
+Spec completo em `claude_fase_tendencia_precisa_v2.md` (na raiz do repo,
+não versionado — mesmo padrão dos specs anteriores; v2 = v1 + auditoria
+contra `analytics.ts`/`TrendBadge.tsx`/`PredictionChart.tsx`/
+`PredictionExplainer.tsx`/`prediction/page.tsx`/`ExportDocument.tsx`/
+`ReportDocument.tsx` reais, achados do Apêndice A do próprio arquivo todos
+incorporados). Implementado nesta sessão: `npx tsc --noEmit` e
+`npm run build` limpos. **Ainda não visto num navegador real** — ver
+checklist abaixo. Patch aplicado ao pé da letra do spec, sem desvios (todo
+`str_replace` bateu exatamente com o código real na primeira tentativa).
+Motivado por relato direto de uso: o card de Tendência classificava um
+peso oscilando ~109–111 kg em 21 dias como "Estável" sem nenhum número
+que sustentasse a leitura, e `/dashboard/prediction` ficava visualmente
+idêntica ao card "Evolução do Peso" do Dashboard nos casos mais comuns
+(tendência não é de perda, ou meta sem peso-alvo).
+
+- **`computeTrend` (`src/lib/analytics.ts`) ganhou 3 campos aditivos em
+  `TrendResult`** — `totalChangeKg` (variação entre primeiro e último ponto
+  da janela de 21 dias), `dataPointsCount` (quantas pesagens sustentam a
+  leitura) e `r2` (coeficiente de determinação da regressão, 0 a 1 — baixo
+  `r2` com peso oscilando é exatamente o sinal que faltava: a tendência
+  pode estar "Estável" e ao mesmo tempo pouco confiável). **Nenhuma mudança
+  nos thresholds/labels de classificação** (`perdendo_rapido` etc.) — só
+  números novos ao lado do que já existia. Os dois early-returns de
+  dados insuficientes preenchem os 3 campos com valores neutros (`0`).
+- **Nova função `computeTrendLine`** (mesmo arquivo, logo após
+  `computeTrend`) — retorna os 2 pontos (início/fim da janela de 21 dias)
+  da reta de regressão, geometria pura sobre o mesmo `slopeKgPerWeek`,
+  sem extrapolar pro futuro (isso é papel da linha de projeção existente,
+  `GoalPrediction`). Duplica ~15 linhas de regressão em vez de mudar a
+  assinatura de `computeTrend` (2+ callers em produção) só pra vazar dados
+  internos — decisão deliberada de simplicidade sobre DRY, documentada no
+  próprio spec.
+- `src/components/TrendBadge.tsx` — bloco novo de métricas (ritmo em
+  kg/semana, variação total no período, nº de pesagens) + qualificador de
+  consistência (Alta/Moderada/Baixa, derivado de `r2`: `>= 0.6` alta,
+  `>= 0.3` moderada, abaixo disso baixa), abaixo do texto qualitativo já
+  existente — nunca escondendo o texto atual, só complementando. Some por
+  completo quando `label === "insufficient_data"`. **Contraste**:
+  consistência "moderada" usa `text-[var(--badge-caution-text)]`, não
+  `text-signal-caution` (amarelo puro falha WCAG AA em fundo claro,
+  ~2:1 — mesma correção já documentada no item 12 de "Decisões
+  importantes" e nos badges de KPI); "Alta"/"Baixa" usam
+  `text-signal-ahead`/`text-signal-behind` diretamente (sem problema de
+  contraste nesses dois).
+- `src/components/PredictionChart.tsx` — nova prop `trendLine`, injetada
+  como uma 3ª `dataKey` (`tendencia`) no dataset já existente (achando ou
+  criando as entradas correspondentes às 2 datas de início/fim, sem
+  duplicar pontos quando a data já existe) + nova `<Line>` pontilhada
+  (`strokeDasharray="2 3"`, cor `colors.axis` — discreta, não compete com
+  peso real/laranja nem projeção/azul) **sempre desenhada quando
+  disponível**, independente de haver projeção de meta — resolve o
+  problema #2 do spec: mesmo sem projeção (tendência não é de perda, ou
+  meta sem `target_value`), a página de previsão passa a mostrar o ajuste
+  linear real sobre o peso, visualmente distinto da oscilação bruta e do
+  card do Dashboard. Legenda ganhou o item correspondente.
+- `src/components/PredictionExplainer.tsx` — nova prop `trend`, bloco
+  "Detalhes do cálculo" (grid `grid-cols-2 sm:grid-cols-4`, `text-xs`) com
+  ritmo, variação (21d), pesagens usadas e consistência (`r2` como %),
+  inserido entre o texto explicativo fixo e os avisos condicionais por
+  `prediction.kind` — some quando `trend.label === "insufficient_data"`.
+- `src/app/(app)/dashboard/prediction/page.tsx` — `computeTrendLine(entries)`
+  calculado 1x (não por meta — tendência de peso é característica dos
+  dados do usuário, mesmo critério já usado por `computeTrend`, chamado 1x
+  e reaproveitado pras N metas de peso ativas), passado como
+  `trendLine ?? undefined` (conversão `null` → `undefined` para prop
+  opcional) pro `PredictionChart`; `trend` passado direto pro
+  `PredictionExplainer`.
+- **Callers de `TrendResult` fora do escopo, confirmados sem quebra**
+  (tabela de verificação no próprio spec, seção 7): `dashboard/page.tsx`,
+  `dashboard/reports/page.tsx`, `ExportDocument.tsx` (lê só
+  `trend.label` via `TREND_LABEL[trend.label]`, confirmado no código
+  real), `ReportDocument.tsx` — os 3 campos novos são aditivos, nenhum
+  desses lê nada que não existisse antes.
+- **Fora de escopo** (idem spec): mudar thresholds/labels de classificação,
+  `computeGoalPrediction`/`computePeriodKpi`/`computeAllKpis`, extrapolar a
+  linha de tendência pro futuro (papel da linha de projeção), acrescentar
+  os números novos no PDF exportado (`ExportDocument.tsx`/
+  `ReportDocument.tsx` continuam só com `TREND_LABEL[trend.label]` — patch
+  separado se desejado depois), qualquer migração/mudança de schema (tudo
+  aqui é cálculo derivado sobre `entries` já carregado, sem persistência
+  nova).
+
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
+      dev — **ainda não visto rodando num navegador real**).
+- [ ] Dashboard: `TrendBadge` mostra ritmo, variação e nº de pesagens em
+      qualquer label (`perdendo_rapido`/`perdendo`/`estavel`/`ganhando`);
+      com `insufficient_data`, bloco de métricas não aparece.
+- [ ] Caso do relato original (peso oscilando ~109–111 kg, label
+      "Estável"): consistência aparece como "Baixa" ou "Moderada", nunca
+      "Alta" — validar visualmente que o r² captura a oscilação.
+- [ ] **Tema claro**: "Consistência moderada" usa `--badge-caution-text`
+      (`#8A5A0B`) e é legível — não amarelo puro.
+- [ ] `/dashboard/prediction`, tendência `wrong_direction`/`estavel` e meta
+      sem `target_value`: gráfico mostra a linha pontilhada de tendência
+      (cinza) sobre o histórico — visualmente diferente do card do
+      Dashboard.
+- [ ] `/dashboard/prediction`, tendência de perda + meta com
+      `target_value`: as duas linhas (tendência cinza + projeção azul)
+      aparecem juntas sem sobreposição confusa.
+- [ ] `PredictionExplainer`: bloco "Detalhes do cálculo" some com
+      `insufficient_data`, aparece com ritmo/variação/pesagens/
+      consistência (%) quando há dados suficientes.
+- [ ] Tema claro/escuro: contraste da linha de tendência (`colors.axis`) e
+      dos textos novos nos dois temas.
+- [ ] Mobile: grid de 4 métricas no `PredictionExplainer` quebra pra 2
+      colunas sem cortar texto; 3 linhas de métricas no `TrendBadge` não
+      quebram o layout do card.
+- [ ] Conferir que `ExportDocument.tsx` (PDF) não quebrou — não foi tocado
+      neste spec, usa `TrendResult` só via `trend.label`.
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 8
+— Navegação/UX → "Tendência precisa") e atualizar os checkboxes acima.
 
 ## Pendências / próximos passos sugeridos (não iniciados)
 
