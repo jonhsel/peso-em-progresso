@@ -15,7 +15,7 @@ import {
 import { format, parseISO, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { WeightEntry, Goal } from "@/types/database";
-import type { GoalPrediction } from "@/lib/analytics";
+import type { GoalPrediction, TrendLine } from "@/lib/analytics";
 
 // Duplicado de WeightChart.tsx — ver decisão 6.1 do spec Fase 8.1.1.
 const FALLBACK_CHART_COLORS = {
@@ -46,10 +46,12 @@ export default function PredictionChart({
   entries,
   goal,
   prediction,
+  trendLine,
 }: {
   entries: WeightEntry[];
   goal: Goal;
   prediction?: GoalPrediction;
+  trendLine?: TrendLine;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [colors, setColors] = useState(FALLBACK_CHART_COLORS);
@@ -82,7 +84,7 @@ export default function PredictionChart({
   }
 
   // Pontos reais
-  type DataPoint = { label: string; date: string; peso: number; projetado?: number };
+  type DataPoint = { label: string; date: string; peso: number; projetado?: number; tendencia?: number };
   const data: DataPoint[] = sorted.map((e) => ({
     label: format(parseISO(e.measured_at), "dd/MM", { locale: ptBR }),
     date: e.measured_at,
@@ -113,8 +115,33 @@ export default function PredictionChart({
     });
   }
 
+  // Linha de tendência (regressão de 21 dias) — sempre desenhada quando
+  // disponível, independente de haver projeção de meta. Resolve o caso em
+  // que a tendência não é de perda (ou a meta não tem target_value): a
+  // página de previsão continua mostrando algo que o Dashboard não mostra.
+  if (trendLine) {
+    const addTrendPoint = (date: string, weightKg: number) => {
+      const existing = data.find((d) => d.date === date);
+      if (existing) {
+        existing.tendencia = weightKg;
+      } else {
+        data.push({
+          label: format(parseISO(date), "dd/MM", { locale: ptBR }),
+          date,
+          peso: undefined as unknown as number,
+          tendencia: weightKg,
+        });
+      }
+    };
+    addTrendPoint(trendLine.start.date, trendLine.start.weightKg);
+    addTrendPoint(trendLine.end.date, trendLine.end.weightKg);
+    data.sort((a, b) => a.date.localeCompare(b.date));
+  }
+
   const allWeights = data.map((d) => d.peso).filter((w) => w != null && !isNaN(w));
   const allValues = [...allWeights];
+  const trendValues = data.map((d) => d.tendencia).filter((w): w is number => w != null && !isNaN(w));
+  allValues.push(...trendValues);
   if (projectionTarget !== null) allValues.push(projectionTarget);
   if (goal.target_value != null) allValues.push(goal.target_value);
 
@@ -136,6 +163,12 @@ export default function PredictionChart({
           <span className="flex items-center gap-1.5">
             <span className="h-0.5 w-3" style={{ backgroundColor: colors.projected, opacity: 0.8 }} />
             projeção
+          </span>
+        )}
+        {trendLine && (
+          <span className="flex items-center gap-1.5">
+            <span className="h-0.5 w-3" style={{ backgroundColor: colors.axis, opacity: 0.8 }} />
+            linha de tendência
           </span>
         )}
       </div>
@@ -201,6 +234,21 @@ export default function PredictionChart({
             activeDot={{ r: 4 }}
             connectNulls={false}
           />
+          {trendLine && (
+            <Line
+              type="linear"
+              dataKey="tendencia"
+              name="Linha de tendência"
+              stroke={colors.axis}
+              strokeWidth={1.5}
+              strokeDasharray="2 3"
+              dot={false}
+              activeDot={{ r: 3 }}
+              connectNulls
+              isAnimationActive={false}
+              legendType="none"
+            />
+          )}
           {hasProjection && projectionTarget !== null && (
             <Line
               type="linear"

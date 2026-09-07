@@ -5,6 +5,7 @@ import {
   computeAllKpis,
   computeTrend,
   computeGoalPrediction,
+  computeTrendLine,
   METRIC_UNIT,
   buildPeriodContext,
   type PeriodKpi,
@@ -36,6 +37,7 @@ export default async function PredictionPage() {
   );
 
   const trend = computeTrend(entries);
+  const trendLine = computeTrendLine(entries);
   const predictionsByGoal: Record<string, GoalPredictions> = {};
   for (const goal of weightGoals) {
     const kpis = kpisByGoal[goal.id] ?? [];
@@ -86,8 +88,9 @@ export default async function PredictionPage() {
                         entries={entries}
                         goal={goal}
                         prediction={chartPrediction}
+                        trendLine={trendLine ?? undefined}
                       />
-                      <PredictionExplainer prediction={chartPrediction} />
+                      <PredictionExplainer prediction={chartPrediction} trend={trend} />
                     </section>
                   );
                 })

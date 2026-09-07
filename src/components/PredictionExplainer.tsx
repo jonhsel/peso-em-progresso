@@ -1,9 +1,11 @@
-import type { GoalPrediction } from "@/lib/analytics";
+import type { GoalPrediction, TrendResult } from "@/lib/analytics";
 
 export default function PredictionExplainer({
   prediction,
+  trend,
 }: {
   prediction?: GoalPrediction;
+  trend?: TrendResult;
 }) {
   return (
     <div className="bg-base-surface border border-base-border rounded-card p-5 space-y-3">
@@ -25,6 +27,31 @@ export default function PredictionExplainer({
           21 dias e de uma tendência de perda de peso para funcionar.
         </p>
       </div>
+
+      {trend && trend.label !== "insufficient_data" && (
+        <div className="pt-2 border-t border-base-border grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div>
+            <p className="text-ink-faint">Ritmo</p>
+            <p className="font-mono text-ink">{Math.abs(trend.slopeKgPerWeek).toFixed(2)} kg/sem</p>
+          </div>
+          <div>
+            <p className="text-ink-faint">Variação (21d)</p>
+            <p className="font-mono text-ink">
+              {trend.totalChangeKg > 0 ? "+" : ""}
+              {trend.totalChangeKg.toFixed(1)} kg
+            </p>
+          </div>
+          <div>
+            <p className="text-ink-faint">Pesagens usadas</p>
+            <p className="font-mono text-ink">{trend.dataPointsCount}</p>
+          </div>
+          <div>
+            <p className="text-ink-faint">Consistência</p>
+            <p className="font-mono text-ink">{(trend.r2 * 100).toFixed(0)}%</p>
+          </div>
+        </div>
+      )}
+
       {prediction?.kind === "insufficient_data" && (
         <p className="text-sm text-signal-caution">
           Registre ao menos 2 pesagens nos últimos 21 dias para ativar a previsão.

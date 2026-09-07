@@ -230,6 +230,9 @@ export type TrendResult = {
   slopeKgPerWeek: number;
   label: "perdendo_rapido" | "perdendo" | "estavel" | "ganhando" | "insufficient_data";
   description: string;
+  totalChangeKg: number;
+  dataPointsCount: number;
+  r2: number;
 };
 
 /**
@@ -245,6 +248,9 @@ export function computeTrend(entries: WeightEntry[], windowDays = 21): TrendResu
       slopeKgPerWeek: 0,
       label: "insufficient_data",
       description: "Registre ao menos 2 pesagens para calcular a tendência.",
+      totalChangeKg: 0,
+      dataPointsCount: points.length,
+      r2: 0,
     };
   }
 
@@ -257,6 +263,9 @@ export function computeTrend(entries: WeightEntry[], windowDays = 21): TrendResu
       slopeKgPerWeek: 0,
       label: "insufficient_data",
       description: `Menos de 2 pesagens nos últimos ${windowDays} dias — pese com mais frequência para ver a tendência atual.`,
+      totalChangeKg: 0,
+      dataPointsCount: recent.length,
+      r2: 0,
     };
   }
 
@@ -274,6 +283,24 @@ export function computeTrend(entries: WeightEntry[], windowDays = 21): TrendResu
   const slopePerDay = denom === 0 ? 0 : (n * sumXY - sumX * sumY) / denom;
   const slopeKgPerWeek = Number((slopePerDay * 7).toFixed(3));
 
+  // Intercepto da reta ajustada (necessário só pro r2 aqui; computeTrendLine
+  // recalcula o seu próprio par de pontos a partir de slopeKgPerWeek).
+  const meanX = sumX / n;
+  const meanY = sumY / n;
+  const intercept = meanY - slopePerDay * meanX;
+
+  // R² — quão bem a reta explica a variação real dos pontos. 1 = ajuste
+  // perfeito, 0 = a reta não explica nada (peso oscilando sem padrão linear
+  // claro dentro da janela).
+  const ssTot = ys.reduce((acc, y) => acc + (y - meanY) ** 2, 0);
+  const ssRes = xs.reduce((acc, x, i) => {
+    const predicted = intercept + slopePerDay * x;
+    return acc + (ys[i] - predicted) ** 2;
+  }, 0);
+  const r2 = ssTot === 0 ? 1 : Math.max(0, 1 - ssRes / ssTot);
+
+  const totalChangeKg = Number((ys[n - 1] - ys[0]).toFixed(2));
+
   let label: TrendResult["label"] = "estavel";
   if (slopeKgPerWeek <= -0.35) label = "perdendo_rapido";
   else if (slopeKgPerWeek <= -0.05) label = "perdendo";
@@ -288,7 +315,67 @@ export function computeTrend(entries: WeightEntry[], windowDays = 21): TrendResu
       ? `Ganhando cerca de ${Math.abs(slopeKgPerWeek).toFixed(2)} kg/semana.`
       : "Peso estável, sem variação significativa.";
 
-  return { slopeKgPerWeek, label, description };
+  return {
+    slopeKgPerWeek,
+    label,
+    description,
+    totalChangeKg,
+    dataPointsCount: n,
+    r2: Number(r2.toFixed(3)),
+  };
+}
+
+export type TrendLine = {
+  start: { date: string; weightKg: number };
+  end: { date: string; weightKg: number };
+};
+
+/**
+ * Retorna os 2 pontos (início/fim da janela de `windowDays`) da reta de
+ * regressão usada por `computeTrend`, para desenhar a "linha de tendência"
+ * no gráfico de previsão. Não extrapola além do fim da janela — isso é
+ * papel da linha de projeção (`GoalPrediction`), que já existe e cobre o
+ * caso com meta + tendência de perda.
+ * Retorna `null` nos mesmos casos em que `computeTrend` retorna
+ * `insufficient_data` (sem pontos suficientes pra traçar uma reta).
+ */
+export function computeTrendLine(entries: WeightEntry[], windowDays = 21): TrendLine | null {
+  const points = toPoints(entries);
+  if (points.length < 2) return null;
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - windowDays);
+  const recent = points.filter((p) => p.date >= cutoff);
+  if (recent.length < 2) return null;
+
+  const t0 = recent[0].date.getTime();
+  const xs = recent.map((p) => (p.date.getTime() - t0) / 86_400_000);
+  const ys = recent.map((p) => p.weight);
+  const n = xs.length;
+
+  const sumX = xs.reduce((a, b) => a + b, 0);
+  const sumY = ys.reduce((a, b) => a + b, 0);
+  const sumXY = xs.reduce((acc, x, i) => acc + x * ys[i], 0);
+  const sumXX = xs.reduce((acc, x) => acc + x * x, 0);
+  const denom = n * sumXX - sumX * sumX;
+  const slopePerDay = denom === 0 ? 0 : (n * sumXY - sumX * sumY) / denom;
+  const meanX = sumX / n;
+  const meanY = sumY / n;
+  const intercept = meanY - slopePerDay * meanX;
+
+  const firstX = xs[0];
+  const lastX = xs[n - 1];
+
+  return {
+    start: {
+      date: formatISO(recent[0].date, { representation: "date" }),
+      weightKg: Number((intercept + slopePerDay * firstX).toFixed(2)),
+    },
+    end: {
+      date: formatISO(recent[n - 1].date, { representation: "date" }),
+      weightKg: Number((intercept + slopePerDay * lastX).toFixed(2)),
+    },
+  };
 }
 
 export type KpiStatus = "ahead" | "on_pace" | "caution" | "behind";
