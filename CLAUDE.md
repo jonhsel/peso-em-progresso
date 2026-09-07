@@ -2685,8 +2685,24 @@ afeta o drawer aberto. `npx tsc --noEmit`/`npm run build` limpos.
   confirmado por busca exaustiva (`grep` pelo wrapper antigo) que
   nenhuma ficou pra trás.
 
+**Hotfix 4 — esconder badge "Pro" para usuários Pro (07/09/2026).** Spec
+`claude_fase8_sidebar_hotfix_hide_pro_badge.md` (raiz do repo, não
+versionado, mesmo padrão dos demais specs) — o badge "Pro" (ícone
+`Lock` + texto) aparecia em todo item `premium: true` independente do
+plano do usuário; uma conta já Pro via 9 cadeados no menu sem
+propósito, poluindo a navegação de quem já converteu. `npx tsc
+--noEmit`/`npm run build` limpos.
+- Condição do badge em `renderNavItem` (`Sidebar.tsx`) trocada de
+  `l.premium &&` pra `l.premium && plan !== "pro" &&`. `plan` já era
+  prop existente do componente — nenhum dado novo buscado.
+- Usuário free: sem mudança, os 9 badges continuam aparecendo.
+- Usuário Pro: nenhum badge "Pro" aparece em nenhum item do menu; item
+  fica com o mesmo espaçamento dos itens free.
+- **Puramente visual** — nenhum `PlanGate` de página foi tocado; gate
+  real de cada rota continua idêntico ao da Fase 7.
+
 - [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
-      dev — **ainda não visto rodando num navegador real**, nem os 3
+      dev — **ainda não visto rodando num navegador real**, nem os 4
       hotfixes acima).
 - [ ] Sidebar aparece fixa em desktop nas 13 páginas (12 do spec + a 13ª
       migrada nesta sessão), sem quebrar `max-w-2xl`/`max-w-6xl` de cada
@@ -2700,8 +2716,10 @@ afeta o drawer aberto. `npx tsc --noEmit`/`npm run build` limpos.
       escuro visível e clicável na faixa restante; mobile (414px+): sidebar
       não ultrapassa 280px.
 - [ ] Badge "Pro" (hotfix 1, não mais "Premium") aparece nos 9 itens
-      certos: Medidas, Fotos, Relatórios, Previsão da Meta, Conquistas,
-      Desafios, Coach, Lembretes, Exportar Dados.
+      certos para usuário free: Medidas, Fotos, Relatórios, Previsão da
+      Meta, Conquistas, Desafios, Coach, Lembretes, Exportar Dados.
+      Para usuário Pro, o badge some completamente nesses 9 itens
+      (hotfix 4), sem alterar alinhamento/espaçamento do item.
 - [ ] 3 itens "Em breve" (`comingSoon`) renderizam como `<span>` cinza, não
       navegam: Previsão da Meta, Conquistas, Exportar Dados.
 - [ ] "Meta: X,X kg" aparece quando há meta de peso ativa com

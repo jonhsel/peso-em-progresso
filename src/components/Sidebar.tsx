@@ -91,7 +91,7 @@ export default function Sidebar({
       <>
         <Icon className="h-4 w-4 shrink-0" />
         <span className="flex-1 truncate">{l.label}</span>
-        {l.premium && (
+        {l.premium && plan !== "pro" && (
           <span className="flex items-center gap-1 rounded bg-accent-tint px-1.5 py-0.5 text-[10px] font-medium text-accent">
             <Lock className="h-2.5 w-2.5" />
             Pro
