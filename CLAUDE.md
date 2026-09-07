@@ -2989,10 +2989,13 @@ modo.
   os 4 períodos (semana/mês/trimestre/semestre) passam a ser contados a
   partir dessa data fixa, não a partir de hoje nem de um calendário civil.
   `periodStart` no modo `anchored` retorna a **mesma data** (o marco) para
-  os 4 períodos; `periodLengthDays` retorna os dias corridos entre o
-  marco e agora (`Math.max(1, ...)`, evita divisão por zero com marco
-  "hoje"). Pesagens anteriores ao marco continuam visíveis no histórico e
-  no `WeightChart` — só os KPIs recontam a partir dele.
+  os 4 períodos; `periodLengthDays` retorna o comprimento nominal de cada
+  período (7/30/90/180, mesmo valor do modo `rolling` — **corrigido em
+  07/09/2026, ver "Hotfix — `periodLengthDays`" abaixo**; a versão
+  original desta sub-fase usava dias corridos entre o marco e agora, bug
+  já corrigido, não reintroduzir). Pesagens anteriores ao marco continuam
+  visíveis no histórico e no `WeightChart` — só os KPIs recontam a partir
+  dele.
   **Modo Pro-gated**, mesmo padrão visual dos demais gates de plano.
   **Streak e conquistas não mudam de cálculo** (decisão explícita da
   spec) — `streak.ts`/`achievements.ts`/`StreakCard.tsx`/
@@ -3076,6 +3079,50 @@ modo.
   marcos (1 por meta — o marco é global no profile), gate server-side via
   RLS/constraint, qualquer mudança em `goals_history`/
   `resolveGoalsForPeriod`/thresholds de status/`computeTrend`.
+
+**Hotfix — `periodLengthDays` no modo `anchored` (mesmo dia, 07/09/2026).**
+Patch `patch_periodLengthDays_anchored.md` (raiz do repo, não versionado,
+mesmo padrão dos demais specs) — bug de lógica na própria spec v3 da Fase
+8.x (seção 3.3), não um erro de implementação: a spec original tratava o
+modo `anchored` como "o período É tudo que já se passou desde o marco",
+fazendo `periodLengthDays` retornar `differenceInCalendarDays(now,
+anchorDate)`. Isso deixa `fractionElapsed = elapsedDays / lengthDays`
+sempre igual a 1.0 (mesmo numerador e denominador), então todo card
+(semana/mês/trimestre/semestre) mostrava a meta **integral** do período
+como "esperado hoje", como se o período inteiro já tivesse passado —
+exemplo do próprio patch: marco há 26 dias, card de Trimestre mostrando
+"esperado: 108.0 kg" (meta cheia de 90 dias) em vez de "esperado: 110.13
+kg" (proporcional a 26/90). `npx tsc --noEmit`/`npm run build` limpos.
+- **Correção:** o modo `anchored` muda só **onde** o período começa (o
+  marco, não hoje/calendário civil), não o comprimento de cada período —
+  mesmo raciocínio já usado pelo `rolling`. `periodLengthDays` passou a
+  tratar `anchored` no mesmo branch de `rolling` (7/30/90/180, comprimento
+  nominal); o parâmetro `now` foi removido da assinatura (só existia para
+  o cálculo antigo). Único caller (dentro de `computePeriodKpi`)
+  atualizado de `periodLengthDays(period, ctx, now)` para
+  `periodLengthDays(period, ctx)`.
+- **Efeito:** no modo `anchored`, os 4 cards voltam a mostrar "esperado"
+  **diferentes entre si**, proporcional ao comprimento nominal de cada
+  período (semana pode chegar a `fractionElapsed` capado em 1.0 se o
+  marco já passou de 7 dias — comportamento esperado, igual ao `rolling`;
+  trimestre/semestre com marco recente mostram fração pequena,
+  corretamente).
+- Modos `fixed`/`rolling` **não são afetados** — `rolling` já usava o
+  branch correto desde a Fase 3; a mudança só reclassifica `anchored` pra
+  cair no mesmo branch.
+
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
+      dev — **ainda não visto rodando num navegador real**).
+- [ ] Dashboard com modo `anchored` + marco de ~26 dias: os 4 cards
+      mostram "esperado pela meta" diferentes entre si (proporcional ao
+      comprimento de cada período, não mais os 4 iguais/integrais).
+- [ ] Card de Semana com marco > 7 dias: `fractionElapsed` capado a 1.0,
+      mostra a meta semanal integral como esperado (comportamento
+      esperado, período semanal "cabe inteiro" dentro do tempo decorrido).
+- [ ] Card de Trimestre/Semestre com marco recente: "esperado" proporcional
+      (ex.: ~29% do trimestre com marco de 26 dias), não 100%.
+- [ ] Modos `fixed` e `rolling` sem regressão (valores idênticos a antes
+      do patch).
 
 - [x] Rodar `supabase/migrations/0014_period_anchor.sql` no Supabase
       Dashboard (3 blocos separados, cada um confirmado "Success" antes do

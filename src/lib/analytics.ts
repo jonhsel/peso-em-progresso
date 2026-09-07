@@ -132,20 +132,21 @@ export function periodStart(
 /**
  * Duração do período em dias, usada para calcular a fração já decorrida.
  * mode "fixed": aproximação civil (30.4/91.3/182.6 para mês/trimestre/semestre).
- * mode "rolling": valor exato (30/90/180), já que o período É esses N dias.
- * mode "anchored": dias corridos entre o marco e `now` — o "período" é tudo
- * que já se passou desde a data escolhida, igual para os 4 cards.
- * `Math.max(1, ...)` evita divisão por zero quando o marco é "hoje".
+ * mode "rolling"/"anchored": valor exato (7/30/90/180) — o modo `anchored`
+ * só muda ONDE o período começa (o marco, não hoje nem um calendário
+ * civil), não o comprimento de cada período: uma "semana desde o marco"
+ * continua sendo 7 dias, um "trimestre desde o marco" continua sendo 90
+ * dias, igual ao `rolling`. (Corrigido em 07/09/2026 — a versão anterior
+ * usava `differenceInCalendarDays(now, anchorDate)`, o que fazia
+ * `fractionElapsed` ser sempre 1.0 e todo card mostrar a meta integral do
+ * período como "esperado", em vez de proporcional ao tempo decorrido. Ver
+ * `patch_periodLengthDays_anchored.md`.)
  */
 function periodLengthDays(
   period: Period,
-  ctx: PeriodContext = DEFAULT_PERIOD_CONTEXT,
-  now: Date = new Date()
+  ctx: PeriodContext = DEFAULT_PERIOD_CONTEXT
 ): number {
-  if (ctx.mode === "anchored" && ctx.anchorDate) {
-    return Math.max(1, differenceInCalendarDays(now, ctx.anchorDate));
-  }
-  if (ctx.mode === "rolling") {
+  if (ctx.mode === "anchored" || ctx.mode === "rolling") {
     const exact: Record<Period, number> = { week: 7, month: 30, quarter: 90, semester: 180 };
     return exact[period];
   }
@@ -370,7 +371,7 @@ export function computePeriodKpi(
   const latest = points.length ? points[points.length - 1] : null;
   const current = latest ? latest.weight : null;
 
-  const lengthDays = periodLengthDays(period, ctx, now);
+  const lengthDays = periodLengthDays(period, ctx);
   const elapsedDays = Math.max(0, differenceInCalendarDays(now, start));
   const fractionElapsed = Math.min(1, elapsedDays / lengthDays);
 
