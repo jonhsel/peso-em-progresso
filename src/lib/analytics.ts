@@ -15,6 +15,7 @@ import type {
   GoalMetric,
   BodyMeasurement,
   Goal,
+  Profile,
 } from "@/types/database";
 
 export type Period = "week" | "month" | "quarter" | "semester";
@@ -50,19 +51,60 @@ const BASELINE_MAX_DAYS_BEFORE: Record<Period, number> = {
 };
 
 /**
+ * Contexto de período: agrupa os 3 parâmetros que juntos determinam onde
+ * cada um dos 4 períodos (semana/mês/trimestre/semestre) começa. Introduzido
+ * na Fase 8.x (marco de período customizado) para não colidir params
+ * posicionais a cada novo modo — extensões futuras de contexto de período
+ * entram aqui, não como mais um parâmetro solto.
+ */
+export type PeriodContext = {
+  mode: PeriodMode;
+  weekStartsOn: WeekStartsOn;
+  anchorDate: Date | null;
+};
+
+export const DEFAULT_PERIOD_CONTEXT: PeriodContext = {
+  mode: "fixed",
+  weekStartsOn: "monday",
+  anchorDate: null,
+};
+
+export function buildPeriodContext(
+  profile: Pick<Profile, "period_mode" | "week_starts_on" | "period_anchor_date">
+): PeriodContext {
+  return {
+    mode: profile.period_mode,
+    weekStartsOn: profile.week_starts_on,
+    anchorDate: profile.period_anchor_date ? parseISO(profile.period_anchor_date) : null,
+  };
+}
+
+/**
  * Início do período que contém `reference`.
  * mode "fixed" (default): período civil — semana a partir de `weekStartsOn`,
  * mês/trimestre/semestre civis.
  * mode "rolling": N dias corridos atrás de hoje (7/30/90/180) — ignora
  * `weekStartsOn`, que só se aplica ao modo fixed.
+ * mode "anchored": todos os 4 períodos retornam a mesma data fixa
+ * (`ctx.anchorDate`) — os KPIs recontam a partir do marco escolhido pelo
+ * usuário, não a partir de hoje nem de um período civil.
  */
 export function periodStart(
   period: Period,
   reference: Date,
-  mode: PeriodMode = "fixed",
-  weekStartsOn: WeekStartsOn = "monday"
+  ctx: PeriodContext = DEFAULT_PERIOD_CONTEXT
 ): Date {
-  if (mode === "rolling") {
+  if (ctx.mode === "anchored") {
+    if (!ctx.anchorDate) {
+      throw new Error(
+        "periodStart: mode 'anchored' requer anchorDate. Profile inconsistente " +
+          "(period_mode='anchored' sem period_anchor_date)."
+      );
+    }
+    return ctx.anchorDate;
+  }
+
+  if (ctx.mode === "rolling") {
     const rollingDays: Record<Period, number> = {
       week: 7,
       month: 30,
@@ -74,7 +116,7 @@ export function periodStart(
 
   switch (period) {
     case "week":
-      return startOfWeek(reference, { weekStartsOn: weekStartsOn === "sunday" ? 0 : 1 });
+      return startOfWeek(reference, { weekStartsOn: ctx.weekStartsOn === "sunday" ? 0 : 1 });
     case "month":
       return startOfMonth(reference);
     case "quarter":
@@ -91,9 +133,19 @@ export function periodStart(
  * Duração do período em dias, usada para calcular a fração já decorrida.
  * mode "fixed": aproximação civil (30.4/91.3/182.6 para mês/trimestre/semestre).
  * mode "rolling": valor exato (30/90/180), já que o período É esses N dias.
+ * mode "anchored": dias corridos entre o marco e `now` — o "período" é tudo
+ * que já se passou desde a data escolhida, igual para os 4 cards.
+ * `Math.max(1, ...)` evita divisão por zero quando o marco é "hoje".
  */
-function periodLengthDays(period: Period, mode: PeriodMode = "fixed"): number {
-  if (mode === "rolling") {
+function periodLengthDays(
+  period: Period,
+  ctx: PeriodContext = DEFAULT_PERIOD_CONTEXT,
+  now: Date = new Date()
+): number {
+  if (ctx.mode === "anchored" && ctx.anchorDate) {
+    return Math.max(1, differenceInCalendarDays(now, ctx.anchorDate));
+  }
+  if (ctx.mode === "rolling") {
     const exact: Record<Period, number> = { week: 7, month: 30, quarter: 90, semester: 180 };
     return exact[period];
   }
@@ -307,11 +359,10 @@ export function computePeriodKpi(
   goalsHistory: GoalsHistoryEntry[],
   period: Period,
   now: Date = new Date(),
-  mode: PeriodMode = "fixed",
-  weekStartsOn: WeekStartsOn = "monday",
+  ctx: PeriodContext = DEFAULT_PERIOD_CONTEXT,
   unit: string = "kg"
 ): PeriodKpi {
-  const start = periodStart(period, now, mode, weekStartsOn);
+  const start = periodStart(period, now, ctx);
   const activeGoals = resolveGoalsForPeriod(goalsHistory, start);
   const targetLossKg = Number(activeGoals?.[GOAL_FIELD[period]] ?? 0);
 
@@ -319,7 +370,7 @@ export function computePeriodKpi(
   const latest = points.length ? points[points.length - 1] : null;
   const current = latest ? latest.weight : null;
 
-  const lengthDays = periodLengthDays(period, mode);
+  const lengthDays = periodLengthDays(period, ctx, now);
   const elapsedDays = Math.max(0, differenceInCalendarDays(now, start));
   const fractionElapsed = Math.min(1, elapsedDays / lengthDays);
 
@@ -381,12 +432,11 @@ export function computeAllKpis(
   points: EntryPoint[],
   goalsHistory: GoalsHistoryEntry[],
   now: Date = new Date(),
-  mode: PeriodMode = "fixed",
-  weekStartsOn: WeekStartsOn = "monday",
+  ctx: PeriodContext = DEFAULT_PERIOD_CONTEXT,
   unit: string = "kg"
 ): PeriodKpi[] {
   return (["week", "month", "quarter", "semester"] as Period[]).map((p) =>
-    computePeriodKpi(points, goalsHistory, p, now, mode, weekStartsOn, unit)
+    computePeriodKpi(points, goalsHistory, p, now, ctx, unit)
   );
 }
 

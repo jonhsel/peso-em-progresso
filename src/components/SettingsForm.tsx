@@ -35,12 +35,27 @@ const PERIOD_MODE_OPTIONS = [
   {
     value: "fixed" as const,
     title: "Semana/mês corrido",
-    desc: "Semana de segunda a domingo, mês do dia 1 ao fim.",
+    desc:
+      "Sua semana reinicia toda segunda (ou domingo, como preferir) e " +
+      "seu mês reinicia no dia 1 — como num calendário normal. Os KPIs " +
+      "de trimestre e semestre também seguem esse calendário civil.",
   },
   {
     value: "rolling" as const,
     title: "Últimos N dias",
-    desc: "Sempre os últimos 7/30/90/180 dias a partir de hoje.",
+    desc:
+      "Os KPIs olham sempre para trás a partir de hoje: os últimos 7 " +
+      "dias para a meta semanal, os últimos 30 para a mensal, e assim " +
+      "por diante. Não depende de qual dia do mês ou da semana é hoje.",
+  },
+  {
+    value: "anchored" as const,
+    title: "A partir de uma data",
+    desc:
+      "Você escolhe uma data de início (ex.: quando começou este ciclo " +
+      "de emagrecimento) e todos os KPIs passam a contar o progresso a " +
+      "partir dela, não a partir de hoje. Pesagens anteriores a essa " +
+      "data continuam aparecendo no seu histórico e gráfico normalmente.",
   },
 ];
 
@@ -57,6 +72,7 @@ export default function SettingsForm({
   weekStartsOn,
   checkinHour,
   plan,
+  periodAnchorDate,
 }: {
   userId: string;
   displayName: string;
@@ -65,6 +81,7 @@ export default function SettingsForm({
   weekStartsOn: WeekStartsOn;
   checkinHour: number | null;
   plan: "free" | "pro";
+  periodAnchorDate: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -73,11 +90,16 @@ export default function SettingsForm({
   const [height, setHeight] = useState(heightCm !== null ? String(heightCm) : "");
   const [mode, setMode] = useState<PeriodMode>(periodMode);
   const [weekStart, setWeekStart] = useState<WeekStartsOn>(weekStartsOn);
+  const [anchorDate, setAnchorDate] = useState<string>(periodAnchorDate ?? "");
   const [checkinHourInput, setCheckinHourInput] = useState(checkinHour !== null ? String(checkinHour) : "");
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const todayStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+  }).format(new Date());
 
   // Some com a mensagem "Configurações atualizadas" após 3s
   useEffect(() => {
@@ -101,6 +123,17 @@ export default function SettingsForm({
 
     const parsedCheckinHour = parseOptionalCheckinHour(checkinHourInput);
 
+    if (mode === "anchored") {
+      if (!anchorDate) {
+        setError("Escolha uma data de início.");
+        return null;
+      }
+      if (anchorDate > todayStr) {
+        setError("A data de início não pode ser no futuro.");
+        return null;
+      }
+    }
+
     return { display_name: trimmedName, height_cm: parsedHeight, checkin_hour: parsedCheckinHour };
   }
 
@@ -116,6 +149,7 @@ export default function SettingsForm({
         period_mode: mode,
         week_starts_on: weekStart,
         checkin_hour: values.checkin_hour,
+        ...(mode === "anchored" ? { period_anchor_date: anchorDate } : {}),
       })
       .eq("id", userId);
 
@@ -225,22 +259,55 @@ export default function SettingsForm({
             </div>
 
             <div className="space-y-3 mt-4">
-              {PERIOD_MODE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setMode(opt.value)}
-                  className={`w-full text-left rounded-card border p-4 transition ${
-                    mode === opt.value
-                      ? "border-accent bg-base-surface2"
-                      : "border-base-border bg-base-surface hover:border-ink-faint"
-                  }`}
-                >
-                  <span className="text-sm font-medium text-ink">{opt.title}</span>
-                  <span className="block mt-1 text-[13px] text-ink-muted">{opt.desc}</span>
-                </button>
-              ))}
+              {PERIOD_MODE_OPTIONS.map((opt) => {
+                const isAnchoredLocked = opt.value === "anchored" && plan !== "pro";
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    disabled={isAnchoredLocked}
+                    onClick={() => {
+                      if (!isAnchoredLocked) setMode(opt.value);
+                    }}
+                    className={`w-full text-left rounded-card border p-4 transition ${
+                      mode === opt.value
+                        ? "border-accent bg-base-surface2"
+                        : "border-base-border bg-base-surface hover:border-ink-faint"
+                    } ${isAnchoredLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+                  >
+                    <span className="text-sm font-medium text-ink">
+                      {opt.title}
+                      {isAnchoredLocked && (
+                        <Link
+                          href="/dashboard/upgrade"
+                          className="ml-2 text-xs text-accent hover:underline pointer-events-auto"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          (Pro)
+                        </Link>
+                      )}
+                    </span>
+                    <span className="block mt-1 text-[13px] text-ink-muted">{opt.desc}</span>
+                  </button>
+                );
+              })}
             </div>
+
+            {mode === "anchored" && (
+              <label className="block mt-4">
+                <span className="text-xs text-ink-muted mb-1.5 block">
+                  Data de início do período:
+                </span>
+                <input
+                  type="date"
+                  value={anchorDate}
+                  max={todayStr}
+                  onChange={(e) => setAnchorDate(e.target.value)}
+                  className="w-full rounded-lg border border-base-border bg-base-surface px-3 py-2 text-sm text-ink"
+                  required
+                />
+              </label>
+            )}
 
             <label className="block mt-4">
               <span className="text-xs text-ink-muted mb-1.5 block">Sua semana começa em:</span>

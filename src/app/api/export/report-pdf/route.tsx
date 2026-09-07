@@ -11,6 +11,7 @@ import {
   getPrimaryWeightGoal,
   METRIC_UNIT,
 } from "@/lib/analytics";
+import type { PeriodContext } from "@/lib/analytics";
 import type { Period } from "@/lib/analytics";
 import { ReportDocument } from "@/lib/pdf/ReportDocument";
 import type {
@@ -67,7 +68,11 @@ export async function GET(request: NextRequest) {
     { data: goalsHistory },
     { data: measurements },
   ] = await Promise.all([
-    supabase.from("profiles").select("display_name, period_mode, week_starts_on, plan").eq("id", user.id).single(),
+    supabase
+      .from("profiles")
+      .select("display_name, period_mode, week_starts_on, period_anchor_date, plan")
+      .eq("id", user.id)
+      .single(),
     supabase
       .from("weight_entries")
       .select("*")
@@ -130,14 +135,12 @@ export async function GET(request: NextRequest) {
         },
       ];
 
-  const kpis = computeAllKpis(
-    points,
-    historyForGoal,
-    new Date(),
-    (profile?.period_mode as PeriodMode) ?? "fixed",
-    (profile?.week_starts_on as WeekStartsOn) ?? "monday",
-    unit
-  );
+  const ctx: PeriodContext = {
+    mode: (profile?.period_mode as PeriodMode) ?? "fixed",
+    weekStartsOn: (profile?.week_starts_on as WeekStartsOn) ?? "monday",
+    anchorDate: profile?.period_anchor_date ? parseISO(profile.period_anchor_date) : null,
+  };
+  const kpis = computeAllKpis(points, historyForGoal, new Date(), ctx, unit);
   const kpi = kpis.find((k) => k.period === period)!;
 
   // Previsão só existe pra semana/mês (Fase 5.1) e só pra metas de peso —

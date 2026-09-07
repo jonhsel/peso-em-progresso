@@ -6,6 +6,7 @@ import {
   computeTrend,
   computeGoalPrediction,
   METRIC_UNIT,
+  buildPeriodContext,
   type PeriodKpi,
 } from "@/lib/analytics";
 import Sidebar from "@/components/Sidebar";
@@ -29,7 +30,7 @@ export default async function PredictionPage() {
       const history = goalsHistory.filter((h) => h.goal_id === goal.id);
       return [
         goal.id,
-        computeAllKpis(points, history, new Date(), profile.period_mode, profile.week_starts_on, METRIC_UNIT[goal.metric]),
+        computeAllKpis(points, history, new Date(), buildPeriodContext(profile), METRIC_UNIT[goal.metric]),
       ];
     })
   );

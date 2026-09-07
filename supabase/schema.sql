@@ -13,8 +13,9 @@ create table if not exists public.profiles (
   height_cm numeric(5,1),
   created_at timestamptz not null default now(),
   onboarded_at timestamptz,
-  period_mode text not null default 'fixed' check (period_mode in ('fixed', 'rolling')),
+  period_mode text not null default 'fixed' check (period_mode in ('fixed', 'rolling', 'anchored')),
   week_starts_on text not null default 'monday' check (week_starts_on in ('monday', 'sunday')),
+  period_anchor_date date, -- data-marco quando period_mode = 'anchored' (Fase 8.x, Pro-gated)
   checkin_hour smallint check (checkin_hour is null or (checkin_hour >= 0 and checkin_hour <= 23)),
   plan text not null default 'free' check (plan in ('free', 'pro')),
   plan_expires_at timestamptz,

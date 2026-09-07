@@ -25,7 +25,8 @@ na tela `/dashboard/goals`, não fixas no código.
 coach/visualizador) + Fase 7 (monetização em camadas — gate free/pro +
 Kiwify, validada em produção 05/09/2026) + Fase 8.1 (sidebar de navegação)
 + Fase 8.1.1 (página de previsão da meta) + Fase 8.1.2 (página de
-conquistas) completos, nenhuma das três ainda validada em produção
+conquistas) + Fase 8.x (marco de período customizado "A partir de uma
+data") completos, nenhuma dessas ainda validada em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -2971,6 +2972,150 @@ Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 8
 — Navegação/UX → "Conquistas") e atualizar os checkboxes acima. Próxima
 sub-fase pendente: 8.1.3 (Exportar Dados).
 
+## Fase 8.x — Marco de período customizado ("A partir de uma data") (implementada 07/09/2026)
+
+Spec completo em `claude_fase8_marco_periodo_v3.md` (na raiz do repo, não
+versionado — mesmo padrão dos specs anteriores; v3 já auditada contra o
+código real via busca direcionada, sem pendências técnicas abertas no
+handoff). Implementado nesta sessão: `npx tsc --noEmit` e `npm run build`
+limpos. **Ainda não testado contra Supabase real nem visto num navegador
+real** — ver checklist abaixo. Patch aplicado ao pé da letra do spec, com
+1 desvio de numeração de migração (abaixo). Estende o mecanismo de
+`period_mode` já existente desde a Fase 3 (`fixed`/`rolling`) com um 3º
+modo.
+
+- **Novo `period_mode`: `"anchored"`** ("A partir de uma data") — o
+  usuário define uma data-marco (date picker em `/dashboard/settings`) e
+  os 4 períodos (semana/mês/trimestre/semestre) passam a ser contados a
+  partir dessa data fixa, não a partir de hoje nem de um calendário civil.
+  `periodStart` no modo `anchored` retorna a **mesma data** (o marco) para
+  os 4 períodos; `periodLengthDays` retorna os dias corridos entre o
+  marco e agora (`Math.max(1, ...)`, evita divisão por zero com marco
+  "hoje"). Pesagens anteriores ao marco continuam visíveis no histórico e
+  no `WeightChart` — só os KPIs recontam a partir dele.
+  **Modo Pro-gated**, mesmo padrão visual dos demais gates de plano.
+  **Streak e conquistas não mudam de cálculo** (decisão explícita da
+  spec) — `streak.ts`/`achievements.ts`/`StreakCard.tsx`/
+  `AchievementsCard.tsx` intocados, continuam operando sobre `entries`
+  diretamente, sem relação com `period_mode`.
+- **Desvio sobre o spec: migração renumerada de `0013` para
+  `supabase/migrations/0014_period_anchor.sql`** — o spec assumia `0013`
+  livre, mas essa numeração já tinha sido usada por
+  `0013_get_user_id_by_email.sql` (Fase 7, correção do bug do webhook
+  Kiwify). Conteúdo idêntico ao spec, só o nome do arquivo mudou. **Ainda
+  precisa ser rodada manualmente no Supabase Dashboard > SQL Editor**, em
+  3 blocos separados (drop constraint → recriar constraint com os 3
+  valores → add column + comments) — sem isso, salvar
+  `period_mode='anchored'` em produção falha na `CHECK` constraint antiga
+  (só aceita `fixed`/`rolling`).
+- `profiles.period_anchor_date` (coluna nova, `date`, nullable, sem
+  `NOT NULL`) — validação de obrigatoriedade fica na camada de aplicação
+  (client-side, já que `SettingsForm` não usa Server Action pra período),
+  permitindo manter o valor salvo ao trocar de modo e voltar depois sem
+  redigitar a data.
+- **Mudança estrutural em `src/lib/analytics.ts`**: os parâmetros
+  posicionais `mode`/`weekStartsOn` de `computePeriodKpi`/`computeAllKpis`/
+  `periodStart` foram substituídos por um único objeto `PeriodContext`
+  (`{ mode, weekStartsOn, anchorDate }`, com `DEFAULT_PERIOD_CONTEXT` e o
+  helper `buildPeriodContext(profile)`) — evita colidir mais parâmetros
+  posicionais a cada novo modo de período que aparecer no futuro. `unit`
+  continua como último parâmetro solto (é "contexto de métrica", não
+  "contexto de período", conceitos que mudam por razões diferentes).
+  **6 callers de `computeAllKpis` migrados** (`dashboard/page.tsx`,
+  `reports/page.tsx`, `prediction/page.tsx`, `coach/[ownerId]/page.tsx` via
+  `buildPeriodContext(profile)`; `api/export/pdf/route.tsx` e
+  `api/export/report-pdf/route.tsx` via `PeriodContext` montado inline,
+  porque ali o profile vem de uma query parcial — só os campos
+  selecionados —, não de `loadUserData()`/`loadCoachClientData()` que
+  retornam um `Profile` tipado completo). Os dois `route.tsx` de export
+  ganharam `period_anchor_date` no `select("...")` de profile que já
+  faziam (sem query extra) e passaram a importar `parseISO`
+  (`api/export/pdf/route.tsx` não importava `date-fns` antes;
+  `api/export/report-pdf/route.tsx` já importava, reaproveitado). O resto
+  do corpo de `computePeriodKpi` (`expectedWeightNow`, `deltaVsExpected`,
+  status labels) não mudou — já estava correto desde a Fase 6.2.
+- `SettingsForm.tsx` — 3º card "A partir de uma data" no mesmo grid dos
+  outros 2, com gate individual (`isAnchoredLocked = opt.value ===
+  "anchored" && plan !== "pro"`, badge "(Pro)" linkando pra
+  `/dashboard/upgrade`, redundante com o `opacity-50 pointer-events-none`
+  que já cobre a seção inteira no free, mas serve de proteção dupla e
+  indicação visual caso a seção vire acessível pro free no futuro). Date
+  picker (`type="date"`, `max` = hoje em São Paulo via
+  `Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" })`, mesmo
+  mecanismo de `streak.ts`/`PhotoUploadForm.tsx`) aparece condicionalmente
+  logo abaixo do grid de cards, antes do bloco de `week_starts_on`.
+  Validação client-side no `validate()` existente: sem data → "Escolha uma
+  data de início.", data futura → "A data de início não pode ser no
+  futuro.". `persist()` só inclui `period_anchor_date` no `.update()`
+  quando `mode === "anchored"` (spread condicional) — trocar pra
+  `fixed`/`rolling` não apaga o valor salvo no banco. Copy dos 3 cards
+  reescrita (pedido de cliente: "não deixa claro o que cada modo
+  significa"), texto inline apenas, sem link pro modal de ajuda (decisão
+  confirmada na spec). Modal de confirmação (`ConfirmDialog`) não precisou
+  de nenhuma mudança — já dispara quando `mode !== periodMode` (prop
+  original), condição que já cobre os 3 modos.
+- **Gate de plano é só client-side (visual), sem `CHECK`/RLS condicional
+  no Postgres** — decisão explícita da spec, consistente com o padrão já
+  usado pelos demais gates de Pro do projeto (Fotos, Previsão, Medidas:
+  `PlanGate` no client + Route Handlers que fazem `select` de `plan`).
+  Risco aceito: um usuário free manipulando o DOM pra salvar
+  `period_mode='anchored'` teria os KPIs recalculados com o marco, mas
+  todas as telas Pro (Previsão, Relatórios) continuam trancadas por
+  `PlanGate` nos respectivos Server Components.
+- `src/types/database.ts` — `PeriodMode` ganhou `"anchored"`; `Profile`
+  ganhou `period_anchor_date: string | null`.
+- `loadUserData.ts` — fallback sintético de profile ganhou
+  `period_anchor_date: null` (a query já é `select("*")`, campo chega
+  automaticamente do banco; só o fallback precisava do campo explícito).
+  `loadCoachClientData.ts` não precisou de mudança — já faz `select("*")`
+  de profile e retorna `Profile` tipado completo, então
+  `buildPeriodContext(profile)` funciona sem alteração nesse arquivo.
+- **Fora de escopo** (idem spec): qualquer mudança em
+  `streak.ts`/`achievements.ts`/`AchievementsCard.tsx`/`StreakCard.tsx`,
+  ocultar cards de trimestre/semestre quando o marco é recente, múltiplos
+  marcos (1 por meta — o marco é global no profile), gate server-side via
+  RLS/constraint, qualquer mudança em `goals_history`/
+  `resolveGoalsForPeriod`/thresholds de status/`computeTrend`.
+
+- [x] Rodar `supabase/migrations/0014_period_anchor.sql` no Supabase
+      Dashboard (3 blocos separados, cada um confirmado "Success" antes do
+      próximo) — **rodada em 07/09/2026** (confirmado pelo usuário). Não
+      verificado nesta sessão via SQL direto que a `CHECK` de
+      `period_mode` de fato aceita os 3 valores e que `period_anchor_date`
+      existe — inferido do relato do usuário, não confirmado por print/
+      query.
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
+      dev — **ainda não visto rodando num navegador real**).
+- [ ] Conta Free: card "A partir de uma data" aparece com badge "(Pro)",
+      desabilitado, link leva para `/dashboard/upgrade`. Seção inteira de
+      período continua `opacity-50 pointer-events-none` no free.
+- [ ] Conta Pro: seleciona "A partir de uma data" → date picker aparece →
+      tenta salvar sem preencher data → erro "Escolha uma data de
+      início."; data futura → "A data de início não pode ser no futuro.".
+- [ ] Conta Pro: preenche marco (com pesagens antes e depois dessa data)
+      → salva → modal de confirmação → confirma → 4 KPIs no dashboard
+      recalculam com o marco como início.
+- [ ] `WeightChart` continua mostrando pesagens anteriores ao marco.
+- [ ] `/dashboard/prediction`: previsão calculada com KPI do modo
+      `anchored`.
+- [ ] `/dashboard/reports`: KPIs consistentes com dashboard.
+- [ ] `/dashboard/coach/[ownerId]`: coach vê KPIs consistentes com o modo
+      `anchored` do cliente.
+- [ ] Exportação PDF (`/api/export/pdf`): `period_mode='anchored'` não
+      quebra, `period_anchor_date` incluído no select.
+- [ ] Exportação Report PDF (`/api/export/report-pdf`): idem.
+- [ ] Trocar de `anchored` para `fixed`/`rolling` e voltar: marco anterior
+      preservado (não apagado pelo spread condicional do `persist()`).
+- [ ] Streak e Conquistas: sem mudança de comportamento (regressão).
+- [ ] Tema claro/escuro: card e date picker usam tokens.
+- [ ] Mobile: 3 cards empilhados, copy mais longa não quebra layout.
+- [ ] Multi-goal (Fase 6.2): 2+ metas ativas + modo `anchored` —
+      `kpisByGoal` calcula corretamente por meta com o mesmo marco global.
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 8
+— Navegação/UX, ou onde fizer mais sentido categorizar "marco de período
+customizado") e atualizar os checkboxes acima.
+
 ## Pendências / próximos passos sugeridos (não iniciados)
 
 - [ ] Testar o app fim a fim contra um projeto Supabase real (criar projeto, rodar
@@ -2979,15 +3124,16 @@ sub-fase pendente: 8.1.3 (Exportar Dados).
       + `migrations/0006_user_achievements.sql` + `migrations/0007_checkin_hour.sql`
       + `migrations/0008_progress_photos.sql` + `migrations/0009_multi_goals.sql`
       + `migrations/0010_challenges.sql` + `migrations/0011_coach_links.sql`
-      + `migrations/0012_plan_gate.sql`,
+      + `migrations/0012_plan_gate.sql` + `migrations/0013_get_user_id_by_email.sql`
+      + `migrations/0014_period_anchor.sql`,
       configurar `.env.local` (incluindo as 3 env vars novas da Fase 7:
       `SUPABASE_SERVICE_ROLE_KEY`, `KIWIFY_WEBHOOK_TOKEN`,
       `NEXT_PUBLIC_KIWIFY_CHECKOUT_URL`), testar signup/login/registro de
       peso, exportação CSV/PDF, importação CSV, medidas corporais, metas +
-      histórico, tela de Configurações/período de meta, conquistas,
-      horário de check-in, fotos de progresso, múltiplas metas
-      simultâneas, desafios, o papel de coach/visualizador, e o gate
-      free/pro + webhook da Kiwify.
+      histórico, tela de Configurações/período de meta (incluindo o modo
+      "A partir de uma data"), conquistas, horário de check-in, fotos de
+      progresso, múltiplas metas simultâneas, desafios, o papel de
+      coach/visualizador, e o gate free/pro + webhook da Kiwify.
 - [ ] Deploy real na Vercel + configurar Site URL / Redirect URLs no Supabase Auth.
 - [ ] Testes unitários para `src/lib/analytics.ts` (funções puras, fáceis de testar).
 - [ ] Massa magra/composição corporal mais completa (bioimpedância avançada) — hoje

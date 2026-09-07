@@ -1,4 +1,4 @@
-export type PeriodMode = "fixed" | "rolling";
+export type PeriodMode = "fixed" | "rolling" | "anchored";
 export type WeekStartsOn = "monday" | "sunday";
 
 export type Profile = {
@@ -9,6 +9,7 @@ export type Profile = {
   onboarded_at: string | null;
   period_mode: PeriodMode;
   week_starts_on: WeekStartsOn;
+  period_anchor_date: string | null; // YYYY-MM-DD, usado quando period_mode = "anchored"
   checkin_hour: number | null;
   plan: "free" | "pro";
   plan_expires_at: string | null;

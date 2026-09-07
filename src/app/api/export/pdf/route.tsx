@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { createClient } from "@/lib/supabase/server";
+import { parseISO } from "date-fns";
 import { extractMetricPoints, computeAllKpis, computeTrend, METRIC_UNIT } from "@/lib/analytics";
+import type { PeriodContext } from "@/lib/analytics";
 import { ExportDocument } from "@/lib/pdf/ExportDocument";
 import type {
   WeightEntry,
@@ -51,7 +53,11 @@ export async function GET() {
     { data: goalsHistory },
     { data: measurements },
   ] = await Promise.all([
-    supabase.from("profiles").select("display_name, period_mode, week_starts_on, plan").eq("id", user.id).single(),
+    supabase
+      .from("profiles")
+      .select("display_name, period_mode, week_starts_on, period_anchor_date, plan")
+      .eq("id", user.id)
+      .single(),
     supabase
       .from("weight_entries")
       .select("*")
@@ -107,14 +113,12 @@ export async function GET() {
             created_at: new Date(0).toISOString(),
           },
         ];
-    const kpis = computeAllKpis(
-      points,
-      historyForGoal,
-      new Date(),
-      (profile?.period_mode as PeriodMode) ?? "fixed",
-      (profile?.week_starts_on as WeekStartsOn) ?? "monday",
-      METRIC_UNIT[goal.metric]
-    );
+    const ctx: PeriodContext = {
+      mode: (profile?.period_mode as PeriodMode) ?? "fixed",
+      weekStartsOn: (profile?.week_starts_on as WeekStartsOn) ?? "monday",
+      anchorDate: profile?.period_anchor_date ? parseISO(profile.period_anchor_date) : null,
+    };
+    const kpis = computeAllKpis(points, historyForGoal, new Date(), ctx, METRIC_UNIT[goal.metric]);
     return { goal, kpis };
   });
 

@@ -11,6 +11,7 @@ import {
   computeGoalPrediction,
   METRIC_UNIT,
   METRIC_LABEL,
+  buildPeriodContext,
   type PeriodKpi,
 } from "@/lib/analytics";
 import type { GoalPredictions } from "@/components/GoalTabs";
@@ -55,7 +56,7 @@ export default async function CoachClientPage({
       const history = goalsHistory.filter((h) => h.goal_id === goal.id);
       return [
         goal.id,
-        computeAllKpis(points, history, new Date(), profile.period_mode, profile.week_starts_on, METRIC_UNIT[goal.metric]),
+        computeAllKpis(points, history, new Date(), buildPeriodContext(profile), METRIC_UNIT[goal.metric]),
       ];
     })
   );

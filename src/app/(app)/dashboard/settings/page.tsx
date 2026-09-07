@@ -20,6 +20,7 @@ export default async function SettingsPage() {
           weekStartsOn={profile.week_starts_on}
           checkinHour={profile.checkin_hour}
           plan={profile.plan}
+          periodAnchorDate={profile.period_anchor_date}
         />
         </main>
       </div>

@@ -84,6 +84,7 @@ export async function loadUserData() {
       onboarded_at: null,
       period_mode: "fixed" as const,
       week_starts_on: "monday" as const,
+      period_anchor_date: null,
       checkin_hour: null,
       plan: "free" as const,
       plan_expires_at: null,
