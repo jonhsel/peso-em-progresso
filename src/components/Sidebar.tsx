@@ -16,6 +16,7 @@ import {
   Users,
   Bell,
   Download,
+  Activity,
   Settings,
   HelpCircle,
   LogOut,
@@ -54,6 +55,7 @@ const links: NavItem[] = [
   { href: "/dashboard/coach", label: "Coach", icon: Users, premium: true },
   { href: "/dashboard/settings#checkin", label: "Lembretes", icon: Bell, premium: true },
   { href: "/dashboard/export", label: "Exportar Dados", icon: Download, premium: true },
+  { href: "/dashboard/activity", label: "Atividade Física", icon: Activity, premium: true },
   { href: "/dashboard/settings", label: "Configurações", icon: Settings },
 ];
 

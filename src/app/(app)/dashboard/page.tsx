@@ -19,12 +19,14 @@ import ChallengesCard from "@/components/ChallengesCard";
 import TrendBadge from "@/components/TrendBadge";
 import WeightChart, { type WeightGoalKpi } from "@/components/WeightChart";
 import BodyMeasurementsSummaryCard from "@/components/BodyMeasurementsSummaryCard";
+import ActivityTeaserCard from "@/components/activity/ActivityTeaserCard";
+import { computeActivityWeeklyKpis } from "@/lib/activity";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default async function DashboardPage() {
-  const { user, profile, entries, measurements, activeGoals, goalsHistory, achievements, challenges } = await loadUserData();
+  const { user, profile, entries, measurements, activeGoals, goalsHistory, achievements, challenges, activityTypes, activitySessions, activityGoals } = await loadUserData();
   const theme = await getTheme();
 
   // KPIs por meta ativa (Fase 6.2): cada meta é avaliada de forma
@@ -71,6 +73,13 @@ export default async function DashboardPage() {
     goal,
     weekKpi: kpisByGoal[goal.id]?.find((k) => k.period === "week") ?? null,
   }));
+
+  const activityKpis = computeActivityWeeklyKpis(
+    activityTypes,
+    activitySessions,
+    activityGoals,
+    profile.week_starts_on
+  );
 
   const latest = entries[entries.length - 1] ?? null;
   const first = entries[0] ?? null;
@@ -148,6 +157,8 @@ export default async function DashboardPage() {
         <GoalTabs goals={activeGoals} kpisByGoal={kpisByGoal} predictionsByGoal={predictionsByGoal} plan={profile.plan} />
 
         <BodyMeasurementsSummaryCard measurements={measurements} />
+
+        <ActivityTeaserCard kpis={activityKpis} />
         </main>
       </div>
     </div>

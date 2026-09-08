@@ -120,6 +120,35 @@ export type CoachLink = {
   revoked_at: string | null;
 };
 
+export type ActivityType = {
+  id: string;
+  user_id: string;
+  name: string;
+  track_distance: boolean;
+  created_at: string;
+};
+
+export type ActivitySession = {
+  id: string;
+  user_id: string;
+  activity_type_id: string;
+  performed_at: string; // ISO datetime
+  duration_minutes: number;
+  distance_km: number | null;
+  note: string | null;
+  created_at: string;
+};
+
+export type ActivityGoal = {
+  id: string;
+  user_id: string;
+  activity_type_id: string;
+  weekly_minutes_target: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -188,6 +217,32 @@ export type Database = {
         Row: CoachLink;
         Insert: Partial<CoachLink> & { owner_user_id: string; invite_code: string; owner_display_name: string };
         Update: Partial<CoachLink>;
+        Relationships: [];
+      };
+      activity_types: {
+        Row: ActivityType;
+        Insert: Partial<ActivityType> & { user_id: string; name: string };
+        Update: Partial<ActivityType>;
+        Relationships: [];
+      };
+      activity_sessions: {
+        Row: ActivitySession;
+        Insert: Partial<ActivitySession> & {
+          user_id: string;
+          activity_type_id: string;
+          duration_minutes: number;
+        };
+        Update: Partial<ActivitySession>;
+        Relationships: [];
+      };
+      activity_goals: {
+        Row: ActivityGoal;
+        Insert: Partial<ActivityGoal> & {
+          user_id: string;
+          activity_type_id: string;
+          weekly_minutes_target: number;
+        };
+        Update: Partial<ActivityGoal>;
         Relationships: [];
       };
     };

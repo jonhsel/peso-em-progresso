@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type {
-  Goal, GoalsHistoryEntry, Profile, WeightEntry, BodyMeasurement, UserAchievement, Challenge
+  Goal, GoalsHistoryEntry, Profile, WeightEntry, BodyMeasurement, UserAchievement, Challenge,
+  ActivityType, ActivitySession, ActivityGoal
 } from "@/types/database";
 
 export async function loadUserData() {
@@ -12,7 +13,9 @@ export async function loadUserData() {
 
   if (!user) redirect("/login");
 
-  const [{ data: profile }, { data: entries }, { data: activeGoals }, { data: measurements }, { data: goalsHistory }, { data: achievements }, { data: challenges }] =
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [{ data: profile }, { data: entries }, { data: activeGoals }, { data: measurements }, { data: goalsHistory }, { data: achievements }, { data: challenges }, { data: activityTypes }, { data: activitySessions }, { data: activityGoals }] =
     await Promise.all([
       supabase.from("profiles").select("*").eq("id", user.id).single(),
       supabase
@@ -45,6 +48,22 @@ export async function loadUserData() {
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false }),
+      supabase
+        .from("activity_types")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at"),
+      supabase
+        .from("activity_sessions")
+        .select("*")
+        .eq("user_id", user.id)
+        .gte("performed_at", ninetyDaysAgo)
+        .order("performed_at", { ascending: false }),
+      supabase
+        .from("activity_goals")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("is_active", true),
     ]);
 
   // Fase 0: quem nunca concluiu o onboarding é redirecionado antes de ver
@@ -96,5 +115,8 @@ export async function loadUserData() {
     activeGoals: typedActiveGoals,
     achievements: (achievements as UserAchievement[]) ?? [],
     challenges: (challenges as Challenge[]) ?? [],
+    activityTypes: (activityTypes as ActivityType[]) ?? [],
+    activitySessions: (activitySessions as ActivitySession[]) ?? [],
+    activityGoals: (activityGoals as ActivityGoal[]) ?? [],
   };
 }

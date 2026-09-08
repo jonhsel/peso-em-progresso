@@ -28,8 +28,9 @@ Kiwify, validada em produção 05/09/2026) + Fase 8.1 (sidebar de navegação)
 conquistas) + Fase 8.1.3 (página de exportação de dados, fecha a Fase 8.1)
 + Fase 8.x (marco de período customizado "A partir de uma
 data") + Fase 8.x (tendência precisa — números de suporte no card de
-Tendência e linha de tendência em `/dashboard/prediction`) completos,
-nenhuma dessas ainda validada em produção
+Tendência e linha de tendência em `/dashboard/prediction`) + Fase 9
+(atividade física — tipos extensíveis, sessões, meta semanal por tipo,
+Pro-only) completos, nenhuma dessas ainda validada em produção
 
 - `npm run build` e `npx tsc --noEmit` rodam limpos (validado no sandbox de dev).
 - Todas as telas abaixo estão implementadas e funcionais, mas **nunca foram testadas
@@ -3392,6 +3393,138 @@ idêntica ao card "Evolução do Peso" do Dashboard nos casos mais comuns
 Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 8
 — Navegação/UX → "Tendência precisa") e atualizar os checkboxes acima.
 
+## Fase 9 — Atividade Física (implementada 08/09/2026)
+
+Spec completo em `claude_fase9_atividade_v2.md` (na raiz do repo, não
+versionado — mesmo padrão dos specs anteriores; v2 já auditada contra o
+código real via busca direcionada, achados do Apêndice A do próprio
+arquivo todos incorporados, sem pendência técnica no handoff).
+Implementado nesta sessão: `npx tsc --noEmit` e `npm run build` limpos.
+**Ainda não testado contra Supabase real nem visto num navegador real** —
+ver checklist abaixo. Patch aplicado ao pé da letra do spec, sem desvios.
+Fase nova, paralela à Fase 8 (Navegação/UX) — não depende dela.
+
+- **Sistema paralelo a `goals`, não uma extensão do `GoalMetric`** — decisão
+  central do spec: `goals` resolve "onde estou vs. onde deveria estar" via
+  regressão linear até um alvo; atividade é acumulação dentro do período
+  (soma de minutos até bater uma meta semanal), modelo de KPI diferente.
+  3 tabelas novas (`supabase/migrations/0015_activity.sql`, também
+  refletidas em `supabase/schema.sql` seção 13, em 4 blocos): `activity_types`
+  (catálogo por usuário, extensível — 2 tipos seedados no signup via 3º
+  trigger `AFTER INSERT ON auth.users`, coexistindo com
+  `on_auth_user_created`/`on_auth_user_created_goals` sem dependência entre
+  eles), `activity_sessions` (múltiplas por dia, `performed_at` timestamptz
+  próprio — não é upsert por dia como Fotos/Medidas), `activity_goals`
+  (meta semanal de minutos por tipo, 1 ativa por tipo via índice único
+  parcial `where is_active`, soft-delete ao "remover meta"). RLS por
+  `auth.uid() = user_id` nas 3 tabelas (select/insert/update/delete — sem
+  restrição append-only, diferente de `goals_history`/`user_achievements`).
+  **Ainda precisa ser rodada manualmente no Supabase Dashboard > SQL
+  Editor**, em 4 blocos separados — sem isso, `/dashboard/activity` quebra
+  em produção (tabelas inexistentes) e o signup não seeda os 2 tipos
+  padrão.
+- `src/lib/activity.ts` (novo, paralelo a `analytics.ts`, não dentro dele —
+  módulo próprio porque o modelo de KPI é soma, não regressão):
+  `computeActivityWeeklyKpis(types, sessions, goals, weekStartsOn, now)`
+  soma minutos/distância de cada tipo dentro da semana civil corrente
+  (`startOfWeek`/`endOfWeek` do `date-fns`, respeitando `week_starts_on` do
+  perfil) e compara com a meta ativa daquele tipo. **Semana de atividade
+  ignora `period_mode` (`rolling`/`anchored`) de propósito** — decisão
+  fechada do spec: atividade é acumulação semanal naturalmente civil, os
+  modos de período fazem sentido pra KPIs de peso (onde baseline importa).
+  `WeekStartsOn` importado de `@/types/database` (não de `analytics.ts`,
+  onde só é re-exportado).
+- `loadUserData()` ganhou 3 queries novas (total: 10) — `activity_types`
+  (todos, ordenados por `created_at`), `activity_sessions` (só últimos 90
+  dias, `gte("performed_at", ninetyDaysAgo)` — suficiente pra semana atual
+  e qualquer relatório futuro, evita carregar histórico ilimitado de
+  sessões a cada load) e `activity_goals` (só ativas). 3 chaves novas no
+  `return`: `activityTypes`/`activitySessions`/`activityGoals`.
+- 5 componentes novos em `src/components/activity/`: `ActivityTypeManager`
+  (client, CRUD completo — criar/editar/excluir tipo, nome único
+  case-insensitive, exclusão com `window.confirm` avisando que as sessões
+  do tipo serão apagadas via cascade), `ActivitySessionForm` (client,
+  formulário de registro — tipo/duração/distância condicional/data-hora
+  default "agora em São Paulo" via `Intl.DateTimeFormat("sv-SE", {
+  timeZone: "America/Sao_Paulo", ... })`, mesmo mecanismo de fuso já usado
+  em `streak.ts`/`PhotoUploadForm.tsx`, adaptado pra incluir hora/minuto/
+  `.replace(" ", "T")` pro formato exigido por `datetime-local`/nota
+  opcional), `ActivityGoalForm` (client, cria ou edita a meta ativa de um
+  tipo por `update`/`insert`, botão "Remover meta" faz soft-delete
+  `is_active = false`), `ActivityWeekCard` (client — precisa ser client
+  porque contém um toggle inline pro `ActivityGoalForm`, sem sair do card;
+  barra de progresso trava visualmente em 100% mesmo passando da meta,
+  mostra distância acumulada quando `track_distance`), `ActivityTeaserCard`
+  (server — só `<Link>`, sem interação, mesmo padrão de
+  `BodyMeasurementsSummaryCard`; lista até 3 tipos priorizados por
+  ter-meta-ativa depois mais-sessões-na-semana; `return null` quando não há
+  nenhuma sessão nem meta ativa em nenhum tipo — ausência silenciosa, mesmo
+  critério já usado por `hasWeeklyTrend`/`hasMovingAverage`).
+- Rota nova `/dashboard/activity` (`export const dynamic =
+  "force-dynamic"`, mesmo padrão de `challenges/page.tsx`/
+  `achievements/page.tsx`): `Sidebar` + `PlanGate plan={profile.plan}
+  featureName="Atividade Física"` envolvendo a página inteira (Pro-only,
+  mesmo padrão de Medidas Corporais/Fotos de Progresso) — formulário de
+  sessão, cards de progresso semanal (1 por tipo, com meta ativa
+  encontrada por tipo via `.find()`) e o gerenciador de tipos, nessa ordem.
+- `Sidebar.tsx` — item "Atividade Física" (ícone `Activity` do
+  `lucide-react`, confirmado existente em `0.454.0`) adicionado ao array
+  `links` entre "Exportar Dados" e "Configurações", com `premium: true`
+  (badge "Pro" some pra quem já é Pro, hotfix 4 da Fase 8.1, sem mudança
+  necessária — a condição já lê `plan` genericamente).
+- `dashboard/page.tsx` — `activityTypes`/`activitySessions`/`activityGoals`
+  desestruturados de `loadUserData()`, `activityKpis` calculado com
+  `computeActivityWeeklyKpis(..., profile.week_starts_on)`, e
+  `<ActivityTeaserCard kpis={activityKpis} />` renderizado como último
+  bloco de `<main>`, depois de `<BodyMeasurementsSummaryCard>` — mesma
+  posição de "card menos acionável no dia a dia" já usada pelas duas outras
+  vezes que o dashboard ganhou um novo card de resumo (Fase 5.5, e agora
+  esta). **Teaser aparece no Dashboard mesmo pra usuário free** (mesmo
+  padrão do `BodyMeasurementsSummaryCard` — mostra resumo, o link leva pra
+  `/dashboard/activity`, que tem o `PlanGate` de verdade); não é
+  escondido atrás de `profile.plan === "pro"` no dashboard, decisão
+  explícita do spec (documentada como alternativa possível, não adotada).
+- **Fora de escopo** (idem spec): correlação com tendência de peso,
+  integração com `StreakCard`/Conquistas, pacing intra-semana (tipo
+  `expectedWeightNowKg` do KPI de peso — v1 mostra só total-feito vs
+  meta-da-semana), estimativa de calorias, exportação PDF/CSV, e a visão
+  do coach (`loadCoachClientData` não carrega atividade — sem mudança).
+
+- [ ] Rodar `supabase/migrations/0015_activity.sql` no Supabase Dashboard
+      (4 blocos separados, "Success" a cada um) — conferir que contas
+      novas ganham os 2 tipos padrão ("Caminhada", "Musculação") via
+      trigger, e que os 3 triggers em `auth.users` coexistem sem conflito.
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
+      dev — **ainda não visto rodando num navegador real**).
+- [ ] Criar tipo customizado com e sem "Registrar distância" — campo
+      distância só aparece no formulário de sessão quando aplicável.
+- [ ] Registrar 2+ sessões no mesmo dia, tipos diferentes — ambas contam
+      separadamente na soma semanal, sem upsert/sobrescrita.
+- [ ] Meta semanal por tipo: progresso soma corretamente, barra trava em
+      100% visualmente mesmo passando da meta.
+- [ ] Tipo sem meta ativa: card mostra só o total, sem barra, com CTA
+      "Definir meta semanal".
+- [ ] Remover meta (soft delete): card volta ao estado "sem meta".
+- [ ] Excluir tipo com sessões associadas: `window.confirm` avisa que as
+      sessões serão apagadas; cascade funciona de fato.
+- [ ] Tentar criar tipo com nome duplicado (case-insensitive): bloqueado
+      no client com mensagem clara.
+- [ ] `PlanGate`: conta Grátis não acessa `/dashboard/activity` (mostra o
+      bloco "Atividade Física é Pro").
+- [ ] Teaser do Dashboard: não aparece pra conta sem nenhuma
+      atividade/meta; aparece com dados, "Ver completo →" navega pra
+      `/dashboard/activity`; visível tanto pra conta free quanto pro.
+- [ ] RLS: usuário A não lê/edita tipos, sessões ou metas do usuário B.
+- [ ] `week_starts_on = "sunday"`: KPI de atividade recalcula a semana
+      corretamente (domingo–sábado em vez de segunda–domingo).
+- [ ] Mobile: formulário de sessão e cards de progresso responsivos;
+      sidebar drawer lista "Atividade Física" com badge Pro.
+- [ ] Tema claro/escuro: barra de progresso (`bg-accent`/`bg-base-surface2`)
+      e demais elementos com contraste adequado nos dois temas.
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 9
+— Atividade Física) e atualizar os checkboxes acima.
+
 ## Pendências / próximos passos sugeridos (não iniciados)
 
 - [ ] Testar o app fim a fim contra um projeto Supabase real (criar projeto, rodar
@@ -3401,7 +3534,7 @@ Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 8
       + `migrations/0008_progress_photos.sql` + `migrations/0009_multi_goals.sql`
       + `migrations/0010_challenges.sql` + `migrations/0011_coach_links.sql`
       + `migrations/0012_plan_gate.sql` + `migrations/0013_get_user_id_by_email.sql`
-      + `migrations/0014_period_anchor.sql`,
+      + `migrations/0014_period_anchor.sql` + `migrations/0015_activity.sql`,
       configurar `.env.local` (incluindo as 3 env vars novas da Fase 7:
       `SUPABASE_SERVICE_ROLE_KEY`, `KIWIFY_WEBHOOK_TOKEN`,
       `NEXT_PUBLIC_KIWIFY_CHECKOUT_URL`), testar signup/login/registro de
@@ -3409,7 +3542,8 @@ Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 8
       histórico, tela de Configurações/período de meta (incluindo o modo
       "A partir de uma data"), conquistas, horário de check-in, fotos de
       progresso, múltiplas metas simultâneas, desafios, o papel de
-      coach/visualizador, e o gate free/pro + webhook da Kiwify.
+      coach/visualizador, o gate free/pro + webhook da Kiwify, e atividade
+      física (tipos, sessões, meta semanal por tipo).
 - [ ] Deploy real na Vercel + configurar Site URL / Redirect URLs no Supabase Auth.
 - [ ] Testes unitários para `src/lib/analytics.ts` (funções puras, fáceis de testar).
 - [ ] Massa magra/composição corporal mais completa (bioimpedância avançada) — hoje
