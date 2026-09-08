@@ -77,15 +77,14 @@ export default function StreakCard({
           </div>
         )}
       </div>
-      <div className="flex items-center gap-1.5" aria-label="Últimos 7 dias">
+      <div className="flex items-center gap-1" aria-label="Últimos 7 dias">
         {last7Days.map((d) => (
-          <span
-            key={d.date}
-            title={d.date}
-            className={`h-2.5 w-2.5 rounded-full ${
-              d.hasEntry ? "bg-accent" : "border border-base-border"
-            }`}
-          />
+          <span key={d.date} title={d.date}>
+            <Flame
+              className={`h-4 w-4 ${d.hasEntry ? "text-accent" : "text-ink-faint opacity-40"}`}
+              fill="currentColor"
+            />
+          </span>
         ))}
       </div>
     </div>
