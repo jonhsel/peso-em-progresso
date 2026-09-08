@@ -96,6 +96,27 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
               um aviso aparece junto da sua sequência lembrando de registrar.
             </p>
           </div>
+
+          <div>
+            <p className="text-sm font-medium">Atividade física (Pro)</p>
+            <p className="mt-1 text-xs text-ink-muted leading-relaxed">
+              Em &quot;Atividade Física&quot; você cria seus próprios tipos de
+              exercício (ex.: caminhada, musculação), registra sessões e
+              define uma meta semanal de minutos por tipo. O card acompanha o
+              progresso da semana até bater a meta.
+            </p>
+          </div>
+
+          <div>
+            <p className="text-sm font-medium">Rastreamento por IA (Pro)</p>
+            <p className="mt-1 text-xs text-ink-muted leading-relaxed">
+              Dentro de &quot;Atividade Física&quot;, o botão &quot;Rastrear
+              com IA&quot; usa a câmera do seu aparelho pra contar flexões e
+              agachamentos automaticamente, por visão computacional — o vídeo
+              não sai do seu dispositivo. Ao encerrar o treino, a contagem é
+              salva como uma sessão normal, contando pra sua meta semanal.
+            </p>
+          </div>
         </div>
 
         <div className="mt-6 flex justify-center">

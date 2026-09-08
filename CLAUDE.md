@@ -3706,6 +3706,27 @@ checklist abaixo.
       temporal do ângulo (média móvel/EMA) como próximo passo.
 - [ ] Deploy.
 
+**Hotfix 2 — guia de ajuda cobrindo Atividade Física e IA (Fase 9/9.x,
+08/09/2026).** Pedido direto do usuário (sem spec próprio, patch pequeno
+e isolado): `HelpModal.tsx` (Fase 4.4) nunca mencionava as duas
+funcionalidades novas da Fase 9 — a pessoa só descobria "Atividade
+Física"/"Rastrear com IA" navegando pela Sidebar, sem explicação prévia
+do conceito (tipos de exercício, meta semanal, rastreamento por câmera).
+Adicionados 2 blocos de texto estático na seção "Acompanhamento diário"
+(mesmo padrão visual dos blocos já existentes de streak/conquistas/
+check-in — `<p className="text-sm font-medium">` + parágrafo
+`text-xs text-ink-muted`), depois do bloco de "Horário de check-in":
+"Atividade física (Pro)" (tipos customizados, sessões, meta semanal por
+tipo) e "Rastreamento por IA (Pro)" (câmera conta flexões/agachamentos
+client-side, vídeo não sai do aparelho, contagem salva como sessão
+normal). Nenhuma mudança de lógica, estado ou prop — só conteúdo.
+`npx tsc --noEmit`/`npm run build` limpos.
+
+- [ ] Abrir o modal de Ajuda (botão "Ajuda" na Sidebar/barra mobile) e
+      conferir visualmente os 2 blocos novos, nos dois temas.
+- [ ] Confirmar que o texto não estoura o `max-h-[85vh] overflow-y-auto`
+      do painel em mobile (mais 2 blocos de texto na lista já longa).
+
 ## Pendências / próximos passos sugeridos (não iniciados)
 
 - [ ] Testar o app fim a fim contra um projeto Supabase real (criar projeto, rodar
