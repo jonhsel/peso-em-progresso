@@ -677,6 +677,11 @@ create table if not exists public.activity_sessions (
   duration_minutes numeric(5,1) not null check (duration_minutes > 0),
   distance_km numeric(6,2) check (distance_km is null or distance_km > 0),
   note text,
+  -- Fase 9.x — contagem de repetições por IA (migração 0016):
+  -- source distingue registro manual de sessão rastreada por
+  -- visão computacional; reps_count só é preenchido quando source='ai_tracked'.
+  source text not null default 'manual' check (source in ('manual', 'ai_tracked')),
+  reps_count integer check (reps_count is null or reps_count > 0),
   created_at timestamptz not null default now()
 );
 
@@ -746,7 +751,7 @@ create trigger on_auth_user_created_activity_types
 comment on table public.activity_types is
   'Catálogo de tipos de atividade física por usuário, extensível (2 tipos padrão criados no signup: Caminhada, Musculação).';
 comment on table public.activity_sessions is
-  'Sessões de atividade registradas — múltiplas por dia, timestamp próprio (performed_at), não é upsert por dia.';
+  'Sessões de atividade registradas — múltiplas por dia, timestamp próprio (performed_at), não é upsert por dia. source/reps_count (Fase 9.x, migração 0016) distinguem sessão manual de sessão rastreada por IA (contagem de reps via câmera, client-side).';
 comment on table public.activity_goals is
   'Meta semanal de minutos por tipo de atividade — 1 meta ativa por tipo (índice parcial). Semana de atividade é sempre civil (startOfWeek/endOfWeek com week_starts_on do perfil), ignora period_mode.';
 

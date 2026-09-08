@@ -6,6 +6,7 @@ import PlanGate from "@/components/PlanGate";
 import ActivityTypeManager from "@/components/activity/ActivityTypeManager";
 import ActivitySessionForm from "@/components/activity/ActivitySessionForm";
 import ActivityWeekCard from "@/components/activity/ActivityWeekCard";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -39,9 +40,17 @@ export default async function ActivityPage() {
         <main className="max-w-2xl mx-auto px-4 py-8">
           <PlanGate plan={profile.plan} featureName="Atividade Física">
             <div className="space-y-6">
-              <p className="text-xs uppercase tracking-wide text-ink-muted">
-                Atividade Física
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs uppercase tracking-wide text-ink-muted">
+                  Atividade Física
+                </p>
+                <Link
+                  href="/dashboard/activity/ai"
+                  className="text-xs font-medium text-accent hover:text-accent-hover transition"
+                >
+                  Rastrear com IA →
+                </Link>
+              </div>
 
               <ActivitySessionForm
                 userId={user.id}

@@ -136,6 +136,8 @@ export type ActivitySession = {
   duration_minutes: number;
   distance_km: number | null;
   note: string | null;
+  source: "manual" | "ai_tracked";
+  reps_count: number | null;
   created_at: string;
 };
 

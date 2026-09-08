@@ -8,6 +8,7 @@ export type ActivityWeeklyKpi = {
   trackDistance: boolean;
   actualMinutes: number;
   totalDistanceKm: number | null;
+  totalReps: number | null; // soma de reps_count das sessões ai_tracked desta semana
   targetMinutes: number | null; // null = sem meta ativa pra esse tipo
   progressPct: number | null;
   sessionsCount: number;
@@ -49,6 +50,10 @@ export function computeActivityWeeklyKpis(
           0
         )
       : null;
+    const aiSessions = typeSessions.filter((s) => s.source === "ai_tracked" && s.reps_count);
+    const totalReps = aiSessions.length > 0
+      ? aiSessions.reduce((sum, s) => sum + Number(s.reps_count), 0)
+      : null;
     const goal = goals.find(
       (g) => g.activity_type_id === type.id && g.is_active
     );
@@ -64,6 +69,7 @@ export function computeActivityWeeklyKpis(
       trackDistance: type.track_distance,
       actualMinutes,
       totalDistanceKm,
+      totalReps,
       targetMinutes,
       progressPct,
       sessionsCount: typeSessions.length,

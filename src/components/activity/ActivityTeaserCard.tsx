@@ -36,6 +36,7 @@ export default function ActivityTeaserCard({ kpis }: { kpis: ActivityWeeklyKpi[]
                 {k.targetMinutes !== null
                   ? `${k.actualMinutes.toFixed(0)}/${k.targetMinutes.toFixed(0)} min`
                   : `${k.actualMinutes.toFixed(0)} min`}
+                {k.totalReps !== null && k.totalReps > 0 ? ` · ${k.totalReps} reps` : ""}
               </p>
             </div>
             {k.targetMinutes !== null && k.progressPct !== null && (

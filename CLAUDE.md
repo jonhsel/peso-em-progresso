@@ -3525,6 +3525,139 @@ Fase nova, paralela à Fase 8 (Navegação/UX) — não depende dela.
 Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 9
 — Atividade Física) e atualizar os checkboxes acima.
 
+## Fase 9.x — Contagem de repetições por IA (implementada 08/09/2026)
+
+Spec completo em `claude_fase9x_ia_reps_v2.md` (na raiz do repo, não
+versionado — mesmo padrão dos specs anteriores; v2 já auditada contra o
+código real via `project_knowledge_search`, achados do Apêndice A do
+próprio arquivo todos incorporados, sem pendência técnica no handoff).
+Implementado nesta sessão: `npx tsc --noEmit` e `npm run build` limpos.
+**Ainda não testado num dispositivo real (câmera/FPS) nem visto num
+navegador** — ver checklist abaixo. Patch aplicado ao pé da letra do
+spec, sem desvios. Extensão **aditiva** à Fase 9 (Atividade Física, já em
+produção) — não substitui o registro manual, é uma segunda forma de
+preencher a mesma tabela `activity_sessions`.
+
+- **Contagem automática de repetições via câmera** (flexão + agachamento,
+  MVP), usando visão computacional 100% client-side — nenhum vídeo sai do
+  dispositivo. Biblioteca `@mediapipe/tasks-vision` (`^1.0.1`, dependência
+  nova), API `PoseLandmarker`, WASM + modelo (`pose_landmarker_lite`)
+  carregados via CDN em runtime (`FilesetResolver.forVisionTasks`), não
+  bundlados pelo webpack — **sem mudança em `next.config.js`**.
+- **2 colunas novas em `activity_sessions`** (migração
+  `supabase/migrations/0016_activity_ai_tracking.sql`, também refletida em
+  `supabase/schema.sql`): `source` (`'manual' | 'ai_tracked'`, `DEFAULT
+  'manual'`) e `reps_count` (integer nullable, `> 0` quando preenchido).
+  Sem RLS nova — a tabela já tem policies por `user_id`. Sessões
+  existentes (registro manual, Fase 9) recebem `source='manual'`
+  automaticamente via `DEFAULT` — **`ActivitySessionForm.tsx` (fluxo
+  manual) não precisou de nenhuma mudança**, o insert que já fazia não
+  passa `source`/`reps_count`, o banco preenche sozinho. **Ainda precisa
+  ser rodada manualmente no Supabase Dashboard > SQL Editor** (bloco
+  único) — sem isso, sessões `ai_tracked` não podem ser salvas em
+  produção (coluna `source`/`reps_count` inexistente).
+- `src/lib/pose-tracking.ts` (novo, módulo isolado, client-only — usa
+  `navigator.mediaDevices`/`requestAnimationFrame`/canvas, não importado
+  por nenhum Server Component): classe `RepTracker` (máquina de estados
+  `up`/`down` com histerese por ângulo articular — cotovelo pra flexão,
+  joelho pra agachamento — calculado via `computeJointAngle`,
+  trigonometria pura sobre os landmarks do MediaPipe Pose), limiares
+  nomeados em `THRESHOLDS` (flexão: topo >150°, profundidade <95°;
+  agachamento: topo >160°, profundidade <100° — ajustáveis depois de
+  teste real, ver pendências) e `drawSkeleton()` (desenha o esqueleto
+  simplificado — ombro-cotovelo-pulso / quadril-joelho-tornozelo — num
+  `<canvas>` sobreposto ao vídeo). Rep só conta se o usuário atingiu o
+  limiar de profundidade antes de subir de volta; senão, dispara feedback
+  de postura ("Desça mais" / "Agache mais") sem incrementar o contador.
+- `src/components/activity/AiRepTracker.tsx` (novo, client) — tela de
+  treino com câmera frontal (`facingMode: "user"`), vídeo e canvas
+  espelhados (`scaleX(-1)`) pro efeito-espelho natural, `playsInline` +
+  `muted` (obrigatórios pro autoplay funcionar no iOS Safari). Import
+  **dinâmico** de `pose-tracking.ts` (`import("@/lib/pose-tracking")`)
+  dentro do componente — evita bundlar o MediaPipe em qualquer página que
+  não seja `/dashboard/activity/ai` (confirmado no build: a rota ficou
+  com 2.71 kB de bundle próprio, sem inflar as demais páginas de
+  atividade). Máquina de fases local (`select → loading → tracking →
+  done/error`); ao encerrar o treino, resolve o `activity_type` por nome
+  case-insensitive (`"Flexão"`/`"Agachamento"`, criando automaticamente
+  com `track_distance: false` se ainda não existir pro usuário) e insere
+  a sessão em `activity_sessions` com `source: "ai_tracked"` +
+  `reps_count`, mesmo padrão de `router.refresh()` pós-persistência já
+  usado por `ActivitySessionForm`/`ActivityGoalForm`/`PhotoUploadForm`.
+  Tratamento de erro de permissão de câmera negada com mensagem própria +
+  atalho pro registro manual.
+- Rota nova `/dashboard/activity/ai`
+  (`src/app/(app)/dashboard/activity/ai/page.tsx`) — Server Component
+  fino, mesmo padrão de `dashboard/achievements/page.tsx`: `Sidebar` +
+  `PlanGate plan={profile.plan} featureName="Atividade Física"` (herda o
+  gate já existente da Fase 9, **sem gate adicional**) envolvendo o
+  `AiRepTracker`.
+- `src/app/(app)/dashboard/activity/page.tsx` — link "Rastrear com IA →"
+  adicionado entre o cabeçalho e o `ActivitySessionForm`, levando pra
+  `/dashboard/activity/ai`.
+- `ActivityWeeklyKpi` (`src/lib/activity.ts`) ganhou campo aditivo
+  `totalReps: number | null` — soma de `reps_count` das sessões
+  `ai_tracked` daquele tipo dentro da semana corrente (`null` quando não
+  há nenhuma sessão de IA nessa semana, mesmo critério de ausência
+  silenciosa já usado por `targetMinutes`/`totalDistanceKm`).
+  `ActivityWeekCard.tsx` e `ActivityTeaserCard.tsx` exibem
+  `· N reps (IA)` / `· N reps` ao lado dos minutos quando `totalReps` é
+  preenchido — puramente aditivo, sem mudança de layout quando não há
+  sessão de IA na semana.
+- **Fora de escopo** (idem spec): outros exercícios além de
+  flexão/agachamento, correção de forma além de profundidade, upload de
+  vídeo, múltiplas pessoas no quadro, integração com Conquistas/Streak,
+  fallback explícito pra navegador sem WASM/câmera (o erro de
+  `getUserMedia` já cai no estado `error` com atalho pro manual, mas não
+  há detecção prévia de suporte a WASM), contagem de séries (1 sessão
+  contínua = 1 registro), Wake Lock API, modo paisagem forçado.
+
+- [ ] Rodar `supabase/migrations/0016_activity_ai_tracking.sql` no
+      Supabase Dashboard (bloco único) — conferir que sessões existentes
+      mantiveram `source='manual'` via `DEFAULT` e que a `CHECK` de
+      `reps_count > 0` rejeita `0`/negativo.
+- [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
+      dev — **ainda não visto rodando num navegador real, nem em
+      dispositivo móvel**).
+- [ ] Testar em Android Chrome + iOS Safari se o FPS é aceitável em
+      aparelhos médios (Moto G, iPhone SE); se não, trocar `delegate:
+      "GPU"` por `"CPU"` em `pose-tracking.ts` como fallback.
+- [ ] Ajustar os limiares de `THRESHOLDS` (`pose-tracking.ts`) depois de
+      testes reais com usuários — os valores atuais (150°/95° flexão,
+      160°/100° agachamento) são estimativa inicial, não calibrados.
+- [ ] Permissão de câmera negada: mensagem de erro aparece, botão
+      "Registro manual" leva pra `/dashboard/activity` sem quebrar.
+- [ ] Treino com 0 reps contadas ao encerrar: volta pra tela de seleção
+      sem salvar sessão (nenhuma linha vazia em `activity_sessions`).
+- [ ] Primeira vez rastreando "Flexão"/"Agachamento" sem esses tipos
+      ainda existirem: cria o `activity_type` automaticamente
+      (`track_distance: false`) antes de inserir a sessão.
+- [ ] Segunda sessão de IA do mesmo exercício: reaproveita o
+      `activity_type` já existente (case-insensitive), não duplica.
+- [ ] `ActivityWeekCard`/`ActivityTeaserCard` no dashboard mostram "· N
+      reps (IA)" depois de uma sessão rastreada; sem nenhuma sessão de
+      IA na semana, layout idêntico a antes (Fase 9).
+- [ ] `PlanGate`: conta Grátis não acessa `/dashboard/activity/ai` (herda
+      o mesmo gate de `/dashboard/activity`).
+- [ ] Registro manual (`/dashboard/activity`, `ActivitySessionForm`)
+      sem nenhuma regressão — sessões continuam salvando com
+      `source='manual'`/`reps_count=null` (via `DEFAULT`, sem mudança no
+      componente).
+- [ ] Mobile: câmera frontal abre corretamente, vídeo/esqueleto
+      espelhados fazem sentido visualmente (efeito-espelho), overlay de
+      contagem/feedback de postura legível sobre o vídeo em fundo claro e
+      escuro.
+- [ ] Confirmar que o bundle de `/dashboard/activity/ai` não inflou
+      nenhuma outra página (import dinâmico de `pose-tracking.ts`
+      funcionando como esperado — já confirmado no build local: rota
+      isolada em 2.71 kB próprios).
+- [ ] RLS: usuário A não consegue inserir/ler sessões `ai_tracked` do
+      usuário B (mesma policy por `user_id` já existente, sem mudança).
+
+Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 9
+— Atividade Física → "Contagem de repetições por IA") e atualizar os
+checkboxes acima.
+
 ## Pendências / próximos passos sugeridos (não iniciados)
 
 - [ ] Testar o app fim a fim contra um projeto Supabase real (criar projeto, rodar
@@ -3534,7 +3667,8 @@ Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 9
       + `migrations/0008_progress_photos.sql` + `migrations/0009_multi_goals.sql`
       + `migrations/0010_challenges.sql` + `migrations/0011_coach_links.sql`
       + `migrations/0012_plan_gate.sql` + `migrations/0013_get_user_id_by_email.sql`
-      + `migrations/0014_period_anchor.sql` + `migrations/0015_activity.sql`,
+      + `migrations/0014_period_anchor.sql` + `migrations/0015_activity.sql`
+      + `migrations/0016_activity_ai_tracking.sql`,
       configurar `.env.local` (incluindo as 3 env vars novas da Fase 7:
       `SUPABASE_SERVICE_ROLE_KEY`, `KIWIFY_WEBHOOK_TOKEN`,
       `NEXT_PUBLIC_KIWIFY_CHECKOUT_URL`), testar signup/login/registro de
@@ -3542,8 +3676,10 @@ Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 9
       histórico, tela de Configurações/período de meta (incluindo o modo
       "A partir de uma data"), conquistas, horário de check-in, fotos de
       progresso, múltiplas metas simultâneas, desafios, o papel de
-      coach/visualizador, o gate free/pro + webhook da Kiwify, e atividade
-      física (tipos, sessões, meta semanal por tipo).
+      coach/visualizador, o gate free/pro + webhook da Kiwify, atividade
+      física (tipos, sessões, meta semanal por tipo), e a contagem de
+      repetições por IA (câmera, flexão/agachamento) em dispositivo móvel
+      real.
 - [ ] Deploy real na Vercel + configurar Site URL / Redirect URLs no Supabase Auth.
 - [ ] Testes unitários para `src/lib/analytics.ts` (funções puras, fáceis de testar).
 - [ ] Massa magra/composição corporal mais completa (bioimpedância avançada) — hoje

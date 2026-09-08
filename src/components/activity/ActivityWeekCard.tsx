@@ -56,6 +56,9 @@ export default function ActivityWeekCard({
         {kpi.trackDistance && kpi.totalDistanceKm !== null && kpi.totalDistanceKm > 0
           ? ` · ${kpi.totalDistanceKm.toFixed(1).replace(".", ",")} km esta semana`
           : ""}
+        {kpi.totalReps !== null && kpi.totalReps > 0
+          ? ` · ${kpi.totalReps} reps (IA)`
+          : ""}
       </p>
 
       {editingGoal && (
