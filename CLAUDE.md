@@ -2706,8 +2706,24 @@ propósito, poluindo a navegação de quem já converteu. `npx tsc
 - **Puramente visual** — nenhum `PlanGate` de página foi tocado; gate
   real de cada rota continua idêntico ao da Fase 7.
 
+**Hotfix 5 — compactar card "Plano Atual: Pro" (08/09/2026).** Spec
+`claude_fase8_sidebar_hotfix_card_plano_pro.md` (raiz do repo, não
+versionado, mesmo padrão dos demais specs) — o card exibido no rodapé da
+Sidebar para usuários `plan === "pro"` estava desproporcional (3 linhas
+empilhadas + botão sólido de largura total, `p-4`), reportado via
+screenshot de produção (mobile). `npx tsc --noEmit`/`npm run build`
+limpos.
+- Bloco `plan === "pro"` em `Sidebar.tsx` trocado de card vertical
+  centralizado pra 1 única linha (`flex items-center justify-between`,
+  `px-3 py-2`): "Plano: **Pro**" à esquerda, link "Ver detalhes" (texto,
+  sem botão sólido) à direita.
+- Bloco `else` ("Seja Pro", usuário free) **não mudou** — CTA de
+  conversão continua com o layout maior, decisão deliberada do spec.
+- **Puramente cosmético** — `href="/dashboard/upgrade"` inalterado,
+  nenhum `PlanGate`/gate de página tocado.
+
 - [ ] `npx tsc --noEmit` e `npm run build` limpos (validado no sandbox de
-      dev — **ainda não visto rodando num navegador real**, nem os 4
+      dev — **ainda não visto rodando num navegador real**, nem os 5
       hotfixes acima).
 - [ ] Sidebar aparece fixa em desktop nas 13 páginas (12 do spec + a 13ª
       migrada nesta sessão), sem quebrar `max-w-2xl`/`max-w-6xl` de cada

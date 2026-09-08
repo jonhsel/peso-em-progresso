@@ -186,12 +186,13 @@ export default function Sidebar({
         </div>
 
         {plan === "pro" ? (
-          <div className="rounded-card border border-base-border bg-base-surface2 p-4 text-center">
-            <p className="font-display text-sm font-bold">Plano Atual</p>
-            <p className="mt-1 text-sm font-medium text-accent">Pro</p>
+          <div className="flex items-center justify-between rounded-card border border-base-border bg-base-surface2 px-3 py-2">
+            <p className="text-xs text-ink-muted">
+              Plano: <span className="font-medium text-accent">Pro</span>
+            </p>
             <Link
               href="/dashboard/upgrade"
-              className="mt-3 inline-block w-full rounded-lg bg-accent px-3 py-2 text-xs font-medium text-base-bg transition hover:bg-accent-hover"
+              className="text-xs font-medium text-accent hover:underline"
             >
               Ver detalhes
             </Link>
