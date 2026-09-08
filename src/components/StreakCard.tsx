@@ -1,3 +1,4 @@
+import { Flame } from "lucide-react";
 import { computeStreak, isPastCheckinHour } from "@/lib/streak";
 import type { WeightEntry } from "@/types/database";
 
@@ -24,11 +25,29 @@ export default function StreakCard({
         <div className="flex items-center gap-3 flex-wrap">
           {hasHistory ? (
             <>
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-display font-bold text-2xl text-accent">{currentStreak}</span>
-                <span className="text-xs text-ink-muted">
-                  {currentStreak === 1 ? "dia seguido" : "dias seguidos"}
-                </span>
+              <div className="flex items-center gap-2">
+                <div
+                  className={`relative flex h-9 w-9 items-center justify-center rounded-full ${
+                    currentStreak > 0 ? "bg-accent-tint" : ""
+                  }`}
+                  style={
+                    currentStreak > 0
+                      ? { boxShadow: "0 0 16px var(--accent-glow)" }
+                      : undefined
+                  }
+                >
+                  <Flame
+                    className={`h-6 w-6 ${currentStreak > 0 ? "text-accent" : "text-ink-faint"}`}
+                    fill={currentStreak > 0 ? "currentColor" : "none"}
+                    fillOpacity={currentStreak > 0 ? 0.25 : 1}
+                  />
+                </div>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="font-display font-bold text-2xl text-accent">{currentStreak}</span>
+                  <span className="text-xs text-ink-muted">
+                    {currentStreak === 1 ? "dia seguido" : "dias seguidos"}
+                  </span>
+                </div>
               </div>
               {bestStreak > 0 && (
                 <span className="text-xs text-ink-faint font-mono">
