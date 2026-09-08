@@ -3658,6 +3658,54 @@ Depois de validar em produção: marcar o item no `claude_fases.md` (Fase 9
 — Atividade Física → "Contagem de repetições por IA") e atualizar os
 checkboxes acima.
 
+**Hotfix 1 — contagem falsa de reps sem checagem de visibilidade (Fase
+9.x, 08/09/2026).** Spec
+`claude_fase9x_ia_reps_hotfix_visibility_check.md` (raiz do repo, não
+versionado). Bug reportado em teste real (dispositivo físico, câmera
+frontal): a contagem de reps subia sozinha com o usuário parado/deitado e
+sem braços ou pernas dentro do quadro (só rosto/ombros visíveis) — 12→49
+reps em menos de um minuto sem nenhum movimento real. Causa raiz:
+`getRelevantAngle()` nunca checava o campo `visibility` dos landmarks
+antes de calcular o ângulo da articulação relevante (cotovelos/pulsos
+pra flexão, joelhos/tornozelos pra agachamento) — o `PoseLandmarker`
+sempre retorna 33 landmarks por frame, mesmo pra partes do corpo fora do
+quadro/ocluídas (estimativa via prior do modelo, com `visibility` baixo),
+e esse ruído cruzava os limiares (`topAngle`/`depthAngle`) repetidas
+vezes por segundo, incrementando reps sem movimento humano real.
+Corrigido em `src/lib/pose-tracking.ts` com 2 camadas: (1)
+`getRelevantAngle()` passou a retornar `number | null` — `null` quando
+qualquer landmark necessário está abaixo de `VISIBILITY_THRESHOLD = 0.6`
+(via `landmarksVisible()`, nova); `processFrame()` ignora o frame nesse
+caso e mostra feedback pedindo pra reenquadrar o corpo (mensagem
+específica por exercício), em vez de deixar a máquina de estados avançar
+com dado de baixa confiança; frame sem nenhuma pessoa detectada
+(`result.landmarks.length === 0`) ganhou o mesmo tratamento ("Corpo não
+detectado — ajuste a câmera"). (2) Debounce de `500ms` entre duas reps
+contadas (`RepTracker.MIN_MS_BETWEEN_REPS`, resetado em `start()`), como
+segunda camada de proteção contra ruído de frame a frame mesmo com
+landmarks visíveis. `npx tsc --noEmit`/`npm run build` limpos
+(`/dashboard/activity/ai` continua isolado em 2.71 kB de bundle próprio,
+sem regressão). Nenhuma outra mudança — `AiRepTracker.tsx` consome
+`RepTracker` só via `getCount()`/`start()`/`processFrame()`/`destroy()`,
+assinaturas inalteradas; `THRESHOLDS`, `numPoses`, `delegate` (GPU) e o
+modelo do `PoseLandmarker` não mudaram (fora de escopo deste hotfix,
+junto com suavização temporal do ângulo via média móvel/EMA — avaliar
+depois se debounce + checagem de visibilidade não bastarem). **Ainda não
+testado em dispositivo físico real** — validado só por `tsc`/`build`, ver
+checklist abaixo.
+
+- [ ] Testar com corpo parcialmente fora do quadro (deitado, só
+      rosto/ombros) — contagem deve **parar** e mostrar feedback de
+      reenquadramento, sem incrementar.
+- [ ] Testar com corpo inteiro no quadro fazendo flexões/agachamentos
+      reais — contagem deve continuar funcionando normalmente, sem
+      regressão de sensibilidade perceptível por causa do debounce de
+      500ms (ritmo humano normal de repetição é bem mais lento que isso).
+- [ ] Se ainda houver falsos positivos com corpo visível (ruído de
+      landmark mesmo com `visibility` alta), considerar suavização
+      temporal do ângulo (média móvel/EMA) como próximo passo.
+- [ ] Deploy.
+
 ## Pendências / próximos passos sugeridos (não iniciados)
 
 - [ ] Testar o app fim a fim contra um projeto Supabase real (criar projeto, rodar

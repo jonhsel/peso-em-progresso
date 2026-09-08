@@ -54,11 +54,36 @@ export function computeJointAngle(
   return degrees;
 }
 
+const VISIBILITY_THRESHOLD = 0.6;
+
+function landmarksVisible(
+  landmarks: NormalizedLandmark[],
+  indices: number[]
+): boolean {
+  return indices.every((i) => {
+    const lm = landmarks[i];
+    return lm && (lm.visibility ?? 0) >= VISIBILITY_THRESHOLD;
+  });
+}
+
+// Retorna null quando as articulações relevantes não estão
+// suficientemente visíveis no quadro (evita ângulo calculado com
+// coordenadas "chutadas" pelo modelo para partes ocluídas/fora de vista).
 function getRelevantAngle(
   exercise: ExerciseType,
   landmarks: NormalizedLandmark[]
-): number {
+): number | null {
   if (exercise === "pushup") {
+    const required = [
+      LM.LEFT_SHOULDER,
+      LM.LEFT_ELBOW,
+      LM.LEFT_WRIST,
+      LM.RIGHT_SHOULDER,
+      LM.RIGHT_ELBOW,
+      LM.RIGHT_WRIST,
+    ];
+    if (!landmarksVisible(landmarks, required)) return null;
+
     const leftElbow = computeJointAngle(
       landmarks[LM.LEFT_SHOULDER],
       landmarks[LM.LEFT_ELBOW],
@@ -72,6 +97,16 @@ function getRelevantAngle(
     return (leftElbow + rightElbow) / 2;
   }
   // squat
+  const required = [
+    LM.LEFT_HIP,
+    LM.LEFT_KNEE,
+    LM.LEFT_ANKLE,
+    LM.RIGHT_HIP,
+    LM.RIGHT_KNEE,
+    LM.RIGHT_ANKLE,
+  ];
+  if (!landmarksVisible(landmarks, required)) return null;
+
   const leftKnee = computeJointAngle(
     landmarks[LM.LEFT_HIP],
     landmarks[LM.LEFT_KNEE],
@@ -144,6 +179,11 @@ export class RepTracker {
   private animFrameId: number | null = null;
   private startTime: number = 0;
   private callbacks: TrackingCallbacks;
+  // Tempo mínimo entre duas reps contadas, em ms. Protege contra
+  // ruído de frame a frame que cruza o limiar rápido demais pra
+  // ser um movimento humano real.
+  private static readonly MIN_MS_BETWEEN_REPS = 500;
+  private lastRepAt = 0;
 
   constructor(exercise: ExerciseType, callbacks: TrackingCallbacks) {
     this.exercise = exercise;
@@ -170,17 +210,30 @@ export class RepTracker {
     this.count = 0;
     this.state = "up";
     this.minAngleInDown = 999;
+    this.lastRepAt = 0;
   }
 
   processFrame(video: HTMLVideoElement, timestamp: number): void {
     if (!this.landmarker) return;
     const result = this.landmarker.detectForVideo(video, timestamp);
-    if (!result.landmarks || result.landmarks.length === 0) return;
+    if (!result.landmarks || result.landmarks.length === 0) {
+      this.callbacks.onPostureFeedback("Corpo não detectado — ajuste a câmera");
+      return;
+    }
 
     const landmarks = result.landmarks[0];
     this.callbacks.onLandmarks(landmarks);
 
     const angle = getRelevantAngle(this.exercise, landmarks);
+    if (angle === null) {
+      this.callbacks.onPostureFeedback(
+        this.exercise === "pushup"
+          ? "Enquadre ombros, cotovelos e pulsos na câmera"
+          : "Enquadre quadril, joelhos e tornozelos na câmera"
+      );
+      return;
+    }
+
     const thresholds = THRESHOLDS[this.exercise];
 
     if (this.state === "up") {
@@ -196,11 +249,14 @@ export class RepTracker {
       }
       if (angle > thresholds.topAngle) {
         // subiu de volta
-        if (this.minAngleInDown <= thresholds.depthAngle) {
+        const now = Date.now();
+        const enoughTimePassed = now - this.lastRepAt >= RepTracker.MIN_MS_BETWEEN_REPS;
+        if (this.minAngleInDown <= thresholds.depthAngle && enoughTimePassed) {
           this.count++;
+          this.lastRepAt = now;
           this.callbacks.onRepCount(this.count);
           this.callbacks.onPostureFeedback(null);
-        } else {
+        } else if (this.minAngleInDown > thresholds.depthAngle) {
           this.callbacks.onPostureFeedback(FEEDBACK_MESSAGES[this.exercise]);
         }
         this.state = "up";
