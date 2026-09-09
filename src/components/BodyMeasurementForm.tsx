@@ -172,7 +172,7 @@ export default function BodyMeasurementForm({ userId }: { userId: string }) {
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-accent text-base-bg font-medium py-2.5 text-sm disabled:opacity-60 transition hover:bg-accent-hover"
+        className="w-full rounded-full bg-accent text-base-bg font-medium py-2.5 text-sm disabled:opacity-60 transition hover:bg-accent-hover"
       >
         {loading ? "Salvando..." : "Salvar medidas"}
       </button>

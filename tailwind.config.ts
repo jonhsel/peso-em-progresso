@@ -40,7 +40,7 @@ const config: Config = {
         mono: ["var(--font-jbmono)", "monospace"],
       },
       borderRadius: {
-        card: "14px",
+        card: "20px",
       },
     },
   },

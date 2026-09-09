@@ -156,7 +156,7 @@ export default function GoalsManager({
                   type="button"
                   onClick={handleAdd}
                   disabled={savingNew}
-                  className="flex-1 rounded-lg bg-accent text-base-bg font-medium py-2 text-sm hover:bg-accent-hover transition disabled:opacity-60"
+                  className="flex-1 rounded-full bg-accent text-base-bg font-medium py-2 text-sm hover:bg-accent-hover transition disabled:opacity-60"
                 >
                   {savingNew ? "Criando..." : "Criar meta"}
                 </button>

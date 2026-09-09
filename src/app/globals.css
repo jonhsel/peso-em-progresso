@@ -11,17 +11,17 @@
    resolver contraste em fundo claro (especialmente signal-caution). */
 :root,
 [data-theme="dark"] {
-  --base-bg: #0B1220;
-  --base-surface: #141B2D;
-  --base-surface2: #1B2438;
-  --base-border: #26314A;
-  --ink: #E7ECF7;
-  --ink-muted: #8C97B4;
-  --ink-faint: #5B6584;
-  --accent: #D97A45;
-  --accent-hover: #E08B5C;
-  --accent-glow: rgba(217, 122, 69, 0.25);
-  --accent-tint: rgba(217, 122, 69, 0.08);
+  --base-bg: #0A0A0D;
+  --base-surface: #17171C;
+  --base-surface2: #212127;
+  --base-border: #2C2C33;
+  --ink: #F5F5F7;
+  --ink-muted: #9C9CA6;
+  --ink-faint: #5E5E68;
+  --accent: #FF6A33;
+  --accent-hover: #FF8657;
+  --accent-glow: rgba(255, 106, 51, 0.28);
+  --accent-tint: rgba(255, 106, 51, 0.10);
 
   --badge-ahead-bg: rgba(52, 211, 153, 0.15);
   --badge-ahead-text: #34D399;
@@ -61,13 +61,12 @@
 }
 
 body {
-  background-image:
-    radial-gradient(circle at 15% -10%, rgba(96, 165, 250, 0.08), transparent 40%),
-    radial-gradient(circle at 85% 0%, rgba(52, 211, 153, 0.06), transparent 40%);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  background-repeat: repeat;
 }
 
 ::selection {
-  background: rgba(96, 165, 250, 0.35);
+  background: rgba(255, 106, 51, 0.30);
 }
 
 :focus-visible {

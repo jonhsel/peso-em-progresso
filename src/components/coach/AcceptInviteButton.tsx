@@ -57,7 +57,7 @@ export default function AcceptInviteButton({
         type="button"
         onClick={handleAccept}
         disabled={accepting}
-        className="rounded-lg bg-accent text-base-bg font-medium px-5 py-2.5 text-sm hover:bg-accent-hover transition disabled:opacity-60"
+        className="rounded-full bg-accent text-base-bg font-medium px-5 py-2.5 text-sm hover:bg-accent-hover transition disabled:opacity-60"
       >
         {accepting ? "Aceitando..." : "Aceitar convite"}
       </button>

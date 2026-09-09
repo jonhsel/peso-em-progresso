@@ -287,7 +287,7 @@ export default function ChallengesManager({
                 type="button"
                 disabled={saving}
                 onClick={handleCustomSubmit}
-                className="rounded-lg bg-accent text-base-bg font-medium px-5 py-2.5 hover:bg-accent-hover transition disabled:opacity-50 text-sm"
+                className="rounded-full bg-accent text-base-bg font-medium px-5 py-2.5 hover:bg-accent-hover transition disabled:opacity-50 text-sm"
               >
                 {saving ? "Criando..." : "Criar desafio"}
               </button>

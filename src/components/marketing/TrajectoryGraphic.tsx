@@ -6,8 +6,9 @@
  * conceito central de computePeriodKpi em src/lib/analytics.ts, desenhado.
  *
  * Cores hardcoded (SVG não lê classes Tailwind) mas espelham exatamente
- * tailwind.config.ts: signal.onpace #60A5FA, ink.faint #5B6584,
- * base.bg #0B1220.
+ * tailwind.config.ts: accent (dark) #FF6A33, ink.faint #5E5E68,
+ * base.bg #0A0A0D. Landing é fixa em dark, então usa direto o hex do
+ * accent dark (sem var(--accent), que dependeria de data-theme).
  *
  * Usado no hero da landing (variant="hero", animado) e na tela 2 do
  * onboarding (variant="compact", estático).
@@ -45,8 +46,8 @@ export function TrajectoryGraphic({
     >
       <defs>
         <linearGradient id="traj-fade" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#60A5FA" stopOpacity="0.22" />
-          <stop offset="100%" stopColor="#60A5FA" stopOpacity="0" />
+          <stop offset="0%" stopColor="#FF6A33" stopOpacity="0.22" />
+          <stop offset="100%" stopColor="#FF6A33" stopOpacity="0" />
         </linearGradient>
       </defs>
 
@@ -62,12 +63,12 @@ export function TrajectoryGraphic({
       <path
         d={EXPECTED_PATH}
         fill="none"
-        stroke="#5B6584"
+        stroke="#5E5E68"
         strokeWidth="1.5"
         strokeDasharray="3 6"
         strokeLinecap="round"
       />
-      <text x="440" y="196" textAnchor="end" fontSize="10" fill="#5B6584">
+      <text x="440" y="196" textAnchor="end" fontSize="10" fill="#5E5E68">
         meta
       </text>
 
@@ -75,7 +76,7 @@ export function TrajectoryGraphic({
       <path
         d={ACTUAL_PATH}
         fill="none"
-        stroke="#60A5FA"
+        stroke="#FF6A33"
         strokeWidth="2.5"
         strokeLinecap="round"
         className={animated ? "traj-line" : ""}
@@ -87,8 +88,8 @@ export function TrajectoryGraphic({
           cx={p.x}
           cy={p.y}
           r={i === MEASURE_POINTS.length - 1 ? 4 : 2.5}
-          fill="#0B1220"
-          stroke="#60A5FA"
+          fill="#0A0A0D"
+          stroke="#FF6A33"
           strokeWidth="2"
           className={animated ? "traj-dot" : ""}
           style={animated ? { animationDelay: `${0.9 + i * 0.12}s` } : undefined}

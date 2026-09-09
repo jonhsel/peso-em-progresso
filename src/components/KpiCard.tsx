@@ -8,10 +8,10 @@ import type { GoalPrediction, PeriodKpi } from "@/lib/analytics";
 // ~2:1). Em dark os valores são idênticos ao hex antigo, então isso não
 // muda nada visualmente ali.
 const STATUS_STYLES: Record<PeriodKpi["status"], { dot: string; text: string; ring: string }> = {
-  ahead: { dot: "bg-signal-ahead", text: "text-[var(--badge-ahead-text)]", ring: "border-signal-ahead/30" },
-  on_pace: { dot: "bg-signal-onpace", text: "text-[var(--badge-onpace-text)]", ring: "border-signal-onpace/30" },
-  caution: { dot: "bg-signal-caution", text: "text-[var(--badge-caution-text)]", ring: "border-signal-caution/30" },
-  behind: { dot: "bg-signal-behind", text: "text-[var(--badge-behind-text)]", ring: "border-signal-behind/30" },
+  ahead: { dot: "bg-signal-ahead", text: "text-[var(--badge-ahead-text)]", ring: "border-t-signal-ahead" },
+  on_pace: { dot: "bg-signal-onpace", text: "text-[var(--badge-onpace-text)]", ring: "border-t-signal-onpace" },
+  caution: { dot: "bg-signal-caution", text: "text-[var(--badge-caution-text)]", ring: "border-t-signal-caution" },
+  behind: { dot: "bg-signal-behind", text: "text-[var(--badge-behind-text)]", ring: "border-t-signal-behind" },
 };
 
 export default function KpiCard({
@@ -29,7 +29,7 @@ export default function KpiCard({
   const hasData = kpi.currentWeightKg !== null && kpi.baselineWeightKg !== null;
 
   return (
-    <div className={`bg-base-surface border ${style.ring} rounded-card p-4 flex flex-col gap-3`}>
+    <div className={`bg-base-surface border border-base-border border-t-[3px] ${style.ring} rounded-card p-5 flex flex-col gap-3`}>
       <div className="flex items-center justify-between">
         <span className="text-xs uppercase tracking-wide text-ink-muted">{kpi.label}</span>
         <span className={`h-2 w-2 rounded-full ${style.dot}`} />
@@ -38,7 +38,7 @@ export default function KpiCard({
       {hasData ? (
         <>
           <div className="flex items-baseline gap-1.5 font-mono">
-            <span className="text-2xl font-bold">
+            <span className="text-3xl font-black tracking-tight">
               {kpi.actualLossKg !== null && kpi.actualLossKg >= 0
                 ? `-${kpi.actualLossKg.toFixed(2)}`
                 : `+${Math.abs(kpi.actualLossKg ?? 0).toFixed(2)}`}

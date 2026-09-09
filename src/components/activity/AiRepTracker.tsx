@@ -201,7 +201,7 @@ export default function AiRepTracker({
           </button>
           <button
             onClick={() => router.push("/dashboard/activity")}
-            className="rounded-lg bg-accent text-base-bg font-medium px-4 py-2 text-sm hover:bg-accent-hover transition"
+            className="rounded-full bg-accent text-base-bg font-medium px-4 py-2 text-sm hover:bg-accent-hover transition"
           >
             Registro manual
           </button>
@@ -231,7 +231,7 @@ export default function AiRepTracker({
             <p className="text-sm text-ink-muted">Sessão salva com sucesso!</p>
             <button
               onClick={() => { setPhase("select"); setRepCount(0); }}
-              className="rounded-lg bg-accent text-base-bg font-medium px-4 py-2 text-sm hover:bg-accent-hover transition"
+              className="rounded-full bg-accent text-base-bg font-medium px-4 py-2 text-sm hover:bg-accent-hover transition"
             >
               Novo treino
             </button>
@@ -268,7 +268,7 @@ export default function AiRepTracker({
           <button
             onClick={startTracking}
             disabled={phase === "loading"}
-            className="w-full rounded-lg bg-accent text-base-bg font-medium px-4 py-2.5 text-sm hover:bg-accent-hover transition disabled:opacity-60"
+            className="w-full rounded-full bg-accent text-base-bg font-medium px-4 py-2.5 text-sm hover:bg-accent-hover transition disabled:opacity-60"
           >
             {phase === "loading" ? "Carregando modelo…" : "Iniciar rastreamento"}
           </button>

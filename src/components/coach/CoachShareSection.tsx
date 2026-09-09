@@ -111,7 +111,7 @@ export default function CoachShareSection({
           type="button"
           onClick={handleGenerate}
           disabled={generating}
-          className="rounded-lg bg-accent text-base-bg font-medium px-4 py-2 text-sm hover:bg-accent-hover transition disabled:opacity-60"
+          className="rounded-full bg-accent text-base-bg font-medium px-4 py-2 text-sm hover:bg-accent-hover transition disabled:opacity-60"
         >
           {generating ? "Gerando..." : "Gerar link de convite"}
         </button>

@@ -345,7 +345,7 @@ export default function SettingsForm({
         <button
           type="submit"
           disabled={loading}
-          className="w-full max-w-md rounded-lg bg-accent text-base-bg font-medium py-2.5 text-sm disabled:opacity-60 transition hover:bg-accent-hover"
+          className="w-full max-w-md rounded-full bg-accent text-base-bg font-medium py-2.5 text-sm disabled:opacity-60 transition hover:bg-accent-hover"
         >
           {loading ? "Salvando..." : "Salvar"}
         </button>

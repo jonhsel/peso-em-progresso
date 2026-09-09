@@ -122,7 +122,7 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
         <div className="mt-6 flex justify-center">
           <button
             onClick={onClose}
-            className="rounded-lg bg-accent text-base-bg font-medium px-4 py-2 text-sm hover:bg-accent-hover transition"
+            className="rounded-full bg-accent text-base-bg font-medium px-4 py-2 text-sm hover:bg-accent-hover transition"
           >
             Fechar
           </button>

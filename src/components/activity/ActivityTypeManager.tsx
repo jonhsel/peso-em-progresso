@@ -166,7 +166,7 @@ export default function ActivityTypeManager({
                     type="button"
                     onClick={() => handleUpdate(t)}
                     disabled={loadingId === t.id}
-                    className="rounded-lg bg-accent text-base-bg font-medium px-3 py-1.5 text-xs disabled:opacity-60 transition hover:bg-accent-hover"
+                    className="rounded-full bg-accent text-base-bg font-medium px-3 py-1.5 text-xs disabled:opacity-60 transition hover:bg-accent-hover"
                   >
                     Salvar
                   </button>
@@ -233,7 +233,7 @@ export default function ActivityTypeManager({
             <button
               type="submit"
               disabled={loadingId === "new"}
-              className="rounded-lg bg-accent text-base-bg font-medium px-3 py-1.5 text-xs disabled:opacity-60 transition hover:bg-accent-hover"
+              className="rounded-full bg-accent text-base-bg font-medium px-3 py-1.5 text-xs disabled:opacity-60 transition hover:bg-accent-hover"
             >
               {loadingId === "new" ? "Criando..." : "Criar"}
             </button>

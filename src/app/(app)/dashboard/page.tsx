@@ -100,10 +100,10 @@ export default async function DashboardPage() {
         <div className="flex items-end justify-between flex-wrap gap-4">
           <div>
             <p className="text-xs uppercase tracking-wide text-ink-muted mb-2">Visão geral</p>
-            <h1 className="font-display font-bold text-5xl sm:text-6xl tracking-tight">
+            <h1 className="font-display font-black text-6xl sm:text-7xl tracking-tight">
               {latest ? (
                 <>
-                  <span className="text-ink" style={{ textShadow: "0 0 40px var(--accent-glow)" }}>
+                  <span className="text-ink">
                     {Number(latest.weight_kg).toFixed(1)}
                   </span>
                   <span className="text-2xl sm:text-3xl text-ink-muted font-medium ml-1">kg</span>
@@ -126,7 +126,7 @@ export default async function DashboardPage() {
           </div>
           <Link
             href="/dashboard/entries"
-            className="text-sm rounded-lg bg-accent text-base-bg font-medium px-5 py-2.5 hover:bg-accent-hover transition"
+            className="text-sm rounded-full bg-accent text-base-bg font-medium px-6 py-2.5 hover:bg-accent-hover transition"
           >
             Registrar pesagem
           </Link>

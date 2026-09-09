@@ -102,7 +102,7 @@ export default function Sidebar({
       </>
     );
 
-    const classes = `flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition ${
+    const classes = `flex items-center gap-3 rounded-full px-3 py-2 text-sm transition ${
       active
         ? "bg-accent-tint font-medium text-accent"
         : l.comingSoon
@@ -169,7 +169,7 @@ export default function Sidebar({
         {links.map(renderNavItem)}
         <button
           onClick={() => setIsHelpOpen(true)}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-ink-muted transition hover:bg-base-surface2 hover:text-ink"
+          className="flex w-full items-center gap-3 rounded-full px-3 py-2 text-sm text-ink-muted transition hover:bg-base-surface2 hover:text-ink"
         >
           <HelpCircle className="h-4 w-4 shrink-0" />
           Ajuda e Suporte
@@ -205,7 +205,7 @@ export default function Sidebar({
             </p>
             <Link
               href="/dashboard/upgrade"
-              className="mt-3 inline-block w-full rounded-lg bg-accent px-3 py-2 text-xs font-medium text-base-bg transition hover:bg-accent-hover"
+              className="mt-3 inline-block w-full rounded-full bg-accent px-3 py-2 text-xs font-medium text-base-bg transition hover:bg-accent-hover"
             >
               Ver Planos
             </Link>

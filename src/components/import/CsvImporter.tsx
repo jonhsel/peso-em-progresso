@@ -246,7 +246,7 @@ export default function CsvImporter({ userId }: { userId: string }) {
           />
           <label
             htmlFor="csv-upload"
-            className="inline-block cursor-pointer rounded-lg bg-accent text-base-bg font-medium px-5 py-2.5 text-sm hover:bg-accent-hover transition"
+            className="inline-block cursor-pointer rounded-full bg-accent text-base-bg font-medium px-5 py-2.5 text-sm hover:bg-accent-hover transition"
           >
             Escolher arquivo
           </label>
@@ -446,7 +446,7 @@ export default function CsvImporter({ userId }: { userId: string }) {
           <button
             onClick={handleConfirm}
             disabled={validRows.length === 0}
-            className="flex-1 rounded-lg bg-accent text-base-bg font-medium py-2.5 text-sm disabled:opacity-60 transition hover:bg-accent-hover"
+            className="flex-1 rounded-full bg-accent text-base-bg font-medium py-2.5 text-sm disabled:opacity-60 transition hover:bg-accent-hover"
           >
             Importar {validRows.length}{" "}
             {validRows.length === 1 ? "pesagem" : "pesagens"}
@@ -543,7 +543,7 @@ export default function CsvImporter({ userId }: { userId: string }) {
       <div className="flex items-center gap-3">
         <button
           onClick={() => router.push("/dashboard/entries")}
-          className="flex-1 rounded-lg bg-accent text-base-bg font-medium py-2.5 text-sm hover:bg-accent-hover transition"
+          className="flex-1 rounded-full bg-accent text-base-bg font-medium py-2.5 text-sm hover:bg-accent-hover transition"
         >
           Ver histórico
         </button>

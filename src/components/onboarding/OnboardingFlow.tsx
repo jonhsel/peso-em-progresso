@@ -191,7 +191,7 @@ function StepWelcome({
       </p>
       <button
         onClick={onNext}
-        className="mt-8 w-full rounded-lg bg-accent text-base-bg font-medium py-3 text-sm hover:bg-accent-hover transition"
+        className="mt-8 w-full rounded-full bg-accent text-base-bg font-medium py-3 text-sm hover:bg-accent-hover transition"
       >
         Vamos lá
       </button>
@@ -247,7 +247,7 @@ function StepKpiExplainer({
         </button>
         <button
           onClick={onNext}
-          className="flex-1 rounded-lg bg-accent text-base-bg font-medium py-3 text-sm hover:bg-accent-hover transition"
+          className="flex-1 rounded-full bg-accent text-base-bg font-medium py-3 text-sm hover:bg-accent-hover transition"
         >
           Entendi, configurar minha meta
         </button>
@@ -347,7 +347,7 @@ function StepPeriodMode({
         </button>
         <button
           onClick={onNext}
-          className="flex-1 rounded-lg bg-accent text-base-bg font-medium py-3 text-sm hover:bg-accent-hover transition"
+          className="flex-1 rounded-full bg-accent text-base-bg font-medium py-3 text-sm hover:bg-accent-hover transition"
         >
           Próximo
         </button>
@@ -433,7 +433,7 @@ function StepFirstGoal({
         <button
           onClick={onFinish}
           disabled={loading}
-          className="flex-1 rounded-lg bg-accent text-base-bg font-medium py-3 text-sm hover:bg-accent-hover transition disabled:opacity-60"
+          className="flex-1 rounded-full bg-accent text-base-bg font-medium py-3 text-sm hover:bg-accent-hover transition disabled:opacity-60"
         >
           {loading ? "Salvando…" : "Concluir e ir pro dashboard"}
         </button>

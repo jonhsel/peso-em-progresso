@@ -98,7 +98,7 @@ export default function ActivityGoalForm({
       <button
         type="submit"
         disabled={loading}
-        className="rounded-lg bg-accent text-base-bg font-medium px-4 py-2 text-sm disabled:opacity-60 transition hover:bg-accent-hover"
+        className="rounded-full bg-accent text-base-bg font-medium px-4 py-2 text-sm disabled:opacity-60 transition hover:bg-accent-hover"
       >
         {loading ? "Salvando..." : "Salvar"}
       </button>

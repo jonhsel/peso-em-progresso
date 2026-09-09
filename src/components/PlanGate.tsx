@@ -23,7 +23,7 @@ export default function PlanGate({
       </p>
       <Link
         href="/dashboard/upgrade"
-        className="mt-4 inline-block rounded-lg bg-accent text-base-bg font-medium px-4 py-2 text-sm hover:bg-accent-hover transition"
+        className="mt-4 inline-block rounded-full bg-accent text-base-bg font-medium px-4 py-2 text-sm hover:bg-accent-hover transition"
       >
         Fazer upgrade
       </Link>
